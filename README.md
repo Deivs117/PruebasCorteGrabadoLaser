@@ -21,9 +21,11 @@ El sistema está diseñado para ser **agnóstico al material**: hoy arranca con 
 │   ├── cli.py                                                ← comandos `laser-toolkit generate-*/prepare-record/compute-costs`
 │   ├── gcode/                                                ← construccion de la grilla, temporizado y emision de G-code
 │   ├── suites/                                               ← orquestacion de suites de barrido y de Final Run
+│   ├── svg/                                                   ← parser SVG propio + conversion a G-code (contorno y relleno)
 │   └── io/                                                    ← csv hermano + Hoja de Registro (registro.py)
-├── tests/                                                  ← pytest (49 casos, ver `make test`)
+├── tests/                                                  ← pytest (109 casos, ver `make test`)
 ├── configs/                                                ← YAML de ejemplo (suites) + plantilla de tarifas
+├── assets/svg/                                             ← SVG de referencia para pruebas de grabado (logo-empresa.svg)
 ├── docs/
 │   ├── Plan Maestro - Estandarizacion Pruebas Laser.md    ← arquitectura completa del sistema
 │   ├── sop/                                                 ← protocolos de una página para el taller
@@ -57,10 +59,16 @@ flowchart TD
     SUITE_G --> GRID
     SUITE_G --> TIMING
     SUITE_G --> WRITER
+    SUITE_G --> SVG["svg/api.py"]
     SUITE_F --> TIMING
     SUITE_F --> WRITER
 
     WRITER --> FONT["gcode/label_font.py"]
+    SVG --> SVGDOC["svg/document.py"]
+    SVG --> SVGFILL["svg/fill.py"]
+    SVG --> SVGGCODE["svg/gcode.py"]
+    SVGDOC --> SVGPATH["svg/path_parser.py"]
+    SVGDOC --> SVGXFORM["svg/transform.py"]
 
     REG --> COSTOS["costos.py"]
     COSTOS --> TARIFAS["tarifas.py<br/>(unico lugar con $)"]
@@ -101,12 +109,31 @@ make summarize-final-run CSVS="data/registros/FINAL_..._ejec1_registro.csv data/
 
 `summarize-final-run` agrupa por combinación (material/espesor/operación/velocidad/potencia, sin importar fecha ni ejecución) y reporta **kWh por unidad** y **tiempo por unidad**, cada uno con su desviación estándar y coeficiente de variación entre ejecuciones — y si ya hay suficientes ejecuciones (mínimo 3) para considerarlo `CALIBRADO`. Ese número calibrado es el que se documenta en la futura Ficha de Parámetro Estándar (F6), no una nueva estimación.
 
+**Grabado de SVG (logo de la empresa y artes vectoriales):**
+
+El paquete `laser_toolkit.svg` es un conversor SVG → G-code propio, sin dependencias pesadas (parser de `path`/`ellipse`/`circle`/`rect`/`line`/`polyline`/`polygon`, aplanado de curvas Bezier, transformación a milímetros, relleno vectorial por trama con regla par-impar). Está deliberadamente desacoplado en piezas atómicas y reutilizables — `cargar_subpaths_svg` da la geometría pura sin G-code, útil para integraciones futuras (nesting, previsualización) que no necesiten emitir G-code.
+
+Dos formas de usarlo:
+
+```
+# 1. Herramienta suelta: un SVG cualquiera -> un .gcode independiente
+make svg-to-gcode SVG=assets/svg/logo-empresa.svg ANCHO=30 ALTO=30 \
+    VELOCIDAD=1200 POTENCIA=25 SALIDA=data/registros/logo.gcode
+
+# 2. Integrado en una suite de barrido: graba el logo en cada celda de la grilla
+make generate-engrave CONFIG=configs/logo_grabado.yaml
+```
+
+`assets/svg/logo-empresa.svg` es el archivo de referencia por defecto del sistema para pruebas de grabado vectorial — casi todo grabado real de producción parte de un SVG así, no de un relleno genérico. El modo (`contorno`, `relleno`, o `contorno_y_relleno`) y la resolución del relleno se configuran en el YAML de la suite (`svg_path`, `modo_grabado_svg`, `svg_resolucion_relleno_mm`) o como flags del comando suelto.
+
+Limitaciones conocidas: no soporta arcos SVG (`A`/`a`, falla con un error claro en vez de dibujar mal) ni el atributo `transform` (falla igual) — exportar el SVG con las transformaciones aplanadas y las curvas como Bezier/rectas.
+
 ## Convenciones del proyecto Python
 
 - **Entorno y dependencias:** `uv` (`uv sync`, `uv add`, `uv run`) — nunca `pip` ni un venv creado a mano.
 - **Linter y formato:** `ruff check` / `ruff format` (`make lint` / `make format`).
 - **Tipado:** `pyright` en modo `standard` (`make typecheck`). Todo el código nuevo lleva type hints; si pyright marca un error, se corrige el tipo, no se silencia con `# type: ignore` salvo que quede documentado por qué.
-- **Testing:** `pytest` (`make test`), un archivo `tests/test_*.py` por módulo (65 casos).
+- **Testing:** `pytest` (`make test`), un archivo `tests/test_*.py` por módulo (109 casos).
 - **Antes de cada commit:** `make check` (lint + typecheck + test).
 
 ## Estado del proyecto
@@ -122,6 +149,8 @@ Ver **[Plan Maestro](docs/Plan%20Maestro%20-%20Estandarizacion%20Pruebas%20Laser
 | F5 | Calibración de energía (Final Run) | Listo — `generate-final-run`/`summarize-final-run` |
 | F6 | Ficha de Parámetro Estándar v1 — MDF | Pendiente |
 | F7 | Extensión a un segundo material | Pendiente |
+
+Adicional (fuera de la numeración F1–F7, pero ya integrado): grabado de artes vectoriales SVG (`laser_toolkit.svg`) — ver sección "Grabado de SVG" arriba y sección 11 del Plan Maestro.
 
 ## Material de referencia
 

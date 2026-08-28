@@ -1,0 +1,30 @@
+# Suite de GRABADO -- logo de la empresa sobre MDF Trupan 3.0mm.
+#
+# A diferencia de mdf_3mm_grabado.yaml (grabado generico tipo trama sobre un
+# cuadrado), esta suite graba el logo real en cada celda -- el formato que
+# casi siempre se va a usar en produccion. Usa la misma grilla velocidad x
+# potencia; solo cambia la geometria grabada.
+
+material: "MDF Trupan"
+espesor_mm: 3.0
+operacion: grabado
+
+velocidades_mm_min: [800, 1000, 1200, 1500]
+potencias_pct: [15, 20, 25, 30]
+pasadas: 1
+
+# El logo se escala para caber dentro de este cuadrado (proporcion preservada,
+# centrado) -- mas grande que en una suite generica para que el logo quede
+# legible.
+tamano_celda_mm: 30.0
+espaciado_mm: 8.0
+id_prefijo: "G"
+lote: "L01"
+
+svg_path: "assets/svg/logo-empresa.svg"
+modo_grabado_svg: contorno_y_relleno   # contorno | relleno | contorno_y_relleno
+svg_resolucion_relleno_mm: 0.3         # mas fino = mas oscuro y mas lento
+
+machine:
+  laser_max_s: 1000
+  travel_feed_mm_min: 3000

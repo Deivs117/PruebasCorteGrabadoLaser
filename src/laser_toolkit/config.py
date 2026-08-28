@@ -11,7 +11,11 @@ from enum import Enum
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+# Se importa desde `svg.modo` (no `svg.api`) a proposito: `svg.api` depende de
+# `MachineConfig` de este mismo modulo, y ese import si crearia un ciclo.
+from laser_toolkit.svg.modo import RESOLUCION_RELLENO_MM_POR_DEFECTO, ModoGrabadoSvg
 
 
 class Operacion(str, Enum):
@@ -70,6 +74,29 @@ class SuiteConfig(BaseModel):
         default=None, description="Formato AAAA-MM-DD. Si se omite, se usa la fecha del dia de generacion."
     )
     machine: MachineConfig = Field(default_factory=lambda: MachineConfig())
+
+    svg_path: str | None = Field(
+        default=None,
+        description=(
+            "Ruta a un SVG a grabar en cada celda (solo aplica a operacion=grabado). Si se omite, "
+            "se usa el relleno generico tipo trama (un cuadrado solido)."
+        ),
+    )
+    modo_grabado_svg: ModoGrabadoSvg = Field(
+        default=ModoGrabadoSvg.CONTORNO_Y_RELLENO,
+        description="Solo aplica si `svg_path` esta definido: contorno, relleno, o ambos.",
+    )
+    svg_resolucion_relleno_mm: float = Field(
+        default=RESOLUCION_RELLENO_MM_POR_DEFECTO,
+        gt=0,
+        description="Espaciado entre lineas de relleno del SVG (mm). Solo aplica si `svg_path` esta definido",
+    )
+
+    @model_validator(mode="after")
+    def _svg_solo_en_grabado(self) -> SuiteConfig:
+        if self.svg_path is not None and self.operacion is not Operacion.GRABADO:
+            raise ValueError("svg_path solo aplica a operacion=grabado")
+        return self
 
     @field_validator("velocidades_mm_min")
     @classmethod

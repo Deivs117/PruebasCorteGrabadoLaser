@@ -35,6 +35,18 @@ def test_velocidad_no_positiva_falla():
         SuiteConfig.model_validate(_config_base(velocidades_mm_min=[0, 200]))
 
 
+def test_svg_path_en_corte_falla():
+    with pytest.raises(ValidationError, match="svg_path"):
+        SuiteConfig.model_validate(_config_base(operacion="corte", svg_path="assets/svg/logo-empresa.svg"))
+
+
+def test_svg_path_en_grabado_es_valido():
+    config = SuiteConfig.model_validate(
+        _config_base(operacion="grabado", velocidades_mm_min=[1000], svg_path="assets/svg/logo-empresa.svg")
+    )
+    assert config.svg_path == "assets/svg/logo-empresa.svg"
+
+
 def test_from_yaml_roundtrip(tmp_path: Path):
     contenido = """
 material: "MDF Trupan"

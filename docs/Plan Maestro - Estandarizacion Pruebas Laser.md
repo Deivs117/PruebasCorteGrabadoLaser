@@ -259,3 +259,37 @@ que el sistema funcione con datos parciales.
 Sigue pendiente de definir (fuera del alcance del costeo, es un criterio operativo):
 
 - Umbral de aceptación de carbonización/calidad de borde para considerar una prueba "aprobada" (Fase F6/F7).
+
+---
+
+## 11. Grabado vectorial de SVG
+
+### 11.1 Por qué
+
+Casi todo grabado real de producción parte de un arte vectorial (logo, icono, texto convertido a curvas) en formato SVG, no de un relleno genérico sobre un cuadrado. El sistema necesitaba una forma de:
+
+1. Probar parámetros de grabado (velocidad/potencia) usando la geometría **real** que se va a grabar en producción, no un sustituto.
+2. Convertir cualquier SVG a G-code como utilidad **independiente**, reutilizable en integraciones futuras (una cola de trabajos, un pipeline de personalización de producto, etc.) sin arrastrar el resto del sistema de pruebas.
+
+### 11.2 Diseño
+
+`laser_toolkit.svg` es un parser SVG propio (sin dependencias externas), separado en piezas atómicas:
+
+- `path_parser.py` — atributo `d` de `<path>` (M/L/H/V/C/S/Q/T/Z, absolutos y relativos).
+- `document.py` — documento SVG completo (`viewBox` + `path`/`ellipse`/`circle`/`rect`/`line`/`polyline`/`polygon`).
+- `bezier.py` — aplanado de curvas cúbicas/cuadráticas a segmentos rectos.
+- `transform.py` — escala el `viewBox` a una caja `ancho_mm x alto_mm` (proporción preservada, centrado), voltea el eje Y.
+- `fill.py` — relleno vectorial por barrido de líneas horizontales, regla par-impar (maneja formas separadas y huecos correctamente).
+- `gcode.py` — emisión de G-code de contorno y de relleno.
+- `api.py` — `cargar_subpaths_svg` (geometría pura, sin G-code) y `convertir_svg_a_gcode` (función atómica de conversión completa), pensadas para integraciones que no pasen por el resto del toolkit.
+
+No soportado (falla con error explícito, nunca dibuja mal en silencio): arcos SVG (`A`/`a`) y el atributo `transform` en cualquier elemento.
+
+### 11.3 Dos formas de uso
+
+1. **Herramienta suelta**: `laser-toolkit svg-to-gcode <archivo.svg> --ancho-mm --alto-mm --velocidad --potencia -o salida.gcode`. No depende de `SuiteConfig` ni de ningún otro concepto del sistema de pruebas.
+2. **Integrado en una suite de barrido**: `SuiteConfig.svg_path` (solo válido con `operacion: grabado`) hace que `generar_suite_grabado` grabe ese SVG —escalado a `tamano_celda_mm`— en cada celda de la grilla, en vez del relleno genérico. `modo_grabado_svg` (`contorno`, `relleno`, `contorno_y_relleno`) y `svg_resolucion_relleno_mm` controlan el resultado. El resto del pipeline (csv hermano, `prepare-record`, `compute-costs`) funciona exactamente igual, sin cambios.
+
+### 11.4 Archivo de referencia
+
+`assets/svg/logo-empresa.svg` es el SVG por defecto del sistema para pruebas de grabado — el formato que se usa casi el 100% de las veces en producción. `configs/logo_grabado.yaml` es la suite de ejemplo que lo usa.

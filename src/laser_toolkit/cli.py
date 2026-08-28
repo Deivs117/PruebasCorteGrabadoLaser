@@ -7,6 +7,8 @@ uv run laser-toolkit compute-costs data/registros/<corrida>_registro.csv --tarif
 uv run laser-toolkit generate-final-run configs/mdf_3mm_corte_final_run.yaml --ejecucion 2
 uv run laser-toolkit summarize-final-run data/registros/FINAL_..._ejec1_registro.csv \
     data/registros/FINAL_..._ejec2_registro.csv
+uv run laser-toolkit svg-to-gcode assets/svg/logo-empresa.svg --ancho-mm 30 --alto-mm 30 \
+    --velocidad 1200 --potencia 25 -o data/registros/logo.gcode
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ from laser_toolkit.naming import nombre_base, nombre_base_final_run
 from laser_toolkit.suites.cut import generar_suite_corte
 from laser_toolkit.suites.engrave import generar_suite_grabado
 from laser_toolkit.suites.final_run import generar_final_run
+from laser_toolkit.svg.api import RESOLUCION_RELLENO_MM_POR_DEFECTO, ModoGrabadoSvg, convertir_svg_a_gcode
 from laser_toolkit.tarifas import TarifasConfig
 
 app = typer.Typer(
@@ -210,6 +213,46 @@ def summarize_final_run(
     else:
         faltan = minimo_ejecuciones - resumen.n_ejecuciones
         typer.echo(f"Estado: PENDIENTE -- falta(n) {faltan} ejecucion(es) mas antes de darlo por calibrado.")
+
+
+@app.command("svg-to-gcode")
+def svg_to_gcode(
+    svg_path: Path = typer.Argument(..., exists=True, help="Archivo SVG a convertir."),
+    ancho_mm: float = typer.Option(..., "--ancho-mm", help="Ancho de la caja destino (mm)."),
+    alto_mm: float = typer.Option(..., "--alto-mm", help="Alto de la caja destino (mm)."),
+    velocidad_mm_min: int = typer.Option(..., "--velocidad", help="Velocidad de grabado (mm/min)."),
+    potencia_pct: int = typer.Option(..., "--potencia", help="Potencia de grabado (%)."),
+    modo: ModoGrabadoSvg = typer.Option(
+        ModoGrabadoSvg.CONTORNO_Y_RELLENO, "--modo", help="contorno, relleno, o contorno_y_relleno."
+    ),
+    resolucion_relleno_mm: float = typer.Option(
+        RESOLUCION_RELLENO_MM_POR_DEFECTO,
+        "--resolucion-relleno-mm",
+        help="Espaciado entre lineas de relleno.",
+    ),
+    laser_max_s: int = typer.Option(1000, "--laser-max-s", help="Valor S de GRBL para 100% de potencia."),
+    travel_feed_mm_min: int = typer.Option(
+        3000, "--travel-feed", help="Velocidad de desplazamiento en vacio."
+    ),
+    salida: Path = typer.Option(..., "--salida", "-o", help="Ruta del archivo .gcode de salida."),
+) -> None:
+    """Convierte un SVG en un archivo .gcode independiente, listo para abrir
+    en LaserGRBL -- herramienta atomica y reutilizable, sin depender del
+    resto del pipeline de suites/costeo (ver `laser_toolkit.svg`)."""
+    machine = MachineConfig(laser_max_s=laser_max_s, travel_feed_mm_min=travel_feed_mm_min)
+    gcode = convertir_svg_a_gcode(
+        svg_path,
+        ancho_mm=ancho_mm,
+        alto_mm=alto_mm,
+        velocidad_mm_min=velocidad_mm_min,
+        potencia_pct=potencia_pct,
+        machine=machine,
+        modo=modo,
+        resolucion_relleno_mm=resolucion_relleno_mm,
+    )
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    salida.write_text("\n".join(gcode) + "\n", encoding="utf-8")
+    typer.echo(f"G-code generado: {salida} ({len(gcode)} lineas, modo {modo.value})")
 
 
 def main() -> None:

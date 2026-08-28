@@ -1,4 +1,4 @@
-.PHONY: help install test test-coverage lint format typecheck check generate-cut generate-engrave prepare-record compute-costs generate-final-run summarize-final-run clean
+.PHONY: help install test test-coverage lint format typecheck check generate-cut generate-engrave prepare-record compute-costs generate-final-run summarize-final-run svg-to-gcode clean
 
 # Deteccion de SO
 ifeq ($(OS),Windows_NT)
@@ -29,6 +29,8 @@ help:
 	@echo "                                              - Generar UNA ejecucion de Final Run (energia exacta)"
 	@echo "  make summarize-final-run CSVS=\"a.csv b.csv c.csv\""
 	@echo "                                              - Resumir varias ejecuciones de una misma Final Run"
+	@echo "  make svg-to-gcode SVG=ruta.svg ANCHO=30 ALTO=30 VELOCIDAD=1200 POTENCIA=25 SALIDA=ruta.gcode"
+	@echo "                                              - Convertir un SVG suelto a .gcode (herramienta atomica)"
 	@echo "  make clean                                - Limpiar cache de Python y artefactos de test"
 
 # ============================================
@@ -70,6 +72,11 @@ endif
 summarize-final-run:
 	@echo "Resumiendo ejecuciones: $(CSVS)..."
 	uv run laser-toolkit summarize-final-run $(CSVS)
+
+svg-to-gcode:
+	@echo "Convirtiendo $(SVG) a G-code..."
+	uv run laser-toolkit svg-to-gcode $(SVG) --ancho-mm $(ANCHO) --alto-mm $(ALTO) \
+		--velocidad $(VELOCIDAD) --potencia $(POTENCIA) -o $(SALIDA)
 
 # ============================================
 # CALIDAD DE CODIGO
