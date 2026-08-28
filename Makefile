@@ -1,4 +1,4 @@
-.PHONY: help install test test-coverage lint format generate-cut generate-engrave clean
+.PHONY: help install test test-coverage lint format typecheck check generate-cut generate-engrave clean
 
 # Deteccion de SO
 ifeq ($(OS),Windows_NT)
@@ -18,6 +18,8 @@ help:
 	@echo "  make test-coverage                        - Ejecutar tests con reporte de cobertura HTML"
 	@echo "  make lint                                 - Revisar estilo de codigo con ruff"
 	@echo "  make format                                - Formatear codigo con ruff"
+	@echo "  make typecheck                              - Revisar tipos con pyright"
+	@echo "  make check                                  - lint + typecheck + test (todo antes de commitear)"
 	@echo "  make generate-cut CONFIG=ruta.yaml         - Generar una suite de corte"
 	@echo "  make generate-engrave CONFIG=ruta.yaml     - Generar una suite de grabado"
 	@echo "  make clean                                - Limpiar cache de Python y artefactos de test"
@@ -53,6 +55,13 @@ lint:
 format:
 	@echo "Formateando codigo con ruff..."
 	uv run ruff format src tests
+
+typecheck:
+	@echo "Revisando tipos con pyright..."
+	uv run pyright
+
+check: lint typecheck test
+	@echo "lint + typecheck + test: todo en orden."
 
 # ============================================
 # TESTS

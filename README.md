@@ -61,11 +61,18 @@ flowchart TD
 make install                                    # uv sync -- instala el entorno
 make generate-cut CONFIG=configs/mdf_3mm_corte.yaml
 make generate-engrave CONFIG=configs/mdf_3mm_grabado.yaml
-make test                                       # pytest
-make lint / make format                         # ruff
+make check                                      # lint + typecheck + test, todo antes de commitear
 ```
 
 Cada comando `generate-*` produce, dentro de `data/registros/`, un `.gcode` listo para abrir en LaserGRBL y su `.csv` hermano (una fila por celda de la grilla, con velocidad, potencia, pasadas y tiempo estimado) — ese csv es la base de la futura Hoja de Registro (Fase F2 del Plan Maestro).
+
+## Convenciones del proyecto Python
+
+- **Entorno y dependencias:** `uv` (`uv sync`, `uv add`, `uv run`) — nunca `pip` ni un venv creado a mano.
+- **Linter y formato:** `ruff check` / `ruff format` (`make lint` / `make format`).
+- **Tipado:** `pyright` en modo `standard` (`make typecheck`). Todo el código nuevo lleva type hints; si pyright marca un error, se corrige el tipo, no se silencia con `# type: ignore` salvo que quede documentado por qué.
+- **Testing:** `pytest` (`make test`), un archivo `tests/test_*.py` por módulo.
+- **Antes de cada commit:** `make check` (lint + typecheck + test).
 
 ## Estado del proyecto
 

@@ -3,18 +3,25 @@ from laser_toolkit.gcode.grid import Celda
 from laser_toolkit.gcode.writer import cortar_cuadrado, grabar_relleno
 
 
-def _celda(**overrides: object) -> Celda:
-    base = dict(
-        id="C-001",
-        velocidad_mm_min=240,
-        potencia_pct=100,
-        pasadas=1,
-        x_mm=10.0,
-        y_mm=10.0,
-        tamano_mm=15.0,
+def _celda(
+    *,
+    id: str = "C-001",
+    velocidad_mm_min: int = 240,
+    potencia_pct: int = 100,
+    pasadas: int = 1,
+    x_mm: float = 10.0,
+    y_mm: float = 10.0,
+    tamano_mm: float = 15.0,
+) -> Celda:
+    return Celda(
+        id=id,
+        velocidad_mm_min=velocidad_mm_min,
+        potencia_pct=potencia_pct,
+        pasadas=pasadas,
+        x_mm=x_mm,
+        y_mm=y_mm,
+        tamano_mm=tamano_mm,
     )
-    base.update(overrides)
-    return Celda(**base)
 
 
 def test_cortar_cuadrado_usa_s_maximo_a_100_por_ciento():

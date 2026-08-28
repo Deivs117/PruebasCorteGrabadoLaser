@@ -27,7 +27,7 @@ class MachineConfig(BaseModel):
     """
 
     laser_max_s: int = Field(
-        1000,
+        default=1000,
         gt=0,
         description=(
             "Valor S maximo del firmware GRBL correspondiente a 100% de potencia "
@@ -35,7 +35,7 @@ class MachineConfig(BaseModel):
         ),
     )
     travel_feed_mm_min: int = Field(
-        3000, gt=0, description="Velocidad de desplazamiento en vacio (laser apagado) entre celdas."
+        default=3000, gt=0, description="Velocidad de desplazamiento en vacio (laser apagado) entre celdas."
     )
 
 
@@ -47,16 +47,16 @@ class SuiteConfig(BaseModel):
     operacion: Operacion
     velocidades_mm_min: list[int] = Field(min_length=1)
     potencias_pct: list[int] = Field(min_length=1)
-    pasadas: int = Field(1, ge=1)
+    pasadas: int = Field(default=1, ge=1)
     z_step_mm: float = 0.0
-    tamano_celda_mm: float = Field(15.0, gt=0)
-    espaciado_mm: float = Field(5.0, ge=0)
-    id_prefijo: str = Field("C", min_length=1, max_length=2)
+    tamano_celda_mm: float = Field(default=15.0, gt=0)
+    espaciado_mm: float = Field(default=5.0, ge=0)
+    id_prefijo: str = Field(default="C", min_length=1, max_length=2)
     lote: str = "L01"
     fecha: str | None = Field(
         default=None, description="Formato AAAA-MM-DD. Si se omite, se usa la fecha del dia de generacion."
     )
-    machine: MachineConfig = Field(default_factory=MachineConfig)
+    machine: MachineConfig = Field(default_factory=lambda: MachineConfig())
 
     @field_validator("velocidades_mm_min")
     @classmethod
