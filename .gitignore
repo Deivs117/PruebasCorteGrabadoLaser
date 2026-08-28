@@ -1,0 +1,14 @@
+# Sistema operativo / editores
+.DS_Store
+Thumbs.db
+*.swp
+
+# Python (script generador de G-code)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Salidas de prueba locales que no deben versionarse por defecto
+# (las fotos y csv de resultados sí se versionan salvo que pesen mucho;
+#  ajustar aquí si el repo empieza a crecer demasiado)
