@@ -1,4 +1,4 @@
-.PHONY: help install test test-coverage lint format typecheck check generate-cut generate-engrave prepare-record compute-costs clean
+.PHONY: help install test test-coverage lint format typecheck check generate-cut generate-engrave prepare-record compute-costs generate-final-run summarize-final-run clean
 
 # Deteccion de SO
 ifeq ($(OS),Windows_NT)
@@ -25,6 +25,10 @@ help:
 	@echo "  make prepare-record CSV=ruta.csv           - Agregar columnas manuales al csv generado"
 	@echo "  make compute-costs CSV=ruta.csv TARIFAS=ruta.yaml"
 	@echo "                                              - Calcular costeo granular de un registro completado"
+	@echo "  make generate-final-run CONFIG=ruta.yaml [EJECUCION=2]"
+	@echo "                                              - Generar UNA ejecucion de Final Run (energia exacta)"
+	@echo "  make summarize-final-run CSVS=\"a.csv b.csv c.csv\""
+	@echo "                                              - Resumir varias ejecuciones de una misma Final Run"
 	@echo "  make clean                                - Limpiar cache de Python y artefactos de test"
 
 # ============================================
@@ -54,6 +58,18 @@ prepare-record:
 compute-costs:
 	@echo "Calculando costeo de $(CSV) con tarifas $(TARIFAS)..."
 	uv run laser-toolkit compute-costs $(CSV) --tarifas $(TARIFAS)
+
+generate-final-run:
+	@echo "Generando Final Run desde $(CONFIG)..."
+ifdef EJECUCION
+	uv run laser-toolkit generate-final-run $(CONFIG) --ejecucion $(EJECUCION)
+else
+	uv run laser-toolkit generate-final-run $(CONFIG)
+endif
+
+summarize-final-run:
+	@echo "Resumiendo ejecuciones: $(CSVS)..."
+	uv run laser-toolkit summarize-final-run $(CSVS)
 
 # ============================================
 # CALIDAD DE CODIGO

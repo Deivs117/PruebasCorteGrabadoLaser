@@ -7,10 +7,14 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-# Columnas que produce automaticamente una suite (generate-cut / generate-engrave):
-# ninguna requiere medicion manual, se derivan todas de la configuracion.
+# Columnas que produce automaticamente una suite (generate-cut / generate-engrave /
+# generate-final-run): ninguna requiere medicion manual, se derivan todas de la
+# configuracion. `grupo_calibracion_id` y `ejecucion` solo se llenan en una Final
+# Run (ver `laser_toolkit.suites.final_run`); en una suite de barrido quedan vacias.
 CAMPOS_CSV = [
     "corrida_id",
+    "grupo_calibracion_id",
+    "ejecucion",
     "id_prueba",
     "lote",
     "fecha",

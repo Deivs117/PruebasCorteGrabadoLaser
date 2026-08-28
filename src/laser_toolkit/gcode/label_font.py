@@ -2,10 +2,11 @@
 celda junto a ella (ej. "C-014") y poder identificar cada cupon a simple vista
 despues de cortarlo, sin llevar cuenta manual de posiciones.
 
-Soporta digitos 0-9, las letras 'C' y 'G' (prefijos de corte/grabado) y '-'
--- suficiente para los IDs que produce `laser_toolkit.gcode.grid`. Si se
-necesitan mas caracteres en el futuro, se agregan como nuevas entradas de
-`GLIFOS` sin tocar el resto del modulo.
+Soporta digitos 0-9, las letras 'C', 'G' y 'F' (prefijos de corte/grabado/
+final run) y '-' -- suficiente para los IDs que producen `laser_toolkit.gcode.grid`
+y `laser_toolkit.suites.final_run`. Si se necesitan mas caracteres en el
+futuro, se agregan como nuevas entradas de `GLIFOS` sin tocar el resto del
+modulo.
 """
 
 from __future__ import annotations
@@ -43,6 +44,7 @@ GLIFOS: dict[str, tuple[str, ...]] = {
     "9": ("a", "b", "c", "d", "f", "g"),
     "C": ("a", "f", "e", "d"),
     "G": ("a", "f", "e", "d", "c", "g"),
+    "F": ("a", "f", "g", "e"),
     "-": ("g",),
 }
 

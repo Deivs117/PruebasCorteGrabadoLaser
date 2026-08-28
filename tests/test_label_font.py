@@ -8,6 +8,13 @@ def test_trazos_no_vacios_para_id_valido():
     assert len(trazos) > 0
 
 
+def test_soporta_prefijo_de_final_run():
+    """Regresion: el prefijo 'F' (Final Run) no estaba en la fuente cuando se
+    agrego suites/final_run.py -- toda celda 'F-00N' fallaba al grabar su ID."""
+    trazos = trazos_texto("F-001", alto_mm=2.0, espaciado_mm=0.4)
+    assert len(trazos) > 0
+
+
 def test_caracter_no_soportado_levanta_error():
     with pytest.raises(ValueError):
         trazos_texto("C-014?", alto_mm=2.0, espaciado_mm=0.4)

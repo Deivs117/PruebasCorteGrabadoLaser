@@ -184,12 +184,50 @@ Con la Hoja de Registro llena para un material/espesor:
 
 1. Filtrar celdas con `corte_pasante = sí` y `carbonizacion_1a5 ≤ umbral aceptable`.
 2. De las que pasan el filtro, elegir la de **mayor velocidad** (mejor throughput) salvo que el costo total no compense (a veces bajar potencia y subir tiempo da menor costo si la energía pesa más que el tiempo — el motor de costeo lo decide, no el ojo).
-3. Esa combinación (velocidad, potencia, pasadas) se convierte en la **Ficha de Parámetro Estándar** de ese material/espesor/operación: mismo formato de tabla que ya usamos en el informe técnico anterior, pero ahora con una columna adicional de **costo unitario validado**.
+3. Esa combinación (velocidad, potencia, pasadas) se convierte en la candidata de la **Ficha de Parámetro Estándar** de ese material/espesor/operación — pero el número de energía/costo que se documenta ahí sale de una **Final Run** (sección 10), no del barrido: el barrido sirve para *elegir* la combinación, la Final Run para *medirla* con precisión.
 4. Las fichas se versionan (v1, v2…) cada vez que se re-testea (nuevo lote de material, ajuste de firmware, etc.).
 
 ---
 
-## 8. Roadmap de implementación (fases)
+## 8. Final Run: energía calibrada para producción
+
+### 10.1 El problema que resuelve
+
+Una suite de barrido (secciones 3–6) mezcla, en una sola corrida, celdas con **velocidades y potencias distintas**. El medidor solo da un total de kWh para toda la corrida, así que el reparto entre celdas se hace por **peso de tiempo** (`tiempo_estimado_celda_s`), no por potencia real. Esto es una aproximación razonable para *comparar* combinaciones entre sí, pero produce un artefacto: dos celdas de igual duración y distinta potencia reciben el mismo costo de energía, aunque hayan consumido corriente distinta.
+
+Una vez que el barrido ya hizo su trabajo (elegir la combinación ganadora), ese artefacto deja de ser aceptable para el número que se entrega a producción/financiero.
+
+### 10.2 Qué es una Final Run
+
+Una corrida que usa **una sola combinación fija** de velocidad/potencia — la ya elegida — repetida en **celdas físicamente idénticas** (`repeticiones`, default 5). Como todas las celdas pesan exactamente igual, el reparto del kWh medido dentro de esa corrida deja de ser una aproximación: es una división exacta.
+
+Eso resuelve la variación *dentro* de una corrida. Para la variación *entre* corridas (calentamiento de la máquina, voltaje de la red, desgaste de la lente, etc.), la misma Final Run se ejecuta **como mínimo 3 veces de forma independiente** (`ejecucion` = 1, 2, 3…), cada una un job físico separado con su propia lectura de medidor de inicio a fin.
+
+### 10.3 Flujo de comandos
+
+```
+uv run laser-toolkit generate-final-run configs/<material>_final_run.yaml --ejecucion 1
+# ... correr en la máquina, medir (SOP), evaluar ...
+uv run laser-toolkit prepare-record data/registros/FINAL_..._ejec1.csv
+# completar kwh_corrida_medido y tiempo_real_corrida_s en el _registro.csv
+
+# repetir con --ejecucion 2, --ejecucion 3, en momentos independientes
+
+uv run laser-toolkit summarize-final-run \
+    data/registros/FINAL_..._ejec1_registro.csv \
+    data/registros/FINAL_..._ejec2_registro.csv \
+    data/registros/FINAL_..._ejec3_registro.csv
+```
+
+`summarize-final-run` agrupa por `grupo_calibracion_id` (material + espesor + operación + velocidad + potencia, sin importar fecha ni ejecución) y calcula, entre ejecuciones: **kWh por unidad** y **tiempo por unidad**, cada uno con su **desviación estándar** y **coeficiente de variación (CV%)**. Reporta `CALIBRADO` solo si hay al menos las ejecuciones mínimas configuradas (default 3, `--minimo-ejecuciones`); si no, dice cuántas faltan.
+
+### 10.4 A dónde va el resultado
+
+El kWh/unidad y tiempo/unidad calibrados de una Final Run **son** el dato de energía que se documenta en la Ficha de Parámetro Estándar (F6) — no una nueva estimación, sino la medición directa de exactamente la combinación que se va a usar en producción. El CV% queda como evidencia de qué tan confiable es ese número (un CV alto indica que algo más inestable está pasando en el proceso, vale la pena investigar antes de confiar en el promedio).
+
+---
+
+## 9. Roadmap de implementación (fases)
 
 | Fase | Entregable | Depende de | Estado |
 |---|---|---|---|
@@ -197,13 +235,13 @@ Con la Hoja de Registro llena para un material/espesor:
 | **F2** | Hoja de Registro + motor de costeo | F1 (columnas del csv) | Listo — `laser-toolkit prepare-record` / `compute-costs`, separados en `io/registro.py` y `costos.py`. Se implementó como extensión del toolkit (no como planilla aparte) para mantener un único pipeline con tests y tipado |
 | **F3** | SOP de una página para el taller | F1 + F2 | Listo — `docs/sop/SOP-corrida-de-prueba.md` |
 | **F4** | Primera corrida piloto en MDF 3mm (validación end-to-end del flujo completo) | F1, F2, F3 | Pendiente |
-| **F5** | Calibración del factor de energía (con o sin medidor funcionando) | F4 | Pendiente |
+| **F5** | Calibración del factor de energía mediante Final Run (sección 8) | F4 | Listo — `generate-final-run`/`summarize-final-run`. Pendiente: correrla en la máquina real |
 | **F6** | Ficha de Parámetro Estándar v1 para MDF (todos los espesores) | F4, F5, repetido por espesor | Pendiente |
 | **F7** | Extender a un segundo material (validar que el sistema es agnóstico) | F6 | Pendiente |
 
 ---
 
-## 9. Pendientes de negocio (autoservicio del área financiera)
+## 10. Pendientes de negocio (autoservicio del área financiera)
 
 Estos valores no los define el desarrollo del toolkit; el desarrollo solo garantiza que
 la cantidad física que cada uno multiplica esté medida y sea granular. Se completan

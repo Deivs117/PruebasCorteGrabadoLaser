@@ -1,0 +1,35 @@
+# Final Run -- MDF Trupan 3.0mm, CORTE, parametros YA elegidos para produccion.
+#
+# A diferencia de mdf_3mm_corte.yaml (barrido de 6 velocidades x 3 potencias),
+# esta corrida usa UNA sola combinacion fija, repetida en celdas identicas,
+# para medir su consumo energetico de forma exacta (Plan Maestro, seccion 8).
+#
+# Flujo recomendado:
+#   1. uv run laser-toolkit generate-final-run configs/mdf_3mm_corte_final_run.yaml
+#   2. Correr en la maquina, medir kWh y tiempo real (ver SOP), evaluar los cupones.
+#   3. uv run laser-toolkit prepare-record data/registros/FINAL_..._ejec1.csv
+#   4. Repetir los pasos 1-3 aumentando --ejecucion (2, 3, ...) en dias/momentos
+#      distintos -- minimo 3 ejecuciones independientes antes de calibrar.
+#   5. uv run laser-toolkit summarize-final-run data/registros/FINAL_..._ejec1_registro.csv \
+#        data/registros/FINAL_..._ejec2_registro.csv data/registros/FINAL_..._ejec3_registro.csv
+
+material: "MDF Trupan"
+espesor_mm: 3.0
+operacion: corte
+
+velocidad_mm_min: 260
+potencia_pct: 100
+pasadas: 1
+z_step_mm: 0.0
+
+repeticiones: 5   # celdas identicas dentro de esta misma corrida
+ejecucion: 1      # sobreescribible con --ejecucion en cada corrida independiente
+
+tamano_celda_mm: 15.0
+espaciado_mm: 6.0
+id_prefijo: "F"
+lote: "L01"
+
+machine:
+  laser_max_s: 1000
+  travel_feed_mm_min: 3000

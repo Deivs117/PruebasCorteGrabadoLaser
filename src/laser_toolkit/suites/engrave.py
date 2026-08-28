@@ -35,6 +35,8 @@ def generar_suite_grabado(config: SuiteConfig) -> tuple[list[str], list[dict]]:
         filas.append(
             {
                 "corrida_id": corrida_id,
+                "grupo_calibracion_id": "",
+                "ejecucion": "",
                 "id_prueba": celda.id,
                 "lote": config.lote,
                 "fecha": fecha,

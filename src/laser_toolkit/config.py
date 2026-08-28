@@ -91,3 +91,54 @@ class SuiteConfig(BaseModel):
     def from_yaml(cls, ruta: str | Path) -> SuiteConfig:
         datos = yaml.safe_load(Path(ruta).read_text(encoding="utf-8"))
         return cls.model_validate(datos)
+
+
+class FinalRunConfig(BaseModel):
+    """Configuracion de una Final Run (Plan Maestro, seccion 8).
+
+    A diferencia de `SuiteConfig` (un barrido de muchas combinaciones), una
+    Final Run usa UNA sola combinacion fija de velocidad/potencia -- la ya
+    elegida para produccion -- repetida en celdas fisicamente identicas. Al
+    ser todas iguales, el reparto del kWh medido entre celdas deja de ser una
+    aproximacion por peso de tiempo (como en una suite de barrido) y pasa a
+    ser una division exacta.
+
+    Se ejecuta varias veces de forma INDEPENDIENTE (`ejecucion` = 1, 2, 3...),
+    cada una una corrida fisica separada con su propia lectura de medidor, para
+    verificar que el consumo sea repetible entre corridas y no solo entre
+    celdas de una misma corrida -- ver `laser_toolkit.calibracion`.
+    """
+
+    material: str
+    espesor_mm: float = Field(gt=0)
+    operacion: Operacion
+    velocidad_mm_min: int = Field(gt=0)
+    potencia_pct: int = Field(gt=0, le=100)
+    pasadas: int = Field(default=1, ge=1)
+    z_step_mm: float = 0.0
+    repeticiones: int = Field(
+        default=5,
+        ge=1,
+        description="Celdas fisicas identicas dentro de esta misma corrida (Plan Maestro, seccion 8).",
+    )
+    ejecucion: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "Numero de ejecucion independiente de esta Final Run. Se recomienda un minimo de 3 "
+            "antes de considerar el valor de energia calibrado."
+        ),
+    )
+    tamano_celda_mm: float = Field(default=15.0, gt=0)
+    espaciado_mm: float = Field(default=5.0, ge=0)
+    id_prefijo: str = Field(default="F", min_length=1, max_length=2)
+    lote: str = "L01"
+    fecha: str | None = Field(
+        default=None, description="Formato AAAA-MM-DD. Si se omite, se usa la fecha del dia de generacion."
+    )
+    machine: MachineConfig = Field(default_factory=lambda: MachineConfig())
+
+    @classmethod
+    def from_yaml(cls, ruta: str | Path) -> FinalRunConfig:
+        datos = yaml.safe_load(Path(ruta).read_text(encoding="utf-8"))
+        return cls.model_validate(datos)
