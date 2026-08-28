@@ -3,11 +3,17 @@
 Thumbs.db
 *.swp
 
-# Python (script generador de G-code)
+# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# uv.lock SI se versiona (fija las mismas versiones de dependencias para todo el equipo)
 
 # Salidas de prueba locales que no deben versionarse por defecto
 # (las fotos y csv de resultados sí se versionan salvo que pesen mucho;

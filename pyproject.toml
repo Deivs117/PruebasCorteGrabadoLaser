@@ -1,0 +1,42 @@
+[project]
+name = "laser-toolkit"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Deivs117", email = "lukistin01@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.13.5",
+    "pyyaml>=6.0.3",
+    "typer>=0.27.2",
+]
+
+[project.scripts]
+laser-toolkit = "laser_toolkit.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.31,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.5",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# typer requiere llamar Argument()/Option() como valor por defecto: es su API
+# idiomatica, no un error real.
+"src/laser_toolkit/cli.py" = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
