@@ -19,18 +19,12 @@ Convertir el proceso actual (ajustar parámetros a ojo) en un **sistema repetibl
 
 ## 2. Arquitectura general (5 piezas)
 
-```
-┌────────────────────┐     ┌──────────────────┐     ┌────────────────────┐
-│ 1. Generador de     │────▶│ 2. Protocolo de   │────▶│ 3. Hoja de Registro │
-│    G-code (script)  │     │    Ejecución (SOP)│     │    de Resultados    │
-└────────────────────┘     └──────────────────┘     └─────────┬──────────┘
-                                                                │
-                            ┌──────────────────┐                ▼
-                            │ 5. Fichas de      │◀────┌────────────────────┐
-                            │    Parámetro       │     │ 4. Motor de Costeo │
-                            │    Estándar (SOP   │     │    (energía+       │
-                            │    de producción)  │     │    material+tiempo)│
-                            └──────────────────┘     └────────────────────┘
+```mermaid
+flowchart LR
+    A["1. Generador de G-code<br/>(script)"] --> B["2. Protocolo de<br/>Ejecucion (SOP)"]
+    B --> C["3. Hoja de Registro<br/>de Resultados"]
+    C --> D["4. Motor de Costeo<br/>(energia + material + tiempo)"]
+    D --> E["5. Fichas de<br/>Parametro Estandar"]
 ```
 
 | Pieza | Qué es | Qué resuelve |

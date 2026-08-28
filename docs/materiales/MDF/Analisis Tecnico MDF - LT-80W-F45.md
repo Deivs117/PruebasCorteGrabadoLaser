@@ -37,21 +37,10 @@ En proyectos decorativos multicapa construidos a partir de placas de $3\text{ mm
 
 Los productos autoportantes ensamblables mediante encastres machiembrados o ranuras *tab-and-slot* (como percheros para joyería, exhibidores de mesa o soportes de exhibición comercial) están sometidos a cargas de cizallamiento y flexión en sus puntos de contacto. La selección del grosor del MDF en estas aplicaciones condiciona la estabilidad vertical y la durabilidad del encastre frente al desgaste por montaje y desmontaje.
 
-```
-+-------------------------------------------------------------+
-|              TIRA SUPERIOR DE CARGA (3mm o 5mm)             |
-+------------------------------+------------------------------+
-                               | Encastre Macho-Hembra
-                               v
-               +-------------------------------+
-               | PARANTE VERTICAL LATERAL      |
-               | (Resistencia al pandeo)       |
-               +---------------+---------------+
-                               | Encastre de Base
-                               v
-  ===========================================================
-  [                  BASE AUTOPORTANTE (5mm)                ]
-  ===========================================================
+```mermaid
+flowchart TD
+    A["Tira superior de carga<br/>(3mm o 5mm)"] -->|Encastre macho-hembra| B["Parante vertical lateral<br/>(resistencia al pandeo)"]
+    B -->|Encastre de base| C["Base autoportante<br/>(5mm)"]
 ```
 
 ### Comportamiento del MDF de $3\text{ mm}$ en Estructuras Verticales

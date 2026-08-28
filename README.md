@@ -32,13 +32,13 @@ Ver **[Plan Maestro](docs/Plan%20Maestro%20-%20Estandarizacion%20Pruebas%20Laser
 
 | Fase | Entregable | Estado |
 |---|---|---|
-| F1 | Script generador de G-code | 🔜 En construcción |
-| F2 | Plantilla de Hoja de Registro + motor de costeo | ⏳ Pendiente |
-| F3 | SOP de una página para el taller | ⏳ Pendiente |
-| F4 | Corrida piloto MDF 3mm | ⏳ Pendiente |
-| F5 | Calibración de energía (medidor manual/API) | ⏳ Pendiente |
-| F6 | Ficha de Parámetro Estándar v1 — MDF | ⏳ Pendiente |
-| F7 | Extensión a un segundo material | ⏳ Pendiente |
+| F1 | Script generador de G-code | En construcción |
+| F2 | Plantilla de Hoja de Registro + motor de costeo | Pendiente |
+| F3 | SOP de una página para el taller | Pendiente |
+| F4 | Corrida piloto MDF 3mm | Pendiente |
+| F5 | Calibración de energía (medidor manual/API) | Pendiente |
+| F6 | Ficha de Parámetro Estándar v1 — MDF | Pendiente |
+| F7 | Extensión a un segundo material | Pendiente |
 
 ## Material de referencia
 
