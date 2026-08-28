@@ -103,6 +103,7 @@ Esto por sí solo ya estandariza cómo se nombran y archivan las pruebas.
 7. **Cargar resultados** a la Hoja de Registro (importando el `.csv` hermano + agregando las columnas de evaluación y energía).
 
 > Este SOP es el documento que se cuelga físicamente en el taller — una sola página, checklist.
+> Versión imprimible ya lista: [`docs/sop/SOP-corrida-de-prueba.md`](sop/SOP-corrida-de-prueba.md) (Fase F3).
 
 ---
 
@@ -194,7 +195,7 @@ Con la Hoja de Registro llena para un material/espesor:
 |---|---|---|---|
 | **F1** | Script generador de G-code (grillas de corte y grabado) + csv hermano | — | Listo — paquete `laser_toolkit` (ver `README.md`) |
 | **F2** | Hoja de Registro + motor de costeo | F1 (columnas del csv) | Listo — `laser-toolkit prepare-record` / `compute-costs`, separados en `io/registro.py` y `costos.py`. Se implementó como extensión del toolkit (no como planilla aparte) para mantener un único pipeline con tests y tipado |
-| **F3** | SOP de una página para el taller | F1 + F2 | Pendiente |
+| **F3** | SOP de una página para el taller | F1 + F2 | Listo — `docs/sop/SOP-corrida-de-prueba.md` |
 | **F4** | Primera corrida piloto en MDF 3mm (validación end-to-end del flujo completo) | F1, F2, F3 | Pendiente |
 | **F5** | Calibración del factor de energía (con o sin medidor funcionando) | F4 | Pendiente |
 | **F6** | Ficha de Parámetro Estándar v1 para MDF (todos los espesores) | F4, F5, repetido por espesor | Pendiente |

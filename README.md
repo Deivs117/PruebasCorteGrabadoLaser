@@ -98,7 +98,7 @@ Ver **[Plan Maestro](docs/Plan%20Maestro%20-%20Estandarizacion%20Pruebas%20Laser
 |---|---|---|
 | F1 | Script generador de G-code | Listo (`laser_toolkit`) |
 | F2 | Hoja de Registro + motor de costeo | Listo (`prepare-record`/`compute-costs`, 49 tests) |
-| F3 | SOP de una página para el taller | Pendiente |
+| F3 | SOP de una página para el taller | Listo — [`docs/sop/SOP-corrida-de-prueba.md`](docs/sop/SOP-corrida-de-prueba.md) |
 | F4 | Corrida piloto MDF 3mm | Pendiente |
 | F5 | Calibración de energía (medidor manual/API) | Pendiente |
 | F6 | Ficha de Parámetro Estándar v1 — MDF | Pendiente |
