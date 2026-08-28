@@ -10,12 +10,14 @@ from laser_toolkit.config import SuiteConfig
 from laser_toolkit.gcode.grid import construir_grilla
 from laser_toolkit.gcode.timing import tiempo_corte_celda_s
 from laser_toolkit.gcode.writer import MARGEN_ETIQUETA_MM, cortar_cuadrado, encabezado, grabar_etiqueta, pie
+from laser_toolkit.naming import nombre_base
 
 
 def generar_suite_corte(config: SuiteConfig) -> tuple[list[str], list[dict]]:
     """Devuelve `(lineas_gcode, filas_csv)` para la suite de corte descrita en `config`."""
     celdas = construir_grilla(config)
     fecha = config.fecha or date.today().isoformat()
+    corrida_id = nombre_base(config)
 
     gcode = encabezado(f"Suite de CORTE -- {config.material} {config.espesor_mm}mm -- lote {config.lote}")
     filas: list[dict] = []
@@ -32,6 +34,7 @@ def generar_suite_corte(config: SuiteConfig) -> tuple[list[str], list[dict]]:
         )
         filas.append(
             {
+                "corrida_id": corrida_id,
                 "id_prueba": celda.id,
                 "lote": config.lote,
                 "fecha": fecha,
@@ -43,6 +46,11 @@ def generar_suite_corte(config: SuiteConfig) -> tuple[list[str], list[dict]]:
                 "pasadas": celda.pasadas,
                 "x_mm": celda.x_mm,
                 "y_mm": celda.y_mm,
+                "tamano_celda_mm": celda.tamano_mm,
+                # El corte remueve toda el area de la celda (incluye el desperdicio
+                # de la grilla, no solo la pieza util): es la cantidad fisica que el
+                # area financiera multiplica por su propio precio de material.
+                "area_material_mm2": celda.tamano_mm**2,
                 "tiempo_estimado_celda_s": round(tiempo_corte_celda_s(celda), 2),
             }
         )

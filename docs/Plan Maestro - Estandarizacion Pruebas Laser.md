@@ -190,23 +190,33 @@ Con la Hoja de Registro llena para un material/espesor:
 
 ## 8. Roadmap de implementación (fases)
 
-| Fase | Entregable | Depende de |
-|---|---|---|
-| **F1** | Script generador de G-code (grillas de corte y grabado) + csv hermano | — |
-| **F2** | Plantilla de Hoja de Registro (Sheets/Excel) con fórmulas de costeo | F1 (columnas del csv) |
-| **F3** | SOP de una página para el taller | F1 + F2 |
-| **F4** | Primera corrida piloto en MDF 3mm (validación end-to-end del flujo completo) | F1, F2, F3 |
-| **F5** | Calibración del factor de energía (con o sin medidor funcionando) | F4 |
-| **F6** | Ficha de Parámetro Estándar v1 para MDF (todos los espesores) | F4, F5, repetido por espesor |
-| **F7** | Extender a un segundo material (validar que el sistema es agnóstico) | F6 |
+| Fase | Entregable | Depende de | Estado |
+|---|---|---|---|
+| **F1** | Script generador de G-code (grillas de corte y grabado) + csv hermano | — | Listo — paquete `laser_toolkit` (ver `README.md`) |
+| **F2** | Hoja de Registro + motor de costeo | F1 (columnas del csv) | Listo — `laser-toolkit prepare-record` / `compute-costs`, separados en `io/registro.py` y `costos.py`. Se implementó como extensión del toolkit (no como planilla aparte) para mantener un único pipeline con tests y tipado |
+| **F3** | SOP de una página para el taller | F1 + F2 | Pendiente |
+| **F4** | Primera corrida piloto en MDF 3mm (validación end-to-end del flujo completo) | F1, F2, F3 | Pendiente |
+| **F5** | Calibración del factor de energía (con o sin medidor funcionando) | F4 | Pendiente |
+| **F6** | Ficha de Parámetro Estándar v1 para MDF (todos los espesores) | F4, F5, repetido por espesor | Pendiente |
+| **F7** | Extender a un segundo material (validar que el sistema es agnóstico) | F6 | Pendiente |
 
 ---
 
-## 9. Pendientes a definir contigo (insumos de negocio)
+## 9. Pendientes de negocio (autoservicio del área financiera)
 
-Estos valores no los puedo inventar, hacen falta para que el motor de costeo funcione:
+Estos valores no los define el desarrollo del toolkit; el desarrollo solo garantiza que
+la cantidad física que cada uno multiplica esté medida y sea granular. Se completan
+copiando `configs/tarifas.example.yaml` a `configs/tarifas.yaml` (ese archivo no se
+sube a git — ver `.gitignore`):
 
-- Tarifa eléctrica vigente ($/kWh).
-- Precio de compra del MDF por espesor (por plancha o por m²).
-- Tarifa hora-máquina (si se va a incluir depreciación/mano de obra, o se deja en 0 por ahora).
-- Umbral de aceptación de carbonización/calidad de borde para considerar una prueba "aprobada".
+- Tarifa eléctrica vigente ($/kWh) → multiplica `kwh_celda`.
+- Precio de compra del material por espesor (por m²) → multiplica `area_material_mm2`.
+- Tarifa hora-máquina (depreciación + mantenimiento + opcional mano de obra) → multiplica `tiempo_maquina_celda_s`.
+
+Mientras un campo quede en `null`, `laser-toolkit compute-costs` deja esa columna de
+costo vacía en el csv de salida en vez de asumir un valor — nunca hay que "avisar" para
+que el sistema funcione con datos parciales.
+
+Sigue pendiente de definir (fuera del alcance del costeo, es un criterio operativo):
+
+- Umbral de aceptación de carbonización/calidad de borde para considerar una prueba "aprobada" (Fase F6/F7).

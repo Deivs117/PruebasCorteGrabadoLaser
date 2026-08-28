@@ -1,4 +1,4 @@
-.PHONY: help install test test-coverage lint format typecheck check generate-cut generate-engrave clean
+.PHONY: help install test test-coverage lint format typecheck check generate-cut generate-engrave prepare-record compute-costs clean
 
 # Deteccion de SO
 ifeq ($(OS),Windows_NT)
@@ -22,6 +22,9 @@ help:
 	@echo "  make check                                  - lint + typecheck + test (todo antes de commitear)"
 	@echo "  make generate-cut CONFIG=ruta.yaml         - Generar una suite de corte"
 	@echo "  make generate-engrave CONFIG=ruta.yaml     - Generar una suite de grabado"
+	@echo "  make prepare-record CSV=ruta.csv           - Agregar columnas manuales al csv generado"
+	@echo "  make compute-costs CSV=ruta.csv TARIFAS=ruta.yaml"
+	@echo "                                              - Calcular costeo granular de un registro completado"
 	@echo "  make clean                                - Limpiar cache de Python y artefactos de test"
 
 # ============================================
@@ -43,6 +46,14 @@ generate-cut:
 generate-engrave:
 	@echo "Generando suite de grabado desde $(CONFIG)..."
 	uv run laser-toolkit generate-engrave $(CONFIG)
+
+prepare-record:
+	@echo "Preparando registro desde $(CSV)..."
+	uv run laser-toolkit prepare-record $(CSV)
+
+compute-costs:
+	@echo "Calculando costeo de $(CSV) con tarifas $(TARIFAS)..."
+	uv run laser-toolkit compute-costs $(CSV) --tarifas $(TARIFAS)
 
 # ============================================
 # CALIDAD DE CODIGO

@@ -1,6 +1,6 @@
 """Nomenclatura estandar de archivos de suite (Plan Maestro, seccion 3.4):
 
-    <material>_<espesor>mm_<operacion>_<fecha>_<lote>
+<material>_<espesor>mm_<operacion>_<fecha>_<lote>
 """
 
 from __future__ import annotations

@@ -37,6 +37,19 @@ class MachineConfig(BaseModel):
     travel_feed_mm_min: int = Field(
         default=3000, gt=0, description="Velocidad de desplazamiento en vacio (laser apagado) entre celdas."
     )
+    potencia_modulo_w: float = Field(
+        default=10.0,
+        gt=0,
+        description="Potencia optica nominal del modulo laser (W), respaldo de estimacion de energia.",
+    )
+    factor_utilizacion_laser: float = Field(
+        default=1.0,
+        gt=0,
+        description=(
+            "Calibracion tecnica del respaldo de estimacion de energia (Plan Maestro, 6.1): se ajusta "
+            "una vez comparando kWh estimados vs. medidos. Parametro tecnico, no una tarifa de negocio."
+        ),
+    )
 
 
 class SuiteConfig(BaseModel):

@@ -1,0 +1,29 @@
+# Tarifas de costeo -- COMPLETAR CON EL AREA FINANCIERA/COMERCIAL.
+#
+# Este archivo es el UNICO lugar del sistema donde entran valores monetarios.
+# El resto del toolkit solo mide cantidades fisicas (kWh, mm2 de material,
+# horas de maquina) -- esa separacion es deliberada: quien desarrolla y calibra
+# la herramienta no tiene por que fijar tarifas de negocio.
+#
+# Como usarlo:
+#   1. Copiar este archivo a "tarifas.yaml" en esta misma carpeta (ese nombre
+#      esta en .gitignore, no se sube a git).
+#   2. Completar los valores reales del taller.
+#   3. Mientras un campo quede en null, el costo correspondiente se reporta
+#      como vacio/pendiente en el csv de salida de `compute-costs` -- nunca se
+#      inventa un numero ni se asume cero.
+
+moneda: "TBD"  # ej. COP, MXN, USD -- la unidad de todos los precios de abajo
+
+tarifa_electrica_por_kwh: null   # $/kWh, segun el recibo de energia del taller
+
+tarifa_hora_maquina: null        # $/hora -- depreciacion + mantenimiento + (opcional) mano de obra del operador
+
+# Precio de material por m2, una entrada por combinacion "material_espesor".
+# La clave debe ser exactamente "<material>_<espesor>mm", igual a como
+# aparecen las columnas `material` y `espesor_mm` en el registro (ver
+# `laser_toolkit.tarifas.clave_material`). Agregar una linea por cada
+# material/espesor que se este costeando.
+precio_material_por_m2:
+  "MDF Trupan_3mm": null
+  "MDF Trupan_5mm": null

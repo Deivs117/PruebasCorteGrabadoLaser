@@ -15,6 +15,11 @@ htmlcov/
 
 # uv.lock SI se versiona (fija las mismas versiones de dependencias para todo el equipo)
 
+# Tarifas de negocio reales (electricidad, material, hora-maquina): dato
+# sensible que completa el area financiera. Solo se versiona la plantilla
+# configs/tarifas.example.yaml, nunca este archivo.
+configs/tarifas.yaml
+
 # Salidas de prueba locales que no deben versionarse por defecto
 # (las fotos y csv de resultados sí se versionan salvo que pesen mucho;
 #  ajustar aquí si el repo empieza a crecer demasiado)
