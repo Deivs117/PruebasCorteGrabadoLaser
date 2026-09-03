@@ -31,11 +31,12 @@ class MachineConfig(BaseModel):
     """
 
     laser_max_s: int = Field(
-        default=1000,
+        default=10000,
         gt=0,
         description=(
             "Valor S maximo del firmware GRBL correspondiente a 100% de potencia "
-            "(revisar el parametro $30 de la configuracion GRBL; suele ser 255 o 1000)."
+            "(parametro $30 de la configuracion GRBL de esta maquina: 10000. Puede "
+            "variar segun el firmware -- valores comunes son 255, 1000 o 10000)."
         ),
     )
     travel_feed_mm_min: int = Field(

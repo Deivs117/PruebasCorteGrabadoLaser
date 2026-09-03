@@ -22,7 +22,7 @@ def test_carga_configuracion_minima_valida():
     config = SuiteConfig.model_validate(_config_base())
     assert config.operacion is Operacion.CORTE
     assert config.pasadas == 1
-    assert config.machine.laser_max_s == 1000
+    assert config.machine.laser_max_s == 10000
 
 
 def test_potencia_fuera_de_rango_falla():

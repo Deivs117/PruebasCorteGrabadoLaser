@@ -1,32 +1,20 @@
-# Suite de CORTE -- contorno del logo de la empresa sobre MDF Trupan 3.0mm.
-#
-# Velocidad de referencia: 240 mm/min, dato del propio fabricante para el
-# modulo LT-80W-F45 sobre MDF 3mm (tabla de velocidad de corte de LaserTree,
-# https://lasertree.com/pages/laser-module-cutting-data). El barrido abre ese
-# valor hacia ambos lados (mismo criterio que las suites de ejemplo) para
-# encontrar el limite real de la maquina, no solo confirmar el dato del
-# fabricante -- y el dato es de corte generico, no de cortar el contorno de
-# una forma con curvas, que tiene mas distancia recorrida por pasada.
-#
-# svg_path hace que cada celda corte SOLO EL CONTORNO del logo (nunca su
-# relleno: cortar no admite relleno tipo trama) -- 2 pasadas de partida,
-# ajustar segun si el corte pasante se logra o no.
-
-material: "MDF Trupan"
-espesor_mm: 3.0
+material: MDF Trupan
+espesor_mm: 3
 operacion: corte
-
-velocidades_mm_min: [180, 210, 240, 270, 300]
-potencias_pct: [70, 85, 100]
+velocidades_mm_min:
+  - 150
+  - 180
+  - 210
+  - 240
+potencias_pct:
+  - 85
+  - 100
 pasadas: 2
-
-tamano_celda_mm: 30.0
-espaciado_mm: 8.0
-id_prefijo: "C"
-lote: "L01"
-
-svg_path: "assets/svg/logo-empresa.svg"
-
+tamano_celda_mm: 15
+espaciado_mm: 3.5
+id_prefijo: C
+lote: L01
+svg_path: data/svgs/simbolo-flux-negro-mtlxpstx.svg
 machine:
-  laser_max_s: 1000
+  laser_max_s: 10000
   travel_feed_mm_min: 3000

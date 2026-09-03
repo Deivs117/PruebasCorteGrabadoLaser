@@ -230,7 +230,7 @@ def svg_to_gcode(
         "--resolucion-relleno-mm",
         help="Espaciado entre lineas de relleno.",
     ),
-    laser_max_s: int = typer.Option(1000, "--laser-max-s", help="Valor S de GRBL para 100% de potencia."),
+    laser_max_s: int = typer.Option(10000, "--laser-max-s", help="Valor S de GRBL para 100% de potencia."),
     travel_feed_mm_min: int = typer.Option(
         3000, "--travel-feed", help="Velocidad de desplazamiento en vacio."
     ),

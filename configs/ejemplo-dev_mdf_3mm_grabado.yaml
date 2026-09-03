@@ -17,5 +17,5 @@ id_prefijo: "G"
 lote: "L01"
 
 machine:
-  laser_max_s: 1000
+  laser_max_s: 10000
   travel_feed_mm_min: 3000

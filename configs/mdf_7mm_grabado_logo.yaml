@@ -27,5 +27,5 @@ modo_grabado_svg: contorno_y_relleno   # contorno | relleno | contorno_y_relleno
 svg_resolucion_relleno_mm: 0.3         # mas fino = mas oscuro y mas lento
 
 machine:
-  laser_max_s: 1000
+  laser_max_s: 10000
   travel_feed_mm_min: 3000
