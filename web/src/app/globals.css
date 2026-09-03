@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+/*
+ * Tokens del sistema de diseño "Laser Toolkit" (paleta Flux).
+ * Fuente de verdad: docs/ui-design/prompts-stitch.md
+ * Los hex son literales — no inventar variaciones no documentadas.
+ */
+:root {
+  --color-navy: #003452; /* headers, sidebar, texto principal */
+  --color-navy-hover: color-mix(in srgb, var(--color-navy) 85%, black);
+  --color-navy-soft: color-mix(in srgb, var(--color-navy) 8%, white);
+
+  --color-blue: #246bce; /* acciones primarias, links, acentos */
+  --color-blue-hover: color-mix(in srgb, var(--color-blue) 85%, black);
+  --color-blue-soft: color-mix(in srgb, var(--color-blue) 10%, white);
+
+  --color-teal: #1fc1b1; /* estados positivos: Listo, Calibrado, OK */
+  --color-teal-soft: color-mix(in srgb, var(--color-teal) 15%, white);
+
+  --color-orange: #ff9f43; /* advertencias: Pendiente, Sin definir */
+  --color-orange-soft: color-mix(in srgb, var(--color-orange) 15%, white);
+
+  --color-purple: #e056fd; /* acento del módulo financiero / Tarifas */
+  --color-purple-soft: color-mix(in srgb, var(--color-purple) 15%, white);
+
+  --color-canvas: #f4f7f9; /* fondo general de la app */
+  --color-surface: #ffffff; /* fondo de tarjetas/paneles */
+  --color-border: #e2e8f0; /* bordes sutiles */
+
+  --color-text-main: #003452;
+  --color-text-muted: #5a7184;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+
+  --shell-topbar-h: 4rem;
+  --shell-sidebar-w: 17rem;
+  --shell-sidebar-w-collapsed: 4.75rem;
+
+  /*
+   * Identidad de movimiento (skill motion-design de LottieFiles):
+   * personalidad "Corporate" — decisiva pero nunca juguetona, sin overshoot.
+   * Un solo easing de marca + tres duraciones, en vez de valores sueltos por
+   * componente.
+   */
+  --ease-motion: cubic-bezier(0.2, 0, 0, 1); /* Material Design 3, on-screen */
+  --duration-quick: 150ms; /* toggles, íconos */
+  --duration-standard: 250ms; /* tarjetas, paneles, drawer */
+  --duration-slow: 400ms; /* transición de página / reveal inicial */
+}
+
+@theme inline {
+  --color-navy: var(--color-navy);
+  --color-navy-hover: var(--color-navy-hover);
+  --color-navy-soft: var(--color-navy-soft);
+  --color-blue: var(--color-blue);
+  --color-blue-hover: var(--color-blue-hover);
+  --color-blue-soft: var(--color-blue-soft);
+  --color-teal: var(--color-teal);
+  --color-teal-soft: var(--color-teal-soft);
+  --color-orange: var(--color-orange);
+  --color-orange-soft: var(--color-orange-soft);
+  --color-purple: var(--color-purple);
+  --color-purple-soft: var(--color-purple-soft);
+  --color-canvas: var(--color-canvas);
+  --color-surface: var(--color-surface);
+  --color-border: var(--color-border);
+  --color-text-main: var(--color-text-main);
+  --color-text-muted: var(--color-text-muted);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --font-sans: var(--font-urbanist);
+  --font-mono: var(--font-dm-mono);
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-text-main);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Respeta la preferencia de movimiento reducido del sistema operativo:
+   morphicons y las transiciones de layout se saltan la animación, no el
+   cambio de estado. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
