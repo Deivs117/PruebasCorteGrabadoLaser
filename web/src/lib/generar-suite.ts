@@ -43,8 +43,12 @@ function nombreArchivoConfig(datos: SuiteFormData): string {
   return `web-${slug(datos.material)}-${datos.espesorMm}mm-${datos.operacion}-${marca}.yaml`;
 }
 
-function construirYaml(datos: SuiteFormData): string {
-  return stringifyYaml({
+/** Solo los campos que administra el asistente — nunca todo el YAML: al
+ * editar, esto se fusiona sobre el archivo original en vez de reemplazarlo
+ * entero, para no borrar configuración que el formulario no muestra (ej. un
+ * `machine` con valores no default). Ver `actualizarSuite`. */
+function camposConocidos(datos: SuiteFormData): Record<string, unknown> {
+  const campos: Record<string, unknown> = {
     material: datos.material,
     espesor_mm: datos.espesorMm,
     operacion: datos.operacion,
@@ -55,25 +59,39 @@ function construirYaml(datos: SuiteFormData): string {
     espaciado_mm: datos.espaciadoMm,
     id_prefijo: idPrefijo(datos.operacion),
     lote: datos.lote,
-  });
+  };
+  if (datos.svgPath) {
+    campos.svg_path = datos.svgPath;
+    // modo_grabado_svg/svg_resolucion_relleno_mm solo tienen efecto en
+    // grabado (corte con SVG siempre traza el contorno, ver suites/cut.py) —
+    // no se escriben para corte, para no sugerir una opción que no aplica.
+    if (datos.operacion === "grabado") {
+      if (datos.modoGrabadoSvg) campos.modo_grabado_svg = datos.modoGrabadoSvg;
+      if (datos.svgResolucionRellenoMm !== undefined) {
+        campos.svg_resolucion_relleno_mm = datos.svgResolucionRellenoMm;
+      }
+    }
+  }
+  return campos;
 }
 
 /**
- * Escribe el YAML en `nombreConfig` y corre el comando real del taller
- * (`uv run laser-toolkit generate-cut/generate-engrave`) sobre ese archivo.
- * Nunca inventa el resultado: si el CLI falla, se devuelve su error tal cual.
- * Compartido entre crear una suite nueva y guardar cambios sobre una ya
- * existente — regenerar el G-code es la misma operación en los dos casos.
+ * Escribe `contenidoYaml` en `nombreConfig` y corre el comando real del
+ * taller (`uv run laser-toolkit generate-cut/generate-engrave`) sobre ese
+ * archivo. Nunca inventa el resultado: si el CLI falla, se devuelve su
+ * error tal cual. Compartido entre crear una suite nueva y guardar cambios
+ * sobre una ya existente — regenerar el G-code es la misma operación en
+ * los dos casos.
  */
 async function escribirYGenerar(
   nombreConfig: string,
-  datos: SuiteFormData,
+  contenidoYaml: Record<string, unknown>,
+  operacion: "corte" | "grabado",
 ): Promise<ResultadoGeneracion> {
   const rutaConfig = path.join(CONFIGS_DIR, nombreConfig);
-  await writeFile(rutaConfig, construirYaml(datos), "utf-8");
+  await writeFile(rutaConfig, stringifyYaml(contenidoYaml), "utf-8");
 
-  const comando =
-    datos.operacion === "corte" ? "generate-cut" : "generate-engrave";
+  const comando = operacion === "corte" ? "generate-cut" : "generate-engrave";
 
   try {
     const { stdout } = await execFileAsync(
@@ -115,12 +133,23 @@ async function escribirYGenerar(
 export async function generarSuite(
   datos: SuiteFormData,
 ): Promise<ResultadoGeneracion> {
-  return escribirYGenerar(nombreArchivoConfig(datos), datos);
+  return escribirYGenerar(
+    nombreArchivoConfig(datos),
+    camposConocidos(datos),
+    datos.operacion,
+  );
 }
 
-/** Guarda los cambios sobre el mismo archivo de configuración (no crea uno
+/**
+ * Guarda los cambios sobre el mismo archivo de configuración (no crea uno
  * nuevo) y regenera su G-code — editar una suite implica que la máquina
- * corra la versión actualizada, no solo cambiar un número en un formulario. */
+ * corra la versión actualizada, no solo cambiar un número en un formulario.
+ *
+ * Fusiona los campos del formulario sobre el YAML original en vez de
+ * reemplazarlo entero: el asistente no conoce todos los campos posibles de
+ * `SuiteConfig` (ej. `machine` con valores no default) y sobreescribir el
+ * archivo completo borraría esos campos en silencio.
+ */
 export async function actualizarSuite(
   archivoExistente: string,
   datos: SuiteFormData,
@@ -128,7 +157,27 @@ export async function actualizarSuite(
   if (!nombreDeSuiteValido(archivoExistente)) {
     return { ok: false, error: "Archivo inválido." };
   }
-  return escribirYGenerar(archivoExistente, datos);
+
+  let original: Record<string, unknown> = {};
+  try {
+    original =
+      (parseYaml(
+        await readFile(path.join(CONFIGS_DIR, archivoExistente), "utf-8"),
+      ) as Record<string, unknown> | null) ?? {};
+  } catch {
+    // No existía o no se pudo leer: se escribe desde cero con lo que sabe el asistente.
+  }
+
+  const fusionado = { ...original, ...camposConocidos(datos) };
+  // El spread de arriba no borra una clave que `camposConocidos` omite: si
+  // el técnico quitó el SVG en el formulario, hay que sacarlo a mano.
+  if (!datos.svgPath) {
+    delete fusionado.svg_path;
+    delete fusionado.modo_grabado_svg;
+    delete fusionado.svg_resolucion_relleno_mm;
+  }
+
+  return escribirYGenerar(archivoExistente, fusionado, datos.operacion);
 }
 
 /** Lee una suite ya existente en la forma que espera el formulario del
@@ -166,6 +215,17 @@ export async function leerSuiteEditable(
         typeof datos.tamano_celda_mm === "number" ? datos.tamano_celda_mm : 15,
       espaciadoMm:
         typeof datos.espaciado_mm === "number" ? datos.espaciado_mm : 5,
+      svgPath: typeof datos.svg_path === "string" ? datos.svg_path : undefined,
+      modoGrabadoSvg:
+        datos.modo_grabado_svg === "contorno" ||
+        datos.modo_grabado_svg === "relleno" ||
+        datos.modo_grabado_svg === "contorno_y_relleno"
+          ? datos.modo_grabado_svg
+          : undefined,
+      svgResolucionRellenoMm:
+        typeof datos.svg_resolucion_relleno_mm === "number"
+          ? datos.svg_resolucion_relleno_mm
+          : undefined,
     };
   } catch {
     return null;

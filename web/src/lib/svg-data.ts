@@ -76,6 +76,23 @@ export async function listarSvgsGuardados(): Promise<SvgGuardado[]> {
   return resultado;
 }
 
+export interface SvgConContenido extends SvgGuardado {
+  contenido: string;
+}
+
+/** Lista + contenido de cada SVG guardado — lo reutilizan la galería de
+ * Grabado Vectorial y el selector de geometría del asistente de Suites,
+ * para no leer/interpretar los mismos archivos por separado en cada uno. */
+export async function listarSvgsConContenido(): Promise<SvgConContenido[]> {
+  const guardados = await listarSvgsGuardados();
+  return Promise.all(
+    guardados.map(async (item) => ({
+      ...item,
+      contenido: (await leerSvgTexto(item.nombre)) ?? "",
+    })),
+  );
+}
+
 export async function leerSvgTexto(nombre: string): Promise<string | null> {
   if (!nombreSvgValido(nombre)) return null;
   try {

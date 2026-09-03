@@ -35,9 +35,14 @@ def test_velocidad_no_positiva_falla():
         SuiteConfig.model_validate(_config_base(velocidades_mm_min=[0, 200]))
 
 
-def test_svg_path_en_corte_falla():
-    with pytest.raises(ValidationError, match="svg_path"):
-        SuiteConfig.model_validate(_config_base(operacion="corte", svg_path="assets/svg/logo-empresa.svg"))
+def test_svg_path_en_corte_es_valido():
+    # Cortar el contorno de un SVG es una operacion valida (ver
+    # suites/cut.py): a diferencia de grabado, corte ignora modo_grabado_svg
+    # y siempre traza solo el contorno.
+    config = SuiteConfig.model_validate(
+        _config_base(operacion="corte", svg_path="assets/svg/logo-empresa.svg")
+    )
+    assert config.svg_path == "assets/svg/logo-empresa.svg"
 
 
 def test_svg_path_en_grabado_es_valido():

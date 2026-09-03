@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { CircleCheck, Flame, Scissors, TriangleAlert } from "lucide-react";
+import {
+  CircleCheck,
+  Flame,
+  Scissors,
+  Shapes,
+  Square,
+  TriangleAlert,
+} from "lucide-react";
 import { clsx } from "clsx";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,10 +18,20 @@ import { DescargarBoton } from "@/components/registro/descargar-boton";
 import { GridPreview } from "@/components/suites/grid-preview";
 import { NumberChipsInput } from "@/components/suites/number-chips-input";
 import { NumberStepper } from "@/components/suites/number-stepper";
+import { SvgPicker } from "@/components/suites/svg-picker";
 import { WizardStepper } from "@/components/suites/wizard-stepper";
 import { totalCeldas, type SuiteFormData } from "@/lib/suite-schema";
 
-const PASOS = ["Operación", "Material", "Barrido", "Grilla", "Resumen"];
+const PASOS = [
+  "Operación",
+  "Material",
+  "Barrido",
+  "Grilla",
+  "Geometría",
+  "Resumen",
+];
+
+type ModoGrabadoSvg = "contorno" | "relleno" | "contorno_y_relleno";
 
 interface EstadoFormulario {
   operacion: "corte" | "grabado" | null;
@@ -26,6 +43,10 @@ interface EstadoFormulario {
   pasadas: number;
   tamanoCeldaMm: number;
   espaciadoMm: number;
+  geometria: "generica" | "svg";
+  svgPath: string;
+  modoGrabadoSvg: ModoGrabadoSvg;
+  svgResolucionRellenoMm: number;
 }
 
 const ESTADO_INICIAL: EstadoFormulario = {
@@ -38,10 +59,21 @@ const ESTADO_INICIAL: EstadoFormulario = {
   pasadas: 1,
   tamanoCeldaMm: 15,
   espaciadoMm: 5,
+  geometria: "generica",
+  svgPath: "",
+  modoGrabadoSvg: "contorno_y_relleno",
+  svgResolucionRellenoMm: 0.3,
 };
 
 function desdeDatosIniciales(datos: SuiteFormData): EstadoFormulario {
-  return { ...datos, espesorMm: String(datos.espesorMm) };
+  return {
+    ...datos,
+    espesorMm: String(datos.espesorMm),
+    geometria: datos.svgPath ? "svg" : "generica",
+    svgPath: datos.svgPath ?? "",
+    modoGrabadoSvg: datos.modoGrabadoSvg ?? "contorno_y_relleno",
+    svgResolucionRellenoMm: datos.svgResolucionRellenoMm ?? 0.3,
+  };
 }
 
 type ResultadoEnvio =
@@ -69,9 +101,16 @@ function puedeAvanzar(paso: number, form: EstadoFormulario): boolean {
       return form.velocidadesMmMin.length > 0 && form.potenciasPct.length > 0;
     case 3:
       return form.tamanoCeldaMm > 0 && form.espaciadoMm >= 0;
+    case 4:
+      return form.geometria === "generica" || form.svgPath !== "";
     default:
       return true;
   }
+}
+
+interface SvgDisponible {
+  nombre: string;
+  contenido: string;
 }
 
 interface SuiteWizardProps {
@@ -79,11 +118,13 @@ interface SuiteWizardProps {
    * guarda sobre el mismo archivo y regenera su G-code. */
   archivoExistente?: string;
   datosIniciales?: SuiteFormData;
+  svgsDisponibles: SvgDisponible[];
 }
 
 export function SuiteWizard({
   archivoExistente,
   datosIniciales,
+  svgsDisponibles,
 }: SuiteWizardProps) {
   const modoEdicion = archivoExistente !== undefined;
   const [paso, setPaso] = useState(0);
@@ -102,6 +143,7 @@ export function SuiteWizard({
     if (!form.operacion) return;
     setResultado({ estado: "enviando" });
 
+    const usaSvg = form.geometria === "svg" && form.svgPath !== "";
     const datos: SuiteFormData = {
       operacion: form.operacion,
       material: form.material.trim(),
@@ -112,6 +154,17 @@ export function SuiteWizard({
       pasadas: form.pasadas,
       tamanoCeldaMm: form.tamanoCeldaMm,
       espaciadoMm: form.espaciadoMm,
+      svgPath: usaSvg ? form.svgPath : undefined,
+      modoGrabadoSvg:
+        usaSvg && form.operacion === "grabado"
+          ? form.modoGrabadoSvg
+          : undefined,
+      svgResolucionRellenoMm:
+        usaSvg &&
+        form.operacion === "grabado" &&
+        form.modoGrabadoSvg !== "contorno"
+          ? form.svgResolucionRellenoMm
+          : undefined,
     };
 
     try {
@@ -383,6 +436,139 @@ export function SuiteWizard({
           ) : null}
 
           {paso === 4 ? (
+            <div className="flex flex-col gap-5">
+              <fieldset className="flex flex-col gap-3">
+                <legend className="text-navy text-base font-semibold">
+                  ¿Qué se {form.operacion === "corte" ? "corta" : "graba"} en
+                  cada celda?
+                </legend>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => actualizar({ geometria: "generica" })}
+                    aria-pressed={form.geometria === "generica"}
+                    className={clsx(
+                      "flex flex-col items-center gap-2 rounded-[var(--radius-md)] border p-6 transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+                      form.geometria === "generica"
+                        ? "border-blue bg-blue-soft"
+                        : "border-border hover:bg-navy-soft",
+                    )}
+                  >
+                    <Square className="text-navy size-6" strokeWidth={1.75} />
+                    <span className="text-navy text-sm font-medium">
+                      Cuadrado genérico
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => actualizar({ geometria: "svg" })}
+                    aria-pressed={form.geometria === "svg"}
+                    className={clsx(
+                      "flex flex-col items-center gap-2 rounded-[var(--radius-md)] border p-6 transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+                      form.geometria === "svg"
+                        ? "border-blue bg-blue-soft"
+                        : "border-border hover:bg-navy-soft",
+                    )}
+                  >
+                    <Shapes className="text-navy size-6" strokeWidth={1.75} />
+                    <span className="text-navy text-sm font-medium">
+                      Importar SVG
+                    </span>
+                  </button>
+                </div>
+              </fieldset>
+
+              {form.geometria === "svg" ? (
+                <div className="flex flex-col gap-4">
+                  <p className="text-text-muted text-sm">
+                    El SVG se escala para caber dentro de {form.tamanoCeldaMm}mm
+                    (el tamaño de celda del paso anterior), proporción
+                    preservada y centrado.
+                  </p>
+                  <SvgPicker
+                    disponibles={svgsDisponibles}
+                    seleccionado={form.svgPath}
+                    onSeleccionar={(nombre) => actualizar({ svgPath: nombre })}
+                  />
+
+                  {form.operacion === "corte" ? (
+                    <p className="border-border bg-navy-soft text-text-muted rounded-[var(--radius-sm)] border p-3 text-sm">
+                      Corte siempre traza solo el contorno del SVG, repetido
+                      según las pasadas configuradas — cortar no admite relleno
+                      tipo trama.
+                    </p>
+                  ) : (
+                    <>
+                      <fieldset className="flex flex-col gap-2">
+                        <legend className="text-navy text-sm font-medium">
+                          Modo de grabado
+                        </legend>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            {
+                              valor: "contorno" as const,
+                              etiqueta: "Contorno",
+                            },
+                            { valor: "relleno" as const, etiqueta: "Relleno" },
+                            {
+                              valor: "contorno_y_relleno" as const,
+                              etiqueta: "Contorno y relleno",
+                            },
+                          ].map((opcion) => (
+                            <button
+                              key={opcion.valor}
+                              type="button"
+                              onClick={() =>
+                                actualizar({ modoGrabadoSvg: opcion.valor })
+                              }
+                              aria-pressed={
+                                form.modoGrabadoSvg === opcion.valor
+                              }
+                              className={clsx(
+                                "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+                                form.modoGrabadoSvg === opcion.valor
+                                  ? "border-blue bg-blue-soft text-navy"
+                                  : "border-border text-text-muted hover:bg-navy-soft",
+                              )}
+                            >
+                              {opcion.etiqueta}
+                            </button>
+                          ))}
+                        </div>
+                      </fieldset>
+                      {form.modoGrabadoSvg !== "contorno" ? (
+                        <Field
+                          label="Resolución de relleno (mm)"
+                          hint="Espaciado entre líneas del relleno — más chico es más denso y más lento."
+                        >
+                          {(id) => (
+                            <input
+                              id={id}
+                              type="number"
+                              inputMode="decimal"
+                              min={0.05}
+                              step="0.05"
+                              value={form.svgResolucionRellenoMm}
+                              onChange={(e) =>
+                                actualizar({
+                                  svgResolucionRellenoMm: Number(
+                                    e.target.value,
+                                  ),
+                                })
+                              }
+                              className={clsx(INPUT_CLASSES, "w-40 font-mono")}
+                            />
+                          )}
+                        </Field>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {paso === 5 ? (
             <div className="flex flex-col gap-4">
               <p className="text-navy text-base font-semibold">
                 {totalCeldas(form)} celdas en total
@@ -424,15 +610,19 @@ export function SuiteWizard({
                     {form.pasadas}
                   </dd>
                 </div>
+                <div>
+                  <dt className="text-text-muted">Geometría</dt>
+                  <dd className="text-navy font-medium">
+                    {form.geometria === "svg"
+                      ? svgsDisponibles.find(
+                          (s) => `data/svgs/${s.nombre}` === form.svgPath,
+                        )
+                        ? "SVG importado"
+                        : form.svgPath.split("/").pop()
+                      : "Cuadrado genérico"}
+                  </dd>
+                </div>
               </dl>
-
-              {form.operacion === "grabado" ? (
-                <p className="border-border bg-navy-soft text-text-muted rounded-[var(--radius-sm)] border p-3 text-sm">
-                  Esta suite va a grabar un relleno genérico (cuadrado sólido)
-                  en cada celda. Importar un diseño propio va a estar disponible
-                  en Grabado Vectorial (SVG).
-                </p>
-              ) : null}
 
               {resultado.estado === "error" ? (
                 <div

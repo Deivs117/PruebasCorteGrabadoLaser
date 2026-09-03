@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { svgADataUri } from "@/lib/svg-data-uri";
 
 interface SvgOriginalPreviewProps {
   contenido: string;
@@ -12,12 +13,7 @@ interface SvgOriginalPreviewProps {
  * atributos de evento, y como imagen el navegador nunca los ejecuta.
  */
 export function SvgOriginalPreview({ contenido }: SvgOriginalPreviewProps) {
-  const dataUri = useMemo(() => {
-    const codificado = encodeURIComponent(contenido)
-      .replace(/'/g, "%27")
-      .replace(/"/g, "%22");
-    return `data:image/svg+xml,${codificado}`;
-  }, [contenido]);
+  const dataUri = useMemo(() => svgADataUri(contenido), [contenido]);
 
   return (
     <div className="bg-surface border-border flex aspect-square items-center justify-center overflow-hidden rounded-[var(--radius-md)] border p-4">

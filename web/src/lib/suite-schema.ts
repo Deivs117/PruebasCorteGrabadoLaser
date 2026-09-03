@@ -6,6 +6,12 @@ import { z } from "zod";
  * formulario avise del error antes de llegar al servidor — pero la
  * validación real y definitiva sigue siendo la del CLI, no esta.
  */
+export const modoGrabadoSvgSchema = z.enum([
+  "contorno",
+  "relleno",
+  "contorno_y_relleno",
+]);
+
 export const suiteSchema = z.object({
   operacion: z.enum(["corte", "grabado"]),
   material: z.string().trim().min(1, "Ingresá el material."),
@@ -20,21 +26,16 @@ export const suiteSchema = z.object({
   pasadas: z.number().int().gte(1),
   tamanoCeldaMm: z.number().gt(0),
   espaciadoMm: z.number().gte(0),
+  // Geometría de cada celda: cuadrado genérico (svgPath ausente) o el
+  // contorno/relleno de un SVG guardado (espejo de SuiteConfig.svg_path).
+  // En corte, modoGrabadoSvg/svgResolucionRellenoMm se ignoran (cortar
+  // siempre traza solo el contorno) — igual que en el backend.
+  svgPath: z.string().optional(),
+  modoGrabadoSvg: modoGrabadoSvgSchema.optional(),
+  svgResolucionRellenoMm: z.number().gt(0).optional(),
 });
 
 export type SuiteFormData = z.infer<typeof suiteSchema>;
-
-export const DEFAULTS: Omit<
-  SuiteFormData,
-  "operacion" | "material" | "espesorMm"
-> = {
-  lote: "L01",
-  velocidadesMmMin: [],
-  potenciasPct: [],
-  pasadas: 1,
-  tamanoCeldaMm: 15,
-  espaciadoMm: 5,
-};
 
 /** "C" para corte, "G" para grabado — misma convención que las suites ya existentes. */
 export function idPrefijo(operacion: "corte" | "grabado"): string {

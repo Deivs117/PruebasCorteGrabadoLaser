@@ -11,7 +11,7 @@ from enum import Enum
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 # Se importa desde `svg.modo` (no `svg.api`) a proposito: `svg.api` depende de
 # `MachineConfig` de este mismo modulo, y ese import si crearia un ciclo.
@@ -78,25 +78,25 @@ class SuiteConfig(BaseModel):
     svg_path: str | None = Field(
         default=None,
         description=(
-            "Ruta a un SVG a grabar en cada celda (solo aplica a operacion=grabado). Si se omite, "
-            "se usa el relleno generico tipo trama (un cuadrado solido)."
+            "Ruta a un SVG a usar en cada celda en vez de la geometria generica "
+            "(cuadrado de corte, o relleno tipo trama de grabado). En grabado aplica "
+            "`modo_grabado_svg`; en corte siempre se traza solo el contorno -- cortar "
+            "no admite relleno tipo trama, no tiene sentido fisico 'cortar un rayado'. "
+            "Si se omite, corte usa el cuadrado generico y grabado el relleno generico."
         ),
     )
     modo_grabado_svg: ModoGrabadoSvg = Field(
         default=ModoGrabadoSvg.CONTORNO_Y_RELLENO,
-        description="Solo aplica si `svg_path` esta definido: contorno, relleno, o ambos.",
+        description=(
+            "Solo aplica a operacion=grabado con `svg_path` definido: contorno, relleno, "
+            "o ambos. Se ignora en corte (corte con `svg_path` siempre traza el contorno)."
+        ),
     )
     svg_resolucion_relleno_mm: float = Field(
         default=RESOLUCION_RELLENO_MM_POR_DEFECTO,
         gt=0,
-        description="Espaciado entre lineas de relleno del SVG (mm). Solo aplica si `svg_path` esta definido",
+        description="Espaciado entre lineas de relleno del SVG (mm). Solo aplica a grabado con `svg_path`.",
     )
-
-    @model_validator(mode="after")
-    def _svg_solo_en_grabado(self) -> SuiteConfig:
-        if self.svg_path is not None and self.operacion is not Operacion.GRABADO:
-            raise ValueError("svg_path solo aplica a operacion=grabado")
-        return self
 
     @field_validator("velocidades_mm_min")
     @classmethod

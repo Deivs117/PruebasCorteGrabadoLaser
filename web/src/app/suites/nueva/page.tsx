@@ -1,7 +1,14 @@
 import { BackLink } from "@/components/ui/back-link";
 import { SuiteWizard } from "@/components/suites/suite-wizard";
+import { listarSvgsConContenido } from "@/lib/svg-data";
 
-export default function NuevaSuite() {
+// La galería de SVGs disponibles cambia en cualquier momento desde Grabado
+// Vectorial, así que esta página no se puede congelar como estática.
+export const dynamic = "force-dynamic";
+
+export default async function NuevaSuite() {
+  const svgsDisponibles = await listarSvgsConContenido();
+
   return (
     <div className="flex flex-col gap-6">
       <BackLink href="/suites" label="Volver a Suites de Prueba" />
@@ -13,7 +20,7 @@ export default function NuevaSuite() {
           Configurá el barrido paso a paso y generá su G-code al final.
         </p>
       </div>
-      <SuiteWizard />
+      <SuiteWizard svgsDisponibles={svgsDisponibles} />
     </div>
   );
 }

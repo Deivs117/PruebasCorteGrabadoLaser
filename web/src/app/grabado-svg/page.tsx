@@ -1,7 +1,7 @@
 import { SvgDropzone } from "@/components/grabado-svg/svg-dropzone";
 import { SvgGaleria } from "@/components/grabado-svg/svg-galeria";
 import { SvgWorkspace } from "@/components/grabado-svg/svg-workspace";
-import { leerSvgTexto, listarSvgsGuardados } from "@/lib/svg-data";
+import { listarSvgsConContenido } from "@/lib/svg-data";
 
 // Se suben y eliminan SVGs en cualquier momento, así que esta página no se
 // puede congelar como estática en el build.
@@ -13,13 +13,7 @@ export default async function GrabadoVectorialSVG({
   const { svg } = await searchParams;
   const nombreSeleccionado = typeof svg === "string" ? svg : undefined;
 
-  const guardados = await listarSvgsGuardados();
-  const galeria = await Promise.all(
-    guardados.map(async (item) => ({
-      ...item,
-      contenido: (await leerSvgTexto(item.nombre)) ?? "",
-    })),
-  );
+  const galeria = await listarSvgsConContenido();
   const contenidoSeleccionado = galeria.find(
     (item) => item.nombre === nombreSeleccionado,
   )?.contenido;

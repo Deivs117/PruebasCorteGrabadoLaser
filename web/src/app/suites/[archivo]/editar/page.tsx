@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { BackLink } from "@/components/ui/back-link";
 import { SuiteWizard } from "@/components/suites/suite-wizard";
 import { leerSuiteEditable } from "@/lib/generar-suite";
+import { listarSvgsConContenido } from "@/lib/svg-data";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,10 @@ export default async function EditarSuite({
 }: PageProps<"/suites/[archivo]/editar">) {
   const { archivo: archivoParam } = await params;
   const archivo = decodeURIComponent(archivoParam);
-  const datos = await leerSuiteEditable(archivo);
+  const [datos, svgsDisponibles] = await Promise.all([
+    leerSuiteEditable(archivo),
+    listarSvgsConContenido(),
+  ]);
 
   if (!datos) {
     notFound();
@@ -26,7 +30,11 @@ export default async function EditarSuite({
           la versión actualizada.
         </p>
       </div>
-      <SuiteWizard archivoExistente={archivo} datosIniciales={datos} />
+      <SuiteWizard
+        archivoExistente={archivo}
+        datosIniciales={datos}
+        svgsDisponibles={svgsDisponibles}
+      />
     </div>
   );
 }

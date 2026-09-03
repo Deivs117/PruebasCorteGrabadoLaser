@@ -109,7 +109,7 @@ make summarize-final-run CSVS="data/registros/FINAL_..._ejec1_registro.csv data/
 
 `summarize-final-run` agrupa por combinación (material/espesor/operación/velocidad/potencia, sin importar fecha ni ejecución) y reporta **kWh por unidad** y **tiempo por unidad**, cada uno con su desviación estándar y coeficiente de variación entre ejecuciones — y si ya hay suficientes ejecuciones (mínimo 3) para considerarlo `CALIBRADO`. Ese número calibrado es el que se documenta en la futura Ficha de Parámetro Estándar (F6), no una nueva estimación.
 
-**Grabado de SVG (logo de la empresa y artes vectoriales):**
+**Grabado y corte de SVG (logo de la empresa y artes vectoriales):**
 
 El paquete `laser_toolkit.svg` es un conversor SVG → G-code propio, sin dependencias pesadas (parser de `path`/`ellipse`/`circle`/`rect`/`line`/`polyline`/`polygon`, aplanado de curvas Bezier, transformación a milímetros, relleno vectorial por trama con regla par-impar). Está deliberadamente desacoplado en piezas atómicas y reutilizables — `cargar_subpaths_svg` da la geometría pura sin G-code, útil para integraciones futuras (nesting, previsualización) que no necesiten emitir G-code.
 
@@ -124,7 +124,7 @@ make svg-to-gcode SVG=assets/svg/logo-empresa.svg ANCHO=30 ALTO=30 \
 make generate-engrave CONFIG=configs/logo_grabado.yaml
 ```
 
-`assets/svg/logo-empresa.svg` es el archivo de referencia por defecto del sistema para pruebas de grabado vectorial — casi todo grabado real de producción parte de un SVG así, no de un relleno genérico. El modo (`contorno`, `relleno`, o `contorno_y_relleno`) y la resolución del relleno se configuran en el YAML de la suite (`svg_path`, `modo_grabado_svg`, `svg_resolucion_relleno_mm`) o como flags del comando suelto.
+`assets/svg/logo-empresa.svg` es el archivo de referencia por defecto del sistema para pruebas de grabado vectorial — casi todo grabado real de producción parte de un SVG así, no de un relleno genérico. `svg_path` en el YAML de la suite (o como flag del comando suelto) funciona tanto en `operacion: grabado` como en `operacion: corte`: en grabado se puede elegir el modo (`contorno`, `relleno`, o `contorno_y_relleno`) y la resolución del relleno (`modo_grabado_svg`, `svg_resolucion_relleno_mm`); en corte siempre se traza únicamente el contorno del SVG, repetido según `pasadas` — cortar no admite relleno tipo trama.
 
 Limitaciones conocidas: no soporta arcos SVG (`A`/`a`, falla con un error claro en vez de dibujar mal) ni el atributo `transform` (falla igual) — exportar el SVG con las transformaciones aplanadas y las curvas como Bezier/rectas.
 

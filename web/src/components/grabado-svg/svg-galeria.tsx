@@ -2,6 +2,7 @@ import Link from "next/link";
 import { clsx } from "clsx";
 import { Card } from "@/components/ui/card";
 import { EliminarSvgButton } from "@/components/grabado-svg/eliminar-svg-button";
+import { svgADataUri } from "@/lib/svg-data-uri";
 import { tiempoRelativo } from "@/lib/tiempo-relativo";
 
 interface ItemGaleria {
@@ -13,13 +14,6 @@ interface ItemGaleria {
 interface SvgGaleriaProps {
   items: ItemGaleria[];
   seleccionado?: string;
-}
-
-function dataUri(contenido: string): string {
-  const codificado = encodeURIComponent(contenido)
-    .replace(/'/g, "%27")
-    .replace(/"/g, "%22");
-  return `data:image/svg+xml,${codificado}`;
 }
 
 export function SvgGaleria({ items, seleccionado }: SvgGaleriaProps) {
@@ -46,7 +40,7 @@ export function SvgGaleria({ items, seleccionado }: SvgGaleriaProps) {
                 <div className="bg-navy-soft hover:bg-blue-soft flex aspect-square items-center justify-center overflow-hidden rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]">
                   {/* eslint-disable-next-line @next/next/no-img-element -- miniatura de un SVG arbitrario, servida como data URI */}
                   <img
-                    src={dataUri(item.contenido)}
+                    src={svgADataUri(item.contenido)}
                     alt={`Miniatura de ${item.nombre}`}
                     className="max-h-full max-w-full p-2"
                   />

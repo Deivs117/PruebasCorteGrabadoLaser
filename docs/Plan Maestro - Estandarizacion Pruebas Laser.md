@@ -288,7 +288,7 @@ No soportado (falla con error explícito, nunca dibuja mal en silencio): arcos S
 ### 11.3 Dos formas de uso
 
 1. **Herramienta suelta**: `laser-toolkit svg-to-gcode <archivo.svg> --ancho-mm --alto-mm --velocidad --potencia -o salida.gcode`. No depende de `SuiteConfig` ni de ningún otro concepto del sistema de pruebas.
-2. **Integrado en una suite de barrido**: `SuiteConfig.svg_path` (solo válido con `operacion: grabado`) hace que `generar_suite_grabado` grabe ese SVG —escalado a `tamano_celda_mm`— en cada celda de la grilla, en vez del relleno genérico. `modo_grabado_svg` (`contorno`, `relleno`, `contorno_y_relleno`) y `svg_resolucion_relleno_mm` controlan el resultado. El resto del pipeline (csv hermano, `prepare-record`, `compute-costs`) funciona exactamente igual, sin cambios.
+2. **Integrado en una suite de barrido**: `SuiteConfig.svg_path` hace que la suite use ese SVG —escalado a `tamano_celda_mm`— en cada celda de la grilla, en vez de la geometría genérica. En **grabado**, `generar_suite_grabado` respeta `modo_grabado_svg` (`contorno`, `relleno`, `contorno_y_relleno`) y `svg_resolucion_relleno_mm`. En **corte**, `generar_suite_corte` siempre traza solo el **contorno** del SVG (ignora `modo_grabado_svg`: cortar no admite relleno tipo trama, no tiene sentido físico "cortar un rayado"), repetido `pasadas` veces igual que el cuadrado genérico — el área de material cobrada sigue siendo la celda completa, no el área encerrada por la forma (sección 6.2). El resto del pipeline (csv hermano, `prepare-record`, `compute-costs`) funciona exactamente igual, sin cambios.
 
 ### 11.4 Archivo de referencia
 
