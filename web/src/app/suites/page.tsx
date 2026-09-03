@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
+import { DuplicarSuiteButton } from "@/components/suites/duplicar-suite-button";
 import { EliminarSuiteButton } from "@/components/suites/eliminar-suite-button";
 import { listarSuites } from "@/lib/fs-data";
 import { tiempoRelativo } from "@/lib/tiempo-relativo";
@@ -80,13 +81,20 @@ export default async function SuitesDePrueba() {
                   </p>
                   <div className="flex shrink-0 items-center gap-1">
                     {suite.tipo === "barrido" ? (
-                      <Link
-                        href={`/suites/${encodeURIComponent(suite.archivo)}/editar`}
-                        aria-label={`Editar suite de ${suite.material}`}
-                        className="text-text-muted hover:bg-navy-soft hover:text-navy flex size-7 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
-                      >
-                        <Pencil className="size-4" strokeWidth={1.75} />
-                      </Link>
+                      <>
+                        <Link
+                          href={`/suites/${encodeURIComponent(suite.archivo)}/editar`}
+                          aria-label={`Editar suite de ${suite.material}`}
+                          className="text-text-muted hover:bg-navy-soft hover:text-navy flex size-7 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
+                        >
+                          <Pencil className="size-4" strokeWidth={1.75} />
+                        </Link>
+                        <DuplicarSuiteButton
+                          archivo={suite.archivo}
+                          material={suite.material}
+                          loteActual={suite.lote}
+                        />
+                      </>
                     ) : null}
                     <EliminarSuiteButton
                       archivo={suite.archivo}

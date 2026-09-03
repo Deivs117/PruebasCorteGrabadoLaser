@@ -1,11 +1,12 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { access, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { CONFIGS_DIR, REPO_ROOT } from "@/lib/fs-data";
+import { CONFIGS_DIR, REGISTROS_DIR, REPO_ROOT } from "@/lib/fs-data";
+import { predecirCorridaId } from "@/lib/corrida-id";
 import { slug } from "@/lib/slug";
 import { idPrefijo, type SuiteFormData } from "@/lib/suite-schema";
 
@@ -130,6 +131,32 @@ async function escribirYGenerar(
   }
 }
 
+async function existeArchivo(ruta: string): Promise<boolean> {
+  try {
+    await access(ruta);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Evita el incidente real que motivó esto: editar una suite que ya tiene su
+ * Hoja de Registro preparada (`_registro.csv`) regenera el `.csv` hermano
+ * bajo el MISMO nombre (mismo material+espesor+operación+fecha+lote) y, si
+ * después se corre "Preparar registro" de nuevo, pisa en silencio las
+ * mediciones y notas ya guardadas. En vez de bloquear todas las ediciones
+ * (el `.csv` se regenera solo en cada guardado, incluso recién creada la
+ * suite, así que bloquear por su sola existencia rompería la edición normal
+ * antes de correr nada), esto solo bloquea cuando ya existe un
+ * `_registro.csv` real para esa identidad — ahí sí hay datos del técnico en
+ * juego.
+ */
+async function corridaYaRegistrada(datos: SuiteFormData): Promise<boolean> {
+  const corridaId = predecirCorridaId(datos);
+  return existeArchivo(path.join(REGISTROS_DIR, `${corridaId}_registro.csv`));
+}
+
 export async function generarSuite(
   datos: SuiteFormData,
 ): Promise<ResultadoGeneracion> {
@@ -156,6 +183,14 @@ export async function actualizarSuite(
 ): Promise<ResultadoGeneracion> {
   if (!nombreDeSuiteValido(archivoExistente)) {
     return { ok: false, error: "Archivo inválido." };
+  }
+
+  if (await corridaYaRegistrada(datos)) {
+    return {
+      ok: false,
+      error:
+        "Ya existe una Hoja de Registro preparada para este material, espesor, operación y lote de hoy. Guardar esta edición pisaría esas mediciones en silencio — usá \"Duplicar\" con un lote distinto en vez de editar esta suite.",
+    };
   }
 
   let original: Record<string, unknown> = {};

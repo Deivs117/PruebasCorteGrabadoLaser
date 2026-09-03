@@ -37,6 +37,7 @@ export interface SuiteConfig {
   velocidadMmMin?: number;
   potenciaPct?: number;
   repeticiones?: number;
+  lote: string;
   /** Cuándo se creó el archivo de configuración, no la fecha de la prueba
    * (`fecha` dentro del YAML, editable) — para saber de verdad hace cuánto
    * existe esta suite antes de eliminarla. */
@@ -114,6 +115,7 @@ async function leerSuite(nombre: string): Promise<SuiteConfig | null> {
         typeof datos.potencia_pct === "number" ? datos.potencia_pct : undefined,
       repeticiones:
         typeof datos.repeticiones === "number" ? datos.repeticiones : undefined,
+      lote: typeof datos.lote === "string" ? datos.lote : "L01",
       creadoEn: creadoEn.toISOString(),
     };
   } catch {
