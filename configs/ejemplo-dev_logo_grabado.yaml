@@ -1,6 +1,6 @@
 # Suite de GRABADO -- logo de la empresa sobre MDF Trupan 3.0mm.
 #
-# A diferencia de mdf_3mm_grabado.yaml (grabado generico tipo trama sobre un
+# A diferencia de ejemplo-dev_mdf_3mm_grabado.yaml (grabado generico tipo trama sobre un
 # cuadrado), esta suite graba el logo real en cada celda -- el formato que
 # casi siempre se va a usar en produccion. Usa la misma grilla velocidad x
 # potencia; solo cambia la geometria grabada.

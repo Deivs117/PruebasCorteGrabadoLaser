@@ -292,4 +292,4 @@ No soportado (falla con error explícito, nunca dibuja mal en silencio): arcos S
 
 ### 11.4 Archivo de referencia
 
-`assets/svg/logo-empresa.svg` es el SVG por defecto del sistema para pruebas de grabado — el formato que se usa casi el 100% de las veces en producción. `configs/logo_grabado.yaml` es la suite de ejemplo que lo usa.
+`assets/svg/logo-empresa.svg` es el SVG por defecto del sistema para pruebas de grabado — el formato que se usa casi el 100% de las veces en producción. `configs/ejemplo-dev_logo_grabado.yaml` es la suite de ejemplo que lo usa.

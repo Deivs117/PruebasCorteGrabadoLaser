@@ -1,10 +1,10 @@
 """Interfaz de linea de comandos de laser_toolkit.
 
-uv run laser-toolkit generate-cut configs/mdf_3mm_corte.yaml
-uv run laser-toolkit generate-engrave configs/mdf_3mm_grabado.yaml
+uv run laser-toolkit generate-cut configs/ejemplo-dev_mdf_3mm_corte.yaml
+uv run laser-toolkit generate-engrave configs/ejemplo-dev_mdf_3mm_grabado.yaml
 uv run laser-toolkit prepare-record data/registros/<corrida>.csv
 uv run laser-toolkit compute-costs data/registros/<corrida>_registro.csv --tarifas configs/tarifas.yaml
-uv run laser-toolkit generate-final-run configs/mdf_3mm_corte_final_run.yaml --ejecucion 2
+uv run laser-toolkit generate-final-run configs/ejemplo-dev_mdf_3mm_corte_final_run.yaml --ejecucion 2
 uv run laser-toolkit summarize-final-run data/registros/FINAL_..._ejec1_registro.csv \
     data/registros/FINAL_..._ejec2_registro.csv
 uv run laser-toolkit svg-to-gcode assets/svg/logo-empresa.svg --ancho-mm 30 --alto-mm 30 \

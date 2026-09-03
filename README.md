@@ -78,8 +78,8 @@ flowchart TD
 
 ```
 make install                                    # uv sync -- instala el entorno
-make generate-cut CONFIG=configs/mdf_3mm_corte.yaml
-make generate-engrave CONFIG=configs/mdf_3mm_grabado.yaml
+make generate-cut CONFIG=configs/ejemplo-dev_mdf_3mm_corte.yaml
+make generate-engrave CONFIG=configs/ejemplo-dev_mdf_3mm_grabado.yaml
 make prepare-record CSV=data/registros/<corrida>.csv
 # ... correr en la maquina, medir, evaluar, completar a mano el _registro.csv ...
 cp configs/tarifas.example.yaml configs/tarifas.yaml   # completar con el area financiera
@@ -100,7 +100,7 @@ make check                                      # lint + typecheck + test, todo 
 Una suite de barrido reparte el kWh medido entre celdas por *peso de tiempo*, no por potencia real — suficiente para *elegir* la combinación ganadora, pero es una aproximación. Una vez elegida, una **Final Run** fija esa única combinación y la repite en celdas físicamente idénticas, de modo que el reparto del kWh deja de ser aproximado.
 
 ```
-make generate-final-run CONFIG=configs/mdf_3mm_corte_final_run.yaml EJECUCION=1
+make generate-final-run CONFIG=configs/ejemplo-dev_mdf_3mm_corte_final_run.yaml EJECUCION=1
 # ... correr en la maquina, medir, evaluar (mismo SOP) ...
 make prepare-record CSV=data/registros/FINAL_..._ejec1.csv
 # repetir con EJECUCION=2, EJECUCION=3 en momentos independientes (minimo 3)
@@ -121,7 +121,7 @@ make svg-to-gcode SVG=assets/svg/logo-empresa.svg ANCHO=30 ALTO=30 \
     VELOCIDAD=1200 POTENCIA=25 SALIDA=data/registros/logo.gcode
 
 # 2. Integrado en una suite de barrido: graba el logo en cada celda de la grilla
-make generate-engrave CONFIG=configs/logo_grabado.yaml
+make generate-engrave CONFIG=configs/ejemplo-dev_logo_grabado.yaml
 ```
 
 `assets/svg/logo-empresa.svg` es el archivo de referencia por defecto del sistema para pruebas de grabado vectorial — casi todo grabado real de producción parte de un SVG así, no de un relleno genérico. `svg_path` en el YAML de la suite (o como flag del comando suelto) funciona tanto en `operacion: grabado` como en `operacion: corte`: en grabado se puede elegir el modo (`contorno`, `relleno`, o `contorno_y_relleno`) y la resolución del relleno (`modo_grabado_svg`, `svg_resolucion_relleno_mm`); en corte siempre se traza únicamente el contorno del SVG, repetido según `pasadas` — cortar no admite relleno tipo trama.
