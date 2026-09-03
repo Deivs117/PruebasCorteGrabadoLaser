@@ -33,11 +33,7 @@ function nombreDescargableValido(nombre: string): boolean {
 }
 
 function filaEvaluada(fila: FilaRegistro): boolean {
-  return (
-    fila.corte_pasante !== "" &&
-    fila.calidad_borde_1a5 !== "" &&
-    fila.carbonizacion_1a5 !== ""
-  );
+  return fila.corte_pasante !== "" && fila.carbonizacion_1a5 !== "";
 }
 
 /** Lee cualquier csv con encabezado como lista de filas de texto — lo

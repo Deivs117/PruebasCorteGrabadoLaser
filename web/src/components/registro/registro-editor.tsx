@@ -30,11 +30,7 @@ function idCandidato(fila: FilaRegistro): string {
 type EstadoGuardado = "idle" | "guardando" | "ok" | "error";
 
 function filaEvaluada(fila: FilaRegistro): boolean {
-  return (
-    fila.corte_pasante !== "" &&
-    fila.calidad_borde_1a5 !== "" &&
-    fila.carbonizacion_1a5 !== ""
-  );
+  return fila.corte_pasante !== "" && fila.carbonizacion_1a5 !== "";
 }
 
 export function RegistroEditor({
@@ -184,17 +180,25 @@ export function RegistroEditor({
           value={evaluadas}
           total={filas.length}
         />
-        <div className="flex flex-col gap-1">
-          <span className="text-navy text-sm font-medium">
-            Foto de toda la batería
-          </span>
-          <PhotoCell
-            corridaId={filas[0]?.corrida_id ?? ""}
-            celdaId={CELDA_ID_BATERIA}
-            foto={fotoBateria}
-            onChange={setFotoBateria}
-            descripcion="toda la batería"
-          />
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="flex flex-col gap-1">
+            <span className="text-navy text-sm font-medium">Pasadas</span>
+            <span className="text-navy font-mono text-lg leading-none">
+              {filas[0]?.pasadas ?? "—"}
+            </span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-navy text-sm font-medium">
+              Foto de toda la batería
+            </span>
+            <PhotoCell
+              corridaId={filas[0]?.corrida_id ?? ""}
+              celdaId={CELDA_ID_BATERIA}
+              foto={fotoBateria}
+              onChange={setFotoBateria}
+              descripcion="toda la batería"
+            />
+          </div>
         </div>
       </Card>
 
@@ -206,13 +210,7 @@ export function RegistroEditor({
                 Prueba
               </th>
               <th scope="col" className="px-4 py-3">
-                Pasadas
-              </th>
-              <th scope="col" className="px-4 py-3">
                 Corte pasante
-              </th>
-              <th scope="col" className="px-4 py-3">
-                Calidad de borde
               </th>
               <th scope="col" className="px-4 py-3">
                 Carbonización
@@ -238,9 +236,6 @@ export function RegistroEditor({
                     onDesmarcar={() => desmarcarCandidata(fila)}
                   />
                 </td>
-                <td className="text-navy px-4 py-3 font-mono">
-                  {fila.pasadas}
-                </td>
                 <td className="px-4 py-3">
                   <div className="border-border inline-flex overflow-hidden rounded-[var(--radius-sm)] border">
                     {(["si", "no"] as const).map((opcion) => (
@@ -262,17 +257,6 @@ export function RegistroEditor({
                       </button>
                     ))}
                   </div>
-                </td>
-                <td className="px-4 py-3">
-                  <StarRating
-                    label={`Calidad de borde, celda ${fila.id_prueba}`}
-                    value={
-                      fila.calidad_borde_1a5 as "" | "1" | "2" | "3" | "4" | "5"
-                    }
-                    onChange={(v) =>
-                      actualizarFila(indice, { calidad_borde_1a5: v })
-                    }
-                  />
                 </td>
                 <td className="px-4 py-3">
                   <StarRating

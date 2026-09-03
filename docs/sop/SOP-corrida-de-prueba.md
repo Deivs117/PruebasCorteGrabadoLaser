@@ -52,18 +52,18 @@
 
 Por cada celda identificada por su ID grabado (`C-001`, `C-002`, ...), completar:
 
-| ID celda | ¿Corte pasante? (si/no) | Calidad de borde (1-5) | Carbonización (1-5) | Notas |
-|---|---|---|---|---|
-| | | | | |
-| | | | | |
-| | | | | |
-| | | | | |
-| | | | | |
-| | | | | |
-| | | | | |
-| | | | | |
+| ID celda | ¿Corte pasante? (si/no) | Carbonización (1-5) | Notas |
+|---|---|---|---|
+| | | | |
+| | | | |
+| | | | |
+| | | | |
+| | | | |
+| | | | |
+| | | | |
+| | | | |
 
-*(Fotocopiar o extender la tabla según el número de celdas de la suite. Escala de calidad de borde: 1 = inaceptable, 5 = corte limpio tipo tostado uniforme. Escala de carbonización: 1 = sin hollín visible, 5 = negro carbonizado que ensucia al tacto.)*
+*(Fotocopiar o extender la tabla según el número de celdas de la suite. Escala de carbonización: 1 = sin hollín visible, 5 = negro carbonizado que ensucia al tacto. No hay columna aparte de "calidad de borde": si el corte no pasa, el borde ya queda mal por definición — `corte_pasante` cubre eso.)*
 
 - [ ] Foto general de la placa completa, con buena luz, antes de desarmar/cortar los cupones.
 
@@ -74,7 +74,7 @@ Por cada celda identificada por su ID grabado (`C-001`, `C-002`, ...), completar
    - `kwh_corrida_medido` = el valor calculado en el paso D.
    - `tiempo_real_corrida_s` = el valor del paso D.
 3. Completar, **fila por fila** según la tabla de la sección E:
-   - `corte_pasante`, `calidad_borde_1a5`, `carbonizacion_1a5`, `notas`.
+   - `corte_pasante`, `carbonizacion_1a5`, `notas`.
    - `foto` = nombre/ruta del archivo de la foto general.
 4. Guardar el archivo.
 

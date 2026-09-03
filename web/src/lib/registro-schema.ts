@@ -25,9 +25,12 @@ export const CAMPOS_CSV = [
   "tiempo_estimado_celda_s",
 ] as const;
 
+// Se eliminó "calidad_borde_1a5" (existía junto a "carbonizacion_1a5"): en la
+// práctica del taller un corte o pasa limpio o no pasa, y si no pasa el borde
+// ya queda mal por definición — "corte_pasante" cubre eso, sin una columna
+// redundante.
 export const COLUMNAS_MANUALES = [
   "corte_pasante",
-  "calidad_borde_1a5",
   "carbonizacion_1a5",
   "kwh_corrida_medido",
   "tiempo_real_corrida_s",
@@ -62,17 +65,13 @@ const numeroPositivoOVacio = z
 /**
  * Valida una fila editada por el técnico, calcando el vocabulario del SOP
  * en papel del taller (docs/sop/SOP-corrida-de-prueba.md): "si"/"no" para
- * corte pasante, escalas 1-5 para calidad de borde y carbonización.
+ * corte pasante, escala 1-5 para carbonización.
  * `kwh_corrida_medido` y `tiempo_real_corrida_s` viajan en cada fila (así se
  * guardan en el csv) pero deben ser el mismo valor en toda la corrida — esa
  * consistencia se valida aparte, con `filasComparten`.
  */
 export const filaEditableSchema = z.object({
   corte_pasante: z.enum(["", "si", "no"]),
-  calidad_borde_1a5: z.union([
-    z.literal(""),
-    z.enum(["1", "2", "3", "4", "5"]),
-  ]),
   carbonizacion_1a5: z.union([
     z.literal(""),
     z.enum(["1", "2", "3", "4", "5"]),

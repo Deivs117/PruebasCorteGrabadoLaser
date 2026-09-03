@@ -99,7 +99,7 @@ Esto por sí solo ya estandariza cómo se nombran y archivan las pruebas.
    - Lectura de energía final (kWh acumulados) o revisar consumo de la corrida en la app del enchufe si el rango de tiempo es identificable.
 6. **Evaluar el cupón** (offline, sin máquina):
    - Foto del cupón completo con buena luz.
-   - Por cada celda: ¿corte pasante? (sí/no), calidad de borde (escala 1–5), carbonización (escala 1–5), notas.
+   - Por cada celda: ¿corte pasante? (sí/no), carbonización (escala 1–5), notas.
 7. **Cargar resultados** a la Hoja de Registro (importando el `.csv` hermano + agregando las columnas de evaluación y energía).
 
 > Este SOP es el documento que se cuelga físicamente en el taller — una sola página, checklist.
@@ -123,7 +123,6 @@ Una fila = una **celda de prueba** (no una corrida completa). Columnas propuesta
 | `potencia_pct` | csv hermano | 100 |
 | `pasadas` | csv hermano | 1 |
 | `corte_pasante` | evaluación manual | sí |
-| `calidad_borde_1a5` | evaluación manual | 4 |
 | `carbonizacion_1a5` | evaluación manual | 2 |
 | `tiempo_corrida_min` | LaserGRBL (tiempo total de la suite, prorrateado) | — |
 | `kwh_corrida` | medidor (total de la suite, prorrateado) | — |
@@ -258,7 +257,7 @@ que el sistema funcione con datos parciales.
 
 Sigue pendiente de definir (fuera del alcance del costeo, es un criterio operativo):
 
-- Umbral de aceptación de carbonización/calidad de borde para considerar una prueba "aprobada" (Fase F6/F7).
+- Umbral de aceptación de carbonización para considerar una prueba "aprobada" (Fase F6/F7).
 
 ---
 
