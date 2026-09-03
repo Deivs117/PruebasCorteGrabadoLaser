@@ -276,7 +276,11 @@ export function SuiteWizard({
 
   return (
     <div className="flex flex-col gap-6">
-      <WizardStepper pasos={PASOS} actual={paso} />
+      <WizardStepper
+        pasos={PASOS}
+        actual={paso}
+        onSeleccionar={datosIniciales ? setPaso : undefined}
+      />
 
       <Reveal key={paso}>
         <Card className="p-6">

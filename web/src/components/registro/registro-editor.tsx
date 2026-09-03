@@ -10,6 +10,8 @@ import { ToastHost, type ToastData } from "@/components/ui/toast";
 import { CandidatoCell } from "@/components/registro/candidato-cell";
 import { PhotoCell } from "@/components/registro/photo-cell";
 import { StarRating } from "@/components/registro/star-rating";
+import { TiempoInput } from "@/components/registro/tiempo-input";
+import { CELDA_ID_BATERIA } from "@/lib/foto-bateria";
 import type { FilaRegistro } from "@/lib/registro-schema";
 
 interface RegistroEditorProps {
@@ -17,6 +19,8 @@ interface RegistroEditorProps {
   filasIniciales: FilaRegistro[];
   /** ids (`${corrida_id}::${id_prueba}`) ya marcados como candidatos a Final Run. */
   candidatosIniciales: string[];
+  /** Nombre del archivo de la foto de toda la batería, si ya se subió una. */
+  fotoBateriaInicial: string;
 }
 
 function idCandidato(fila: FilaRegistro): string {
@@ -37,8 +41,10 @@ export function RegistroEditor({
   archivo,
   filasIniciales,
   candidatosIniciales,
+  fotoBateriaInicial,
 }: RegistroEditorProps) {
   const [filas, setFilas] = useState<FilaRegistro[]>(filasIniciales);
+  const [fotoBateria, setFotoBateria] = useState(fotoBateriaInicial);
   const [kwhCorrida, setKwhCorrida] = useState(
     filasIniciales[0]?.kwh_corrida_medido ?? "",
   );
@@ -172,12 +178,24 @@ export function RegistroEditor({
 
   return (
     <div className="flex flex-col gap-4 pb-24">
-      <Card className="p-4">
+      <Card className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
         <ProgressBar
           label="Celdas evaluadas"
           value={evaluadas}
           total={filas.length}
         />
+        <div className="flex flex-col gap-1">
+          <span className="text-navy text-sm font-medium">
+            Foto de toda la batería
+          </span>
+          <PhotoCell
+            corridaId={filas[0]?.corrida_id ?? ""}
+            celdaId={CELDA_ID_BATERIA}
+            foto={fotoBateria}
+            onChange={setFotoBateria}
+            descripcion="toda la batería"
+          />
+        </div>
       </Card>
 
       <Card className="overflow-x-auto p-0">
@@ -306,23 +324,15 @@ export function RegistroEditor({
                 className={clsx(INPUT_CLASSES, "w-40 font-mono")}
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-navy font-medium">
-                Tiempo real (segundos)
-              </span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="1"
+            <div className="text-sm">
+              <TiempoInput
                 value={tiempoCorrida}
-                onChange={(e) => {
+                onChange={(v) => {
                   setEstadoGuardado("idle");
-                  setTiempoCorrida(e.target.value);
+                  setTiempoCorrida(v);
                 }}
-                className={clsx(INPUT_CLASSES, "w-40 font-mono")}
               />
-            </label>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">

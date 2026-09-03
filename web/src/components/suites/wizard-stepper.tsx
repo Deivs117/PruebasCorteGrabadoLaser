@@ -4,34 +4,57 @@ import { clsx } from "clsx";
 interface WizardStepperProps {
   pasos: string[];
   actual: number;
+  /** Si se pasa, cada paso se puede clickear para saltar directo ahí — para
+   * editar o duplicar, donde los datos ya están cargados y el técnico sabe
+   * exactamente qué campo quiere tocar, en vez de forzarlo a pasar por
+   * Siguiente uno por uno. En una suite nueva se omite: ahí sí conviene la
+   * guía secuencial. */
+  onSeleccionar?: (indice: number) => void;
 }
 
-/** Progreso del asistente: solo informativo (no navega al hacer click) — avanzar y volver es responsabilidad de los botones Siguiente/Atrás. */
-export function WizardStepper({ pasos, actual }: WizardStepperProps) {
+export function WizardStepper({
+  pasos,
+  actual,
+  onSeleccionar,
+}: WizardStepperProps) {
   return (
     <ol aria-label="Progreso del asistente" className="flex items-center">
       {pasos.map((paso, indice) => {
         const completado = indice < actual;
         const activo = indice === actual;
+        const circulo = (
+          <span
+            aria-current={activo ? "step" : undefined}
+            className={clsx(
+              "flex size-8 items-center justify-center rounded-full font-mono text-sm font-medium",
+              "transition-colors duration-[var(--duration-standard)] ease-[var(--ease-motion)]",
+              completado && "bg-teal text-white",
+              activo && "bg-blue text-white",
+              !completado && !activo && "bg-navy-soft text-text-muted",
+            )}
+          >
+            {completado ? (
+              <Check className="size-4" strokeWidth={2.5} />
+            ) : (
+              indice + 1
+            )}
+          </span>
+        );
         return (
           <li key={paso} className="flex flex-1 items-center last:flex-none">
             <div className="flex flex-col items-center gap-1.5">
-              <span
-                aria-current={activo ? "step" : undefined}
-                className={clsx(
-                  "flex size-8 items-center justify-center rounded-full font-mono text-sm font-medium",
-                  "transition-colors duration-[var(--duration-standard)] ease-[var(--ease-motion)]",
-                  completado && "bg-teal text-white",
-                  activo && "bg-blue text-white",
-                  !completado && !activo && "bg-navy-soft text-text-muted",
-                )}
-              >
-                {completado ? (
-                  <Check className="size-4" strokeWidth={2.5} />
-                ) : (
-                  indice + 1
-                )}
-              </span>
+              {onSeleccionar ? (
+                <button
+                  type="button"
+                  onClick={() => onSeleccionar(indice)}
+                  aria-label={`Ir al paso ${indice + 1}: ${paso}`}
+                  className="rounded-full transition-transform duration-[var(--duration-quick)] ease-[var(--ease-motion)] hover:scale-105"
+                >
+                  {circulo}
+                </button>
+              ) : (
+                circulo
+              )}
               <span
                 className={clsx(
                   "max-w-20 text-center text-xs",

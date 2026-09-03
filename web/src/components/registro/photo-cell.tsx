@@ -9,6 +9,10 @@ interface PhotoCellProps {
   celdaId: string;
   foto: string;
   onChange: (foto: string) => void;
+  /** Texto para el alt de la miniatura — por defecto "la celda {celdaId}",
+   * mismo mecanismo pero distinta etiqueta cuando no es una celda puntual
+   * (ej. la foto de toda la batería). */
+  descripcion?: string;
 }
 
 /** Evidencia fotográfica de una celda: sube el archivo real a data/fotos/ al
@@ -20,6 +24,7 @@ export function PhotoCell({
   celdaId,
   foto,
   onChange,
+  descripcion = `la celda ${celdaId}`,
 }: PhotoCellProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [subiendo, setSubiendo] = useState(false);
@@ -71,7 +76,7 @@ export function PhotoCell({
             {/* eslint-disable-next-line @next/next/no-img-element -- imagen local servida por nuestra propia API, fuera de public/ */}
             <img
               src={`/api/fotos/${encodeURIComponent(foto)}`}
-              alt={`Foto de la celda ${celdaId}`}
+              alt={`Foto de ${descripcion}`}
               className="border-border size-9 rounded-full border object-cover"
             />
             <button

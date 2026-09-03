@@ -3,6 +3,7 @@ import { BackLink } from "@/components/ui/back-link";
 import { RegistroEditor } from "@/components/registro/registro-editor";
 import { leerRegistro } from "@/lib/registro-data";
 import { listarCandidatos } from "@/lib/candidatos-final-run";
+import { leerFotoBateria } from "@/lib/fotos-data";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export default async function DetalleRegistro({
   const candidatosIniciales = candidatos
     .filter((c) => c.archivo === archivo)
     .map((c) => c.id);
+  const fotoBateriaInicial = await leerFotoBateria(primera.corrida_id);
 
   return (
     <div className="flex flex-col gap-6">
@@ -39,6 +41,7 @@ export default async function DetalleRegistro({
         archivo={archivo}
         filasIniciales={filas}
         candidatosIniciales={candidatosIniciales}
+        fotoBateriaInicial={fotoBateriaInicial}
       />
     </div>
   );

@@ -1,8 +1,9 @@
 import "server-only";
 
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { FOTOS_DIR } from "@/lib/fs-data";
+import { CELDA_ID_BATERIA } from "@/lib/foto-bateria";
 import { slug } from "@/lib/slug";
 
 const TAMANO_MAXIMO_BYTES = 8 * 1024 * 1024;
@@ -52,6 +53,19 @@ export async function leerFoto(
     return { bytes, mime };
   } catch {
     return null;
+  }
+}
+
+/** La foto de toda la batería no viaja en ninguna columna del csv (no es un
+ * dato por celda) — se identifica solo por su nombre de archivo, así que
+ * para saber si ya existe hay que buscarla en disco por prefijo. */
+export async function leerFotoBateria(corridaId: string): Promise<string> {
+  try {
+    const prefijo = `${slug(corridaId)}_${slug(CELDA_ID_BATERIA)}.`;
+    const archivos = await readdir(FOTOS_DIR);
+    return archivos.find((n) => n.startsWith(prefijo)) ?? "";
+  } catch {
+    return "";
   }
 }
 
