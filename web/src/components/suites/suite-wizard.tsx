@@ -7,6 +7,7 @@ import { Button, LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
 import { Reveal } from "@/components/ui/reveal";
+import { DescargarBoton } from "@/components/registro/descargar-boton";
 import { GridPreview } from "@/components/suites/grid-preview";
 import { NumberChipsInput } from "@/components/suites/number-chips-input";
 import { NumberStepper } from "@/components/suites/number-stepper";
@@ -151,12 +152,22 @@ export function SuiteWizard() {
               Suite generada: {resultado.celdas} celdas listas
             </p>
             <p className="text-text-muted mt-1 text-sm">
-              El G-code (
-              <span className="font-mono">{resultado.gcodeFileName}</span>) y su
-              registro de datos (
-              <span className="font-mono">{resultado.csvFileName}</span>) ya
-              están listos para correr en la máquina.
+              El G-code y su registro de datos ya quedaron guardados en el
+              sistema, listos para correr en la máquina. Si además querés una
+              copia en otra carpeta, descargala acá:
             </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <DescargarBoton
+              archivo={resultado.gcodeFileName}
+              etiqueta="Descargar G-code"
+              variant="secondary"
+            />
+            <DescargarBoton
+              archivo={resultado.csvFileName}
+              etiqueta="Descargar CSV"
+              variant="outline"
+            />
           </div>
           <div className="flex gap-3">
             <LinkButton href="/registro" variant="primary">

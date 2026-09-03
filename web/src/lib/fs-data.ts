@@ -1,6 +1,6 @@
 import "server-only";
 
-import { access, readFile, readdir } from "node:fs/promises";
+import { access, readFile, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
@@ -18,7 +18,8 @@ import { parse as parseYaml } from "yaml";
 
 export const REPO_ROOT = path.resolve(process.cwd(), "..");
 export const CONFIGS_DIR = path.join(REPO_ROOT, "configs");
-const REGISTROS_DIR = path.join(REPO_ROOT, "data", "registros");
+export const REGISTROS_DIR = path.join(REPO_ROOT, "data", "registros");
+export const FOTOS_DIR = path.join(REPO_ROOT, "data", "fotos");
 const MATERIALES_DIR = path.join(REPO_ROOT, "docs", "materiales");
 const TARIFAS_PATH = path.join(CONFIGS_DIR, "tarifas.yaml");
 
@@ -113,6 +114,24 @@ export async function listarSuites(): Promise<SuiteConfig[]> {
   const archivos = (await listarArchivos(CONFIGS_DIR)).filter(esYamlDeSuite);
   const suites = await Promise.all(archivos.map(leerSuite));
   return suites.filter((s): s is SuiteConfig => s !== null);
+}
+
+/** Solo borra un archivo que ya pasó `esYamlDeSuite` (nunca tarifas.yaml,
+ * nunca nada fuera de configs/) — CRUD real, no un botón que no hace nada. */
+export async function eliminarSuite(archivo: string): Promise<boolean> {
+  if (
+    !esYamlDeSuite(archivo) ||
+    archivo.includes("/") ||
+    archivo.includes("..")
+  ) {
+    return false;
+  }
+  try {
+    await unlink(path.join(CONFIGS_DIR, archivo));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function contarRegistros(): Promise<{

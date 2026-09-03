@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
+import { EliminarSuiteButton } from "@/components/suites/eliminar-suite-button";
 import { listarSuites } from "@/lib/fs-data";
 
 // Nuevas suites se agregan en cualquier momento (desde el asistente o a
@@ -53,9 +54,15 @@ export default async function SuitesDePrueba() {
                   <p className="text-navy text-base font-semibold">
                     {suite.material}
                   </p>
-                  <Badge tone={suite.tipo === "final_run" ? "ok" : "neutral"}>
-                    {suite.tipo === "final_run" ? "Final run" : "Barrido"}
-                  </Badge>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Badge tone={suite.tipo === "final_run" ? "ok" : "neutral"}>
+                      {suite.tipo === "final_run" ? "Final run" : "Barrido"}
+                    </Badge>
+                    <EliminarSuiteButton
+                      archivo={suite.archivo}
+                      material={suite.material}
+                    />
+                  </div>
                 </div>
                 <p className="text-text-muted text-sm capitalize">
                   {suite.operacion} · {suite.espesorMm}mm

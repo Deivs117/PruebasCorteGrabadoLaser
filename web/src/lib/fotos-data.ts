@@ -1,11 +1,10 @@
 import "server-only";
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { REPO_ROOT } from "@/lib/fs-data";
+import { FOTOS_DIR } from "@/lib/fs-data";
 import { slug } from "@/lib/slug";
 
-const FOTOS_DIR = path.join(REPO_ROOT, "data", "fotos");
 const TAMANO_MAXIMO_BYTES = 8 * 1024 * 1024;
 
 const EXTENSIONES_PERMITIDAS: Record<string, string> = {
@@ -53,5 +52,15 @@ export async function leerFoto(
     return { bytes, mime };
   } catch {
     return null;
+  }
+}
+
+export async function eliminarFoto(nombre: string): Promise<boolean> {
+  if (!nombreValido(nombre)) return false;
+  try {
+    await unlink(path.join(FOTOS_DIR, nombre));
+    return true;
+  } catch {
+    return false;
   }
 }

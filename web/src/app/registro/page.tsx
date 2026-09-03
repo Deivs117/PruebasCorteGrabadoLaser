@@ -5,6 +5,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { Reveal } from "@/components/ui/reveal";
+import { DescargarBoton } from "@/components/registro/descargar-boton";
+import { EliminarCorridaButton } from "@/components/registro/eliminar-corrida-button";
 import { PrepararRegistroButton } from "@/components/registro/preparar-registro-button";
 import { listarCorridas } from "@/lib/registro-data";
 
@@ -56,12 +58,23 @@ export default async function HojaDeRegistro() {
                   {generadas.map((corrida) => (
                     <Card
                       key={corrida.archivo}
-                      className="flex items-center justify-between gap-4 p-4"
+                      className="flex flex-wrap items-center justify-between gap-4 p-4"
                     >
                       <p className="text-navy font-mono text-sm">
                         {corrida.corridaId}
                       </p>
-                      <PrepararRegistroButton archivo={corrida.archivo} />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <DescargarBoton
+                          archivo={corrida.archivo}
+                          etiqueta="Descargar CSV"
+                        />
+                        <DescargarBoton
+                          archivo={corrida.archivo.replace(/\.csv$/, ".gcode")}
+                          etiqueta="Descargar G-code"
+                        />
+                        <PrepararRegistroButton archivo={corrida.archivo} />
+                        <EliminarCorridaButton corridaId={corrida.corridaId} />
+                      </div>
                     </Card>
                   ))}
                 </div>
@@ -77,12 +90,14 @@ export default async function HojaDeRegistro() {
                 </h2>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {preparadas.map((corrida) => (
-                    <Link
+                    <Card
                       key={corrida.archivo}
-                      href={`/registro/${encodeURIComponent(corrida.archivo)}`}
-                      className="block rounded-[var(--radius-lg)] transition-transform duration-[var(--duration-quick)] ease-[var(--ease-motion)] hover:-translate-y-0.5"
+                      className="flex flex-col gap-3 p-5"
                     >
-                      <Card className="flex flex-col gap-3 p-5">
+                      <Link
+                        href={`/registro/${encodeURIComponent(corrida.archivo)}`}
+                        className="flex flex-col gap-3"
+                      >
                         <p className="text-navy text-base font-semibold">
                           {corrida.material}
                         </p>
@@ -94,8 +109,15 @@ export default async function HojaDeRegistro() {
                           value={corrida.celdasEvaluadas}
                           total={corrida.totalCeldas}
                         />
-                      </Card>
-                    </Link>
+                      </Link>
+                      <div className="border-border flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+                        <DescargarBoton
+                          archivo={corrida.corridaId + ".gcode"}
+                          etiqueta="G-code"
+                        />
+                        <EliminarCorridaButton corridaId={corrida.corridaId} />
+                      </div>
+                    </Card>
                   ))}
                 </div>
               </section>

@@ -1,6 +1,7 @@
 import { clsx } from "clsx";
 
-export type ButtonVariant = "primary" | "secondary" | "outline" | "inverted";
+export type ButtonVariant =
+  "primary" | "secondary" | "outline" | "inverted" | "danger";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const BASE =
@@ -13,6 +14,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   secondary: "bg-blue-soft text-navy hover:bg-border",
   outline: "border border-border bg-transparent text-navy hover:bg-navy-soft",
   inverted: "bg-white/10 text-white hover:bg-white/20",
+  danger: "bg-danger text-white hover:bg-danger-hover",
 };
 
 const SIZES: Record<ButtonSize, string> = {

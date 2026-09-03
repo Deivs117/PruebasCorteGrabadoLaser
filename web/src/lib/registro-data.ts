@@ -1,16 +1,16 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
-import { readFile, readdir, writeFile } from "node:fs/promises";
+import { readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { parse as parseCsv } from "csv-parse/sync";
 import { stringify as stringifyCsv } from "csv-stringify/sync";
-import { REPO_ROOT } from "@/lib/fs-data";
+import { FOTOS_DIR, REGISTROS_DIR, REPO_ROOT } from "@/lib/fs-data";
+import { slug } from "@/lib/slug";
 import { COLUMNAS_REGISTRO, type FilaRegistro } from "@/lib/registro-schema";
 
 const execFileAsync = promisify(execFile);
-const REGISTROS_DIR = path.join(REPO_ROOT, "data", "registros");
 
 export interface CorridaGenerada {
   archivo: string;
@@ -31,6 +31,14 @@ export interface CorridaPreparada {
  * segmentos (`/`, `..`), para que no pueda escaparse de data/registros. */
 function nombreDeArchivoValido(nombre: string): boolean {
   return /^[A-Za-z0-9._-]+\.csv$/.test(nombre) && !nombre.includes("..");
+}
+
+/** Igual que arriba, pero acepta también `.gcode` — para descargar el
+ * archivo tal cual quedó en el sistema, no solo leer el csv. */
+function nombreDescargableValido(nombre: string): boolean {
+  return (
+    /^[A-Za-z0-9._-]+\.(csv|gcode)$/.test(nombre) && !nombre.includes("..")
+  );
 }
 
 function filaEvaluada(fila: FilaRegistro): boolean {
@@ -116,6 +124,45 @@ export async function guardarRegistro(
     return false;
   const csv = stringifyCsv(filas, { header: true, columns: COLUMNAS_REGISTRO });
   await writeFile(path.join(REGISTROS_DIR, archivo), csv, "utf-8");
+  return true;
+}
+
+/** Ruta absoluta de un archivo descargable si (y solo si) es válido y
+ * vive dentro de data/registros/ — usado por la ruta de descarga. */
+export function rutaDescarga(archivo: string): string | null {
+  if (!nombreDescargableValido(archivo)) return null;
+  return path.join(REGISTROS_DIR, archivo);
+}
+
+/** Borra los tres archivos que puede tener una corrida (G-code, csv
+ * generado, csv de registro) y las fotos que le subieron — CRUD real, no
+ * un botón decorativo. Nunca falla si alguno ya no existe. */
+export async function eliminarCorrida(corridaId: string): Promise<boolean> {
+  if (/[\\/]|\.\./.test(corridaId) || corridaId.trim() === "") return false;
+
+  const posibles = [
+    `${corridaId}.gcode`,
+    `${corridaId}.csv`,
+    `${corridaId}_registro.csv`,
+  ];
+  await Promise.all(
+    posibles.map((nombre) =>
+      unlink(path.join(REGISTROS_DIR, nombre)).catch(() => undefined),
+    ),
+  );
+
+  try {
+    const prefijo = `${slug(corridaId)}_`;
+    const fotos = (await readdir(FOTOS_DIR)).filter((n) =>
+      n.startsWith(prefijo),
+    );
+    await Promise.all(
+      fotos.map((n) => unlink(path.join(FOTOS_DIR, n)).catch(() => undefined)),
+    );
+  } catch {
+    // sin fotos o carpeta inexistente: no es un error.
+  }
+
   return true;
 }
 

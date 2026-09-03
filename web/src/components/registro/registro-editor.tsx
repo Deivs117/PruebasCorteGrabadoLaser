@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { clsx } from "clsx";
-import { Button } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { INPUT_CLASSES } from "@/components/ui/field";
 import { ProgressBar } from "@/components/ui/progress-bar";
@@ -244,14 +244,21 @@ export function RegistroEditor({
             </label>
           </div>
 
-          <div className="flex items-center gap-3" aria-live="polite">
+          <div className="flex items-center gap-3">
+            <div aria-live="polite">
+              {estadoGuardado === "ok" ? (
+                <p className="text-teal text-sm font-medium">Guardado.</p>
+              ) : null}
+              {estadoGuardado === "error" ? (
+                <p role="alert" className="text-orange text-sm font-medium">
+                  {mensajeError}
+                </p>
+              ) : null}
+            </div>
             {estadoGuardado === "ok" ? (
-              <p className="text-teal text-sm font-medium">Guardado.</p>
-            ) : null}
-            {estadoGuardado === "error" ? (
-              <p role="alert" className="text-orange text-sm font-medium">
-                {mensajeError}
-              </p>
+              <LinkButton href="/registro" variant="outline">
+                Volver a Hoja de Registro
+              </LinkButton>
             ) : null}
             <Button
               variant="primary"

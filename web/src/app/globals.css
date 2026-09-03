@@ -23,6 +23,12 @@
   --color-purple: #e056fd; /* acento del módulo financiero / Tarifas */
   --color-purple-soft: color-mix(in srgb, var(--color-purple) 15%, white);
 
+  /* No está en docs/ui-design/prompts-stitch.md (esa paleta no contemplaba
+     acciones destructivas) — rojo estándar, exclusivo para eliminar. */
+  --color-danger: #dc2626;
+  --color-danger-hover: color-mix(in srgb, var(--color-danger) 85%, black);
+  --color-danger-soft: color-mix(in srgb, var(--color-danger) 12%, white);
+
   --color-canvas: #f4f7f9; /* fondo general de la app */
   --color-surface: #ffffff; /* fondo de tarjetas/paneles */
   --color-border: #e2e8f0; /* bordes sutiles */
@@ -63,6 +69,9 @@
   --color-orange-soft: var(--color-orange-soft);
   --color-purple: var(--color-purple);
   --color-purple-soft: var(--color-purple-soft);
+  --color-danger: var(--color-danger);
+  --color-danger-hover: var(--color-danger-hover);
+  --color-danger-soft: var(--color-danger-soft);
   --color-canvas: var(--color-canvas);
   --color-surface: var(--color-surface);
   --color-border: var(--color-border);

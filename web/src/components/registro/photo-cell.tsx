@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera } from "lucide-react";
+import { Camera, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface PhotoCellProps {
@@ -13,7 +13,8 @@ interface PhotoCellProps {
 
 /** Evidencia fotográfica de una celda: sube el archivo real a data/fotos/ al
  * elegirlo — la referencia queda en la fila recién cuando se guarda el
- * registro completo, como el resto de los campos. */
+ * registro completo, como el resto de los campos. Un solo control visible
+ * por estado, nunca un ícono decorativo al lado de un botón que hace lo mismo. */
 export function PhotoCell({
   corridaId,
   celdaId,
@@ -54,39 +55,64 @@ export function PhotoCell({
     }
   }
 
+  async function quitar() {
+    const fotoActual = foto;
+    onChange("");
+    await fetch(`/api/fotos/${encodeURIComponent(fotoActual)}`, {
+      method: "DELETE",
+    });
+  }
+
   return (
-    <div className="flex items-center gap-2">
-      {foto ? (
-        // eslint-disable-next-line @next/next/no-img-element -- imagen local servida por nuestra propia API, fuera de public/
-        <img
-          src={`/api/fotos/${encodeURIComponent(foto)}`}
-          alt={`Foto de la celda ${celdaId}`}
-          className="border-border size-9 rounded-full border object-cover"
-        />
-      ) : (
-        <span
-          className="bg-navy-soft text-text-muted flex size-9 items-center justify-center rounded-full"
-          aria-hidden="true"
-        >
-          <Camera className="size-4" />
-        </span>
-      )}
-      <div className="flex flex-col gap-0.5">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => inputRef.current?.click()}
-          disabled={subiendo}
-        >
-          {subiendo ? "Subiendo…" : foto ? "Reemplazar" : "Subir foto"}
-        </Button>
-        {error ? (
-          <p role="alert" className="text-orange text-xs">
-            {error}
-          </p>
-        ) : null}
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        {foto ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- imagen local servida por nuestra propia API, fuera de public/ */}
+            <img
+              src={`/api/fotos/${encodeURIComponent(foto)}`}
+              alt={`Foto de la celda ${celdaId}`}
+              className="border-border size-9 rounded-full border object-cover"
+            />
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={subiendo}
+              aria-label="Reemplazar foto"
+              title="Reemplazar foto"
+              className="text-navy hover:bg-navy-soft flex size-8 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)] disabled:opacity-40"
+            >
+              <Camera className="size-4" strokeWidth={1.75} />
+            </button>
+            <button
+              type="button"
+              onClick={quitar}
+              disabled={subiendo}
+              aria-label="Quitar foto"
+              title="Quitar foto"
+              className="text-text-muted hover:bg-danger-soft hover:text-danger flex size-8 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)] disabled:opacity-40"
+            >
+              <X className="size-4" strokeWidth={1.75} />
+            </button>
+          </>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => inputRef.current?.click()}
+            disabled={subiendo}
+          >
+            <Camera className="size-4" strokeWidth={1.75} />
+            {subiendo ? "Subiendo…" : "Subir foto"}
+          </Button>
+        )}
       </div>
+      {error ? (
+        <p role="alert" className="text-danger text-xs">
+          {error}
+        </p>
+      ) : null}
       <input
         ref={inputRef}
         type="file"
