@@ -39,11 +39,20 @@ export const COLUMNAS_REGISTRO = [...CAMPOS_CSV, ...COLUMNAS_MANUALES];
 
 export type FilaRegistro = Record<(typeof COLUMNAS_REGISTRO)[number], string>;
 
-/**
- * Valida una fila editada por el técnico, calcando el vocabulario del SOP
- * en papel del taller (docs/sop/SOP-corrida-de-prueba.md): "si"/"no" para
- * corte pasante, escalas 1-5 para calidad de borde y carbonización.
- */
+/** Espejo de COLUMNAS_COSTEO en io/registro.py — lo que agrega `compute-costs`. */
+export const COLUMNAS_COSTEO = [
+  "kwh_celda",
+  "costo_energia_celda",
+  "costo_material_celda",
+  "tiempo_maquina_celda_s",
+  "costo_tiempo_maquina_celda",
+  "costo_total_celda",
+] as const;
+
+export const COLUMNAS_COSTEADO = [...COLUMNAS_REGISTRO, ...COLUMNAS_COSTEO];
+
+export type FilaCosteada = Record<(typeof COLUMNAS_COSTEADO)[number], string>;
+
 const numeroPositivoOVacio = z
   .string()
   .refine((v) => v === "" || (Number.isFinite(Number(v)) && Number(v) > 0), {

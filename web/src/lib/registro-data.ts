@@ -17,16 +17,6 @@ export interface CorridaGenerada {
   corridaId: string;
 }
 
-export interface CorridaPreparada {
-  archivo: string;
-  corridaId: string;
-  material: string;
-  espesorMm: string;
-  operacion: string;
-  totalCeldas: number;
-  celdasEvaluadas: number;
-}
-
 /** Nombre de archivo tal como lo entrega el listado — nunca una ruta con
  * segmentos (`/`, `..`), para que no pueda escaparse de data/registros. */
 function nombreDeArchivoValido(nombre: string): boolean {
@@ -49,9 +39,51 @@ function filaEvaluada(fila: FilaRegistro): boolean {
   );
 }
 
-async function leerFilas(rutaAbsoluta: string): Promise<FilaRegistro[]> {
+/** Lee cualquier csv con encabezado como lista de filas de texto — lo
+ * reutiliza Costeo para leer un `_costeado.csv`, que tiene más columnas
+ * que `FilaRegistro` pero el mismo formato. */
+export async function leerFilasCsv<T = FilaRegistro>(
+  rutaAbsoluta: string,
+): Promise<T[]> {
   const contenido = await readFile(rutaAbsoluta, "utf-8");
   return parseCsv(contenido, { columns: true, skip_empty_lines: true });
+}
+
+async function leerFilas(rutaAbsoluta: string): Promise<FilaRegistro[]> {
+  return leerFilasCsv<FilaRegistro>(rutaAbsoluta);
+}
+
+export interface ResumenRegistro {
+  corridaId: string;
+  material: string;
+  espesorMm: string;
+  operacion: string;
+  totalCeldas: number;
+  celdasEvaluadas: number;
+}
+
+export type CorridaPreparada = ResumenRegistro & { archivo: string };
+
+/** Datos básicos de un `_registro.csv` ya preparado — usado por Hoja de
+ * Registro y por Costeo, para no leer/interpretar el csv dos veces. */
+export async function resumenRegistro(
+  archivo: string,
+): Promise<ResumenRegistro | null> {
+  try {
+    const filas = await leerFilas(path.join(REGISTROS_DIR, archivo));
+    const primera = filas[0];
+    if (!primera) return null;
+    return {
+      corridaId: primera.corrida_id,
+      material: primera.material,
+      espesorMm: primera.espesor_mm,
+      operacion: primera.operacion,
+      totalCeldas: filas.length,
+      celdasEvaluadas: filas.filter(filaEvaluada).length,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Corridas separadas en dos grupos: generadas (falta correr `prepare-record`)
@@ -83,22 +115,8 @@ export async function listarCorridas(): Promise<{
 
   const preparadas: CorridaPreparada[] = [];
   for (const archivo of preparadosSet) {
-    try {
-      const filas = await leerFilas(path.join(REGISTROS_DIR, archivo));
-      const primera = filas[0];
-      if (!primera) continue;
-      preparadas.push({
-        archivo,
-        corridaId: primera.corrida_id,
-        material: primera.material,
-        espesorMm: primera.espesor_mm,
-        operacion: primera.operacion,
-        totalCeldas: filas.length,
-        celdasEvaluadas: filas.filter(filaEvaluada).length,
-      });
-    } catch {
-      // csv ilegible: se omite del listado en vez de romper toda la página.
-    }
+    const resumen = await resumenRegistro(archivo);
+    if (resumen) preparadas.push({ archivo, ...resumen });
   }
 
   return { generadas, preparadas };

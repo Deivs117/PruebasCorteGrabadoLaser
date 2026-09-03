@@ -21,7 +21,7 @@ export const CONFIGS_DIR = path.join(REPO_ROOT, "configs");
 export const REGISTROS_DIR = path.join(REPO_ROOT, "data", "registros");
 export const FOTOS_DIR = path.join(REPO_ROOT, "data", "fotos");
 const MATERIALES_DIR = path.join(REPO_ROOT, "docs", "materiales");
-const TARIFAS_PATH = path.join(CONFIGS_DIR, "tarifas.yaml");
+export const TARIFAS_PATH = path.join(CONFIGS_DIR, "tarifas.yaml");
 
 export type Operacion = "corte" | "grabado";
 export type TipoSuite = "barrido" | "final_run";
@@ -166,7 +166,7 @@ async function contarFichasOficiales(): Promise<number> {
   }
 }
 
-async function existeArchivoTarifas(): Promise<boolean> {
+export async function existeArchivoTarifas(): Promise<boolean> {
   try {
     await access(TARIFAS_PATH);
     return true;
