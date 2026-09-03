@@ -16,8 +16,8 @@ import { parse as parseYaml } from "yaml";
  * taller una ruta de archivo ni el nombre de una carpeta del sistema.
  */
 
-const REPO_ROOT = path.resolve(process.cwd(), "..");
-const CONFIGS_DIR = path.join(REPO_ROOT, "configs");
+export const REPO_ROOT = path.resolve(process.cwd(), "..");
+export const CONFIGS_DIR = path.join(REPO_ROOT, "configs");
 const REGISTROS_DIR = path.join(REPO_ROOT, "data", "registros");
 const MATERIALES_DIR = path.join(REPO_ROOT, "docs", "materiales");
 const TARIFAS_PATH = path.join(CONFIGS_DIR, "tarifas.yaml");
@@ -108,7 +108,8 @@ async function leerSuite(nombre: string): Promise<SuiteConfig | null> {
   }
 }
 
-async function leerSuites(): Promise<SuiteConfig[]> {
+/** Suites de prueba configuradas hoy — usado por el Dashboard y por la sección Suites. */
+export async function listarSuites(): Promise<SuiteConfig[]> {
   const archivos = (await listarArchivos(CONFIGS_DIR)).filter(esYamlDeSuite);
   const suites = await Promise.all(archivos.map(leerSuite));
   return suites.filter((s): s is SuiteConfig => s !== null);
@@ -158,7 +159,7 @@ async function existeArchivoTarifas(): Promise<boolean> {
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   const [suites, registros, fichasOficiales, tarifasConfiguradas] =
     await Promise.all([
-      leerSuites(),
+      listarSuites(),
       contarRegistros(),
       contarFichasOficiales(),
       existeArchivoTarifas(),
