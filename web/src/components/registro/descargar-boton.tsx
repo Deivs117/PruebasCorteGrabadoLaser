@@ -10,12 +10,15 @@ interface DescargarBotonProps {
   archivo: string;
   etiqueta: string;
   variant?: ButtonVariant;
+  /** Ruta base de la API de descarga — por defecto, la de data/registros/. */
+  endpointBase?: string;
 }
 
 export function DescargarBoton({
   archivo,
   etiqueta,
   variant = "outline",
+  endpointBase,
 }: DescargarBotonProps) {
   const [descargando, setDescargando] = useState(false);
   const [error, setError] = useState(false);
@@ -24,7 +27,7 @@ export function DescargarBoton({
     setDescargando(true);
     setError(false);
     try {
-      await descargarArchivo(archivo);
+      await descargarArchivo(archivo, endpointBase);
     } catch {
       setError(true);
     } finally {

@@ -26,9 +26,12 @@ declare global {
   }
 }
 
-export async function descargarArchivo(nombre: string): Promise<void> {
+export async function descargarArchivo(
+  nombre: string,
+  endpointBase = "/api/registros/descargar",
+): Promise<void> {
   const respuesta = await fetch(
-    `/api/registros/descargar/${encodeURIComponent(nombre)}`,
+    `${endpointBase}/${encodeURIComponent(nombre)}`,
   );
   if (!respuesta.ok) {
     throw new Error("No se pudo descargar el archivo.");
