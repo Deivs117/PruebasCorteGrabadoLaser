@@ -1,0 +1,162 @@
+import "server-only";
+
+import { execFile } from "node:child_process";
+import { readFile, readdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { promisify } from "node:util";
+import { parse as parseCsv } from "csv-parse/sync";
+import { stringify as stringifyCsv } from "csv-stringify/sync";
+import { REPO_ROOT } from "@/lib/fs-data";
+import { COLUMNAS_REGISTRO, type FilaRegistro } from "@/lib/registro-schema";
+
+const execFileAsync = promisify(execFile);
+const REGISTROS_DIR = path.join(REPO_ROOT, "data", "registros");
+
+export interface CorridaGenerada {
+  archivo: string;
+  corridaId: string;
+}
+
+export interface CorridaPreparada {
+  archivo: string;
+  corridaId: string;
+  material: string;
+  espesorMm: string;
+  operacion: string;
+  totalCeldas: number;
+  celdasEvaluadas: number;
+}
+
+/** Nombre de archivo tal como lo entrega el listado — nunca una ruta con
+ * segmentos (`/`, `..`), para que no pueda escaparse de data/registros. */
+function nombreDeArchivoValido(nombre: string): boolean {
+  return /^[A-Za-z0-9._-]+\.csv$/.test(nombre) && !nombre.includes("..");
+}
+
+function filaEvaluada(fila: FilaRegistro): boolean {
+  return (
+    fila.corte_pasante !== "" &&
+    fila.calidad_borde_1a5 !== "" &&
+    fila.carbonizacion_1a5 !== ""
+  );
+}
+
+async function leerFilas(rutaAbsoluta: string): Promise<FilaRegistro[]> {
+  const contenido = await readFile(rutaAbsoluta, "utf-8");
+  return parseCsv(contenido, { columns: true, skip_empty_lines: true });
+}
+
+/** Corridas separadas en dos grupos: generadas (falta correr `prepare-record`)
+ * y preparadas (ya tienen su Hoja de Registro, con progreso real). */
+export async function listarCorridas(): Promise<{
+  generadas: CorridaGenerada[];
+  preparadas: CorridaPreparada[];
+}> {
+  let archivos: string[];
+  try {
+    archivos = (await readdir(REGISTROS_DIR)).filter((n) => n.endsWith(".csv"));
+  } catch {
+    return { generadas: [], preparadas: [] };
+  }
+
+  const preparadosSet = new Set(
+    archivos.filter((n) => n.includes("_registro")),
+  );
+  const generados = archivos.filter(
+    (n) =>
+      !n.includes("_registro") &&
+      !preparadosSet.has(`${n.replace(/\.csv$/, "")}_registro.csv`),
+  );
+
+  const generadas: CorridaGenerada[] = generados.map((archivo) => ({
+    archivo,
+    corridaId: archivo.replace(/\.csv$/, ""),
+  }));
+
+  const preparadas: CorridaPreparada[] = [];
+  for (const archivo of preparadosSet) {
+    try {
+      const filas = await leerFilas(path.join(REGISTROS_DIR, archivo));
+      const primera = filas[0];
+      if (!primera) continue;
+      preparadas.push({
+        archivo,
+        corridaId: primera.corrida_id,
+        material: primera.material,
+        espesorMm: primera.espesor_mm,
+        operacion: primera.operacion,
+        totalCeldas: filas.length,
+        celdasEvaluadas: filas.filter(filaEvaluada).length,
+      });
+    } catch {
+      // csv ilegible: se omite del listado en vez de romper toda la página.
+    }
+  }
+
+  return { generadas, preparadas };
+}
+
+export async function leerRegistro(
+  archivo: string,
+): Promise<FilaRegistro[] | null> {
+  if (!nombreDeArchivoValido(archivo) || !archivo.includes("_registro"))
+    return null;
+  try {
+    return await leerFilas(path.join(REGISTROS_DIR, archivo));
+  } catch {
+    return null;
+  }
+}
+
+export async function guardarRegistro(
+  archivo: string,
+  filas: FilaRegistro[],
+): Promise<boolean> {
+  if (!nombreDeArchivoValido(archivo) || !archivo.includes("_registro"))
+    return false;
+  const csv = stringifyCsv(filas, { header: true, columns: COLUMNAS_REGISTRO });
+  await writeFile(path.join(REGISTROS_DIR, archivo), csv, "utf-8");
+  return true;
+}
+
+export interface ResultadoPreparar {
+  ok: boolean;
+  archivoRegistro?: string;
+  error?: string;
+}
+
+/** Corre `uv run laser-toolkit prepare-record <csv>` — el mismo comando que
+ * usaría el técnico a mano, no una reimplementación en JS. */
+export async function prepararRegistro(
+  archivo: string,
+): Promise<ResultadoPreparar> {
+  if (!nombreDeArchivoValido(archivo) || archivo.includes("_registro")) {
+    return { ok: false, error: "Archivo inválido." };
+  }
+
+  const rutaCsv = path.join(REGISTROS_DIR, archivo);
+  try {
+    const { stdout } = await execFileAsync(
+      "uv",
+      ["run", "laser-toolkit", "prepare-record", rutaCsv],
+      { cwd: REPO_ROOT, timeout: 30_000 },
+    );
+    const ruta = stdout.match(/Registro preparado: (\S+)/)?.[1];
+    if (!ruta) {
+      return {
+        ok: false,
+        error:
+          "Se preparó el registro pero no se pudo confirmar el archivo resultante.",
+      };
+    }
+    return { ok: true, archivoRegistro: path.basename(ruta) };
+  } catch (error) {
+    const mensaje =
+      error && typeof error === "object" && "stderr" in error
+        ? String((error as { stderr: unknown }).stderr)
+        : error instanceof Error
+          ? error.message
+          : "Error desconocido al preparar el registro.";
+    return { ok: false, error: mensaje.trim() };
+  }
+}

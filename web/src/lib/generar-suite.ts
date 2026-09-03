@@ -6,6 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { stringify as stringifyYaml } from "yaml";
 import { CONFIGS_DIR, REPO_ROOT } from "@/lib/fs-data";
+import { slug } from "@/lib/slug";
 import { idPrefijo, type SuiteFormData } from "@/lib/suite-schema";
 
 const execFileAsync = promisify(execFile);
@@ -23,20 +24,6 @@ export interface ResultadoGeneracion {
   csvFileName?: string;
   celdas?: number;
   error?: string;
-}
-
-/** Deja solo [a-z0-9-], para que texto libre del formulario nunca termine
- * siendo parte de una ruta de archivo insegura. */
-function slug(texto: string): string {
-  return (
-    texto
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // quita acentos ya separados por NFD
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 40) || "suite"
-  );
 }
 
 function nombreArchivoConfig(datos: SuiteFormData): string {
