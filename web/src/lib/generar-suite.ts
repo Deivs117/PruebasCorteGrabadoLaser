@@ -1,12 +1,12 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
-import { access, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { CONFIGS_DIR, REGISTROS_DIR, REPO_ROOT } from "@/lib/fs-data";
-import { predecirCorridaId } from "@/lib/corrida-id";
+import { existeArchivo, predecirCorridaId } from "@/lib/corrida-id";
 import { slug } from "@/lib/slug";
 import { idPrefijo, type SuiteFormData } from "@/lib/suite-schema";
 
@@ -128,15 +128,6 @@ async function escribirYGenerar(
           ? error.message
           : "Error desconocido al generar la suite.";
     return { ok: false, error: mensaje.trim() };
-  }
-}
-
-async function existeArchivo(ruta: string): Promise<boolean> {
-  try {
-    await access(ruta);
-    return true;
-  } catch {
-    return false;
   }
 }
 

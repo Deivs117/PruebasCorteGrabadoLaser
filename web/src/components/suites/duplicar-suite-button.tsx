@@ -10,6 +10,8 @@ import { loteSiguiente } from "@/lib/lote-siguiente";
 interface DuplicarSuiteButtonProps {
   archivo: string;
   material: string;
+  espesorMm: number;
+  operacion: "corte" | "grabado";
   loteActual: string;
 }
 
@@ -19,16 +21,24 @@ interface DuplicarSuiteButtonProps {
  * como un campo más) porque el nombre de archivo de salida depende de
  * material+espesor+operación+fecha+lote: si el lote quedara igual, la
  * corrida duplicada chocaría con la original apenas se guardara.
+ *
+ * La sugerencia inicial no es solo "el lote de origen + 1": eso rompía en
+ * la práctica apenas se duplicaba una segunda vez (L01 -> L02 sugerido, pero
+ * L02 ya existía de la primera duplicación) -- se le pide al servidor el
+ * primer lote realmente libre para esta identidad.
  */
 export function DuplicarSuiteButton({
   archivo,
   material,
+  espesorMm,
+  operacion,
   loteActual,
 }: DuplicarSuiteButtonProps) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [abierto, setAbierto] = useState(false);
   const [lote, setLote] = useState(() => loteSiguiente(loteActual));
+  const [buscandoSugerencia, setBuscandoSugerencia] = useState(false);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -37,9 +47,25 @@ export function DuplicarSuiteButton({
     if (!abierto && dialog.open) dialog.close();
   }, [abierto]);
 
-  function abrir() {
-    setLote(loteSiguiente(loteActual));
+  async function abrir() {
     setAbierto(true);
+    setLote(loteSiguiente(loteActual)); // valor optimista mientras se confirma con el servidor
+    setBuscandoSugerencia(true);
+    try {
+      const parametros = new URLSearchParams({
+        material,
+        espesorMm: String(espesorMm),
+        operacion,
+        loteActual,
+      });
+      const respuesta = await fetch(`/api/lote-sugerido?${parametros}`);
+      const cuerpo = (await respuesta.json()) as { ok: boolean; lote?: string };
+      if (cuerpo.ok && cuerpo.lote) setLote(cuerpo.lote);
+    } catch {
+      // se queda con la sugerencia optimista; el servidor igual valida al guardar
+    } finally {
+      setBuscandoSugerencia(false);
+    }
   }
 
   function continuar() {
@@ -55,7 +81,7 @@ export function DuplicarSuiteButton({
     <>
       <button
         type="button"
-        onClick={abrir}
+        onClick={() => void abrir()}
         aria-label={`Duplicar suite de ${material}`}
         className="text-text-muted hover:bg-navy-soft hover:text-navy flex size-7 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
       >
@@ -78,8 +104,9 @@ export function DuplicarSuiteButton({
           </p>
           <Field
             label="Nuevo lote"
+            hint={buscandoSugerencia ? "Buscando el próximo lote libre…" : undefined}
             error={
-              lote.trim() === loteActual
+              !buscandoSugerencia && lote.trim() === loteActual
                 ? "Tiene que ser distinto al lote original."
                 : undefined
             }

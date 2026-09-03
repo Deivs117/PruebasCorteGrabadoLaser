@@ -92,6 +92,8 @@ export default async function SuitesDePrueba() {
                         <DuplicarSuiteButton
                           archivo={suite.archivo}
                           material={suite.material}
+                          espesorMm={suite.espesorMm}
+                          operacion={suite.operacion}
                           loteActual={suite.lote}
                         />
                       </>

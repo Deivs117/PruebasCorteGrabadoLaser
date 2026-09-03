@@ -206,6 +206,9 @@ export function RegistroEditor({
                 Prueba
               </th>
               <th scope="col" className="px-4 py-3">
+                Pasadas
+              </th>
+              <th scope="col" className="px-4 py-3">
                 Corte pasante
               </th>
               <th scope="col" className="px-4 py-3">
@@ -234,6 +237,9 @@ export function RegistroEditor({
                     onMarcar={() => marcarCandidata(fila)}
                     onDesmarcar={() => desmarcarCandidata(fila)}
                   />
+                </td>
+                <td className="text-navy px-4 py-3 font-mono">
+                  {fila.pasadas}
                 </td>
                 <td className="px-4 py-3">
                   <div className="border-border inline-flex overflow-hidden rounded-[var(--radius-sm)] border">
