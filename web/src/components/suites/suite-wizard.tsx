@@ -40,6 +40,10 @@ const ESTADO_INICIAL: EstadoFormulario = {
   espaciadoMm: 5,
 };
 
+function desdeDatosIniciales(datos: SuiteFormData): EstadoFormulario {
+  return { ...datos, espesorMm: String(datos.espesorMm) };
+}
+
 type ResultadoEnvio =
   | { estado: "idle" }
   | { estado: "enviando" }
@@ -70,9 +74,22 @@ function puedeAvanzar(paso: number, form: EstadoFormulario): boolean {
   }
 }
 
-export function SuiteWizard() {
+interface SuiteWizardProps {
+  /** Si se pasa, el asistente edita esa suite en vez de crear una nueva:
+   * guarda sobre el mismo archivo y regenera su G-code. */
+  archivoExistente?: string;
+  datosIniciales?: SuiteFormData;
+}
+
+export function SuiteWizard({
+  archivoExistente,
+  datosIniciales,
+}: SuiteWizardProps) {
+  const modoEdicion = archivoExistente !== undefined;
   const [paso, setPaso] = useState(0);
-  const [form, setForm] = useState<EstadoFormulario>(ESTADO_INICIAL);
+  const [form, setForm] = useState<EstadoFormulario>(
+    datosIniciales ? desdeDatosIniciales(datosIniciales) : ESTADO_INICIAL,
+  );
   const [resultado, setResultado] = useState<ResultadoEnvio>({
     estado: "idle",
   });
@@ -98,11 +115,16 @@ export function SuiteWizard() {
     };
 
     try {
-      const respuesta = await fetch("/api/suites", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(datos),
-      });
+      const respuesta = await fetch(
+        modoEdicion
+          ? `/api/suites/${encodeURIComponent(archivoExistente)}`
+          : "/api/suites",
+        {
+          method: modoEdicion ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(datos),
+        },
+      );
       const cuerpo = (await respuesta.json()) as {
         ok: boolean;
         celdas?: number;
@@ -149,12 +171,14 @@ export function SuiteWizard() {
           </span>
           <div aria-live="polite">
             <p className="text-navy text-base font-semibold">
-              Suite generada: {resultado.celdas} celdas listas
+              {modoEdicion ? "Cambios guardados" : "Suite generada"}:{" "}
+              {resultado.celdas} celdas listas
             </p>
             <p className="text-text-muted mt-1 text-sm">
-              El G-code y su registro de datos ya quedaron guardados en el
-              sistema, listos para correr en la máquina. Si además querés una
-              copia en otra carpeta, descargala acá:
+              El G-code y su registro de datos ya quedaron{" "}
+              {modoEdicion ? "regenerados" : "guardados"} en el sistema, listos
+              para correr en la máquina. Si además querés una copia en otra
+              carpeta, descargala acá:
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -170,19 +194,27 @@ export function SuiteWizard() {
             />
           </div>
           <div className="flex gap-3">
-            <LinkButton href="/registro" variant="primary">
-              Ir a Hoja de Registro
-            </LinkButton>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setForm(ESTADO_INICIAL);
-                setPaso(0);
-                setResultado({ estado: "idle" });
-              }}
-            >
-              Configurar otra suite
-            </Button>
+            {modoEdicion ? (
+              <LinkButton href="/suites" variant="primary">
+                Volver a Suites de Prueba
+              </LinkButton>
+            ) : (
+              <>
+                <LinkButton href="/registro" variant="primary">
+                  Ir a Hoja de Registro
+                </LinkButton>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setForm(ESTADO_INICIAL);
+                    setPaso(0);
+                    setResultado({ estado: "idle" });
+                  }}
+                >
+                  Configurar otra suite
+                </Button>
+              </>
+            )}
           </div>
         </Card>
       </Reveal>
@@ -441,7 +473,13 @@ export function SuiteWizard() {
             onClick={generar}
             disabled={resultado.estado === "enviando"}
           >
-            {resultado.estado === "enviando" ? "Generando…" : "Generar"}
+            {resultado.estado === "enviando"
+              ? modoEdicion
+                ? "Guardando…"
+                : "Generando…"
+              : modoEdicion
+                ? "Guardar cambios"
+                : "Generar"}
           </Button>
         )}
       </div>

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { access, readFile, readdir, unlink } from "node:fs/promises";
+import { access, readFile, readdir, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
@@ -37,6 +37,10 @@ export interface SuiteConfig {
   velocidadMmMin?: number;
   potenciaPct?: number;
   repeticiones?: number;
+  /** Cuándo se creó el archivo de configuración, no la fecha de la prueba
+   * (`fecha` dentro del YAML, editable) — para saber de verdad hace cuánto
+   * existe esta suite antes de eliminarla. */
+  creadoEn: string;
 }
 
 export interface DashboardSummary {
@@ -66,8 +70,15 @@ function esYamlDeSuite(nombre: string): boolean {
 
 async function leerSuite(nombre: string): Promise<SuiteConfig | null> {
   try {
-    const contenido = await readFile(path.join(CONFIGS_DIR, nombre), "utf-8");
+    const rutaArchivo = path.join(CONFIGS_DIR, nombre);
+    const [contenido, estado] = await Promise.all([
+      readFile(rutaArchivo, "utf-8"),
+      stat(rutaArchivo),
+    ]);
     const datos = parseYaml(contenido) as Record<string, unknown>;
+    // birthtime puede quedar en epoch 0 en sistemas de archivos que no lo
+    // soportan — en ese caso, mtime es la mejor aproximación disponible.
+    const creadoEn = estado.birthtimeMs > 0 ? estado.birthtime : estado.mtime;
 
     const material = typeof datos.material === "string" ? datos.material : null;
     const espesorMm =
@@ -103,6 +114,7 @@ async function leerSuite(nombre: string): Promise<SuiteConfig | null> {
         typeof datos.potencia_pct === "number" ? datos.potencia_pct : undefined,
       repeticiones:
         typeof datos.repeticiones === "number" ? datos.repeticiones : undefined,
+      creadoEn: creadoEn.toISOString(),
     };
   } catch {
     return null;

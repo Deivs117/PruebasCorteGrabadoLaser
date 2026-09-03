@@ -6,15 +6,16 @@ import { clsx } from "clsx";
 import { NAV_SECTIONS } from "@/lib/nav";
 
 interface SidebarProps {
-  /** En viewports angostos, controla si el panel está desplegado. */
+  /** Controla si el panel está desplegado, en cualquier ancho de pantalla. */
   open: boolean;
   onNavigate: () => void;
 }
 
 /**
- * Navegación principal de la app. En escritorio (lg+) queda fija y visible;
- * por debajo de ese ancho se convierte en panel deslizante controlado por
- * AppShell — el mismo <nav>, no una versión "mobile" duplicada.
+ * Navegación principal de la app. Se puede ocultar en cualquier ancho de
+ * pantalla (AppShell decide cuándo cerrarla sola al navegar: solo en
+ * viewports angostos, donde además actúa como panel deslizante) — el mismo
+ * <nav>, no una versión "mobile" separada.
  */
 export function Sidebar({ open, onNavigate }: SidebarProps) {
   const pathname = usePathname();
@@ -25,7 +26,6 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
       className={clsx(
         "fixed inset-y-0 left-0 z-40 flex w-[var(--shell-sidebar-w)] flex-col overflow-y-auto",
         "bg-navy text-white transition-transform duration-[var(--duration-slow)] ease-[var(--ease-motion)]",
-        "lg:translate-x-0",
         open ? "translate-x-0" : "-translate-x-full",
       )}
     >

@@ -1,4 +1,5 @@
-import { FlaskConical } from "lucide-react";
+import Link from "next/link";
+import { FlaskConical, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -6,6 +7,7 @@ import { LinkButton } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
 import { EliminarSuiteButton } from "@/components/suites/eliminar-suite-button";
 import { listarSuites } from "@/lib/fs-data";
+import { tiempoRelativo } from "@/lib/tiempo-relativo";
 
 // Nuevas suites se agregan en cualquier momento (desde el asistente o a
 // mano), así que esta lista no se puede congelar como estática en el build.
@@ -54,15 +56,9 @@ export default async function SuitesDePrueba() {
                   <p className="text-navy text-base font-semibold">
                     {suite.material}
                   </p>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <Badge tone={suite.tipo === "final_run" ? "ok" : "neutral"}>
-                      {suite.tipo === "final_run" ? "Final run" : "Barrido"}
-                    </Badge>
-                    <EliminarSuiteButton
-                      archivo={suite.archivo}
-                      material={suite.material}
-                    />
-                  </div>
+                  <Badge tone={suite.tipo === "final_run" ? "ok" : "neutral"}>
+                    {suite.tipo === "final_run" ? "Final run" : "Barrido"}
+                  </Badge>
                 </div>
                 <p className="text-text-muted text-sm capitalize">
                   {suite.operacion} · {suite.espesorMm}mm
@@ -78,6 +74,26 @@ export default async function SuitesDePrueba() {
                     {suite.velocidadMmMin} mm/min · {suite.potenciaPct}%
                   </p>
                 )}
+                <div className="border-border flex items-center justify-between gap-2 border-t pt-3">
+                  <p className="text-text-muted text-xs">
+                    Creada {tiempoRelativo(suite.creadoEn)}
+                  </p>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {suite.tipo === "barrido" ? (
+                      <Link
+                        href={`/suites/${encodeURIComponent(suite.archivo)}/editar`}
+                        aria-label={`Editar suite de ${suite.material}`}
+                        className="text-text-muted hover:bg-navy-soft hover:text-navy flex size-7 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
+                      >
+                        <Pencil className="size-4" strokeWidth={1.75} />
+                      </Link>
+                    ) : null}
+                    <EliminarSuiteButton
+                      archivo={suite.archivo}
+                      material={suite.material}
+                    />
+                  </div>
+                </div>
               </Card>
             </Reveal>
           ))}

@@ -38,17 +38,20 @@ export function ConfirmDialog({
     <dialog
       ref={dialogRef}
       onClose={onCancel}
-      className="border-border bg-surface backdrop:bg-navy/40 rounded-[var(--radius-lg)] border p-0 backdrop:backdrop-blur-[1px]"
+      className="border-border bg-surface backdrop:bg-navy/40 m-auto rounded-[var(--radius-lg)] border p-0 backdrop:backdrop-blur-[1px]"
     >
       <div className="flex w-80 flex-col gap-4 p-6">
         <p className="text-navy text-base font-semibold">{title}</p>
         <p className="text-text-muted text-sm">{description}</p>
-        <div className="flex justify-end gap-3">
-          <Button variant="outline" size="sm" onClick={onCancel}>
-            Cancelar
-          </Button>
+        {/* Eliminar a la izquierda a propósito: el hábito es hacer click a
+            la derecha, y ahí queda "Cancelar" — una acción destructiva no
+            debe quedar donde cae el click por reflejo. */}
+        <div className="flex justify-between gap-3">
           <Button variant="danger" size="sm" onClick={onConfirm}>
             {confirmLabel}
+          </Button>
+          <Button variant="outline" size="sm" onClick={onCancel}>
+            Cancelar
           </Button>
         </div>
       </div>
