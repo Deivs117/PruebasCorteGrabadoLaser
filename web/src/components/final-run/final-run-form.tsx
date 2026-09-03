@@ -12,6 +12,11 @@ import {
   DEFAULTS_FINAL_RUN,
   type FinalRunFormData,
 } from "@/lib/final-run-schema";
+import type { CandidatoFinalRun } from "@/lib/candidatos-final-run";
+
+interface FinalRunFormProps {
+  candidatos: CandidatoFinalRun[];
+}
 
 interface EstadoFormulario {
   operacion: "corte" | "grabado" | null;
@@ -57,12 +62,24 @@ function puedeEnviar(form: EstadoFormulario): boolean {
   );
 }
 
-export function FinalRunForm() {
+export function FinalRunForm({ candidatos }: FinalRunFormProps) {
   const [form, setForm] = useState<EstadoFormulario>(ESTADO_INICIAL);
   const [resultado, setResultado] = useState<Resultado>({ estado: "idle" });
+  const [candidatoElegidoId, setCandidatoElegidoId] = useState("");
 
   function actualizar(cambios: Partial<EstadoFormulario>) {
     setForm((anterior) => ({ ...anterior, ...cambios }));
+  }
+
+  function elegirCandidato(candidato: CandidatoFinalRun) {
+    setCandidatoElegidoId(candidato.id);
+    actualizar({
+      operacion: candidato.operacion,
+      material: candidato.material,
+      espesorMm: candidato.espesorMm,
+      velocidadMmMin: candidato.velocidadMmMin,
+      potenciaPct: candidato.potenciaPct,
+    });
   }
 
   async function enviar() {
@@ -166,6 +183,43 @@ export function FinalRunForm() {
 
   return (
     <div className="flex flex-col gap-6">
+      {candidatos.length > 0 ? (
+        <Card className="flex flex-col gap-3 p-6">
+          <p className="text-navy text-base font-semibold">
+            Candidatas marcadas en Hoja de Registro
+          </p>
+          <p className="text-text-muted -mt-2 text-sm">
+            Elegí una para completar los campos de abajo, o ignorá esto y
+            cargalos a mano.
+          </p>
+          <div className="flex flex-col gap-2">
+            {candidatos.map((candidato) => (
+              <button
+                key={candidato.id}
+                type="button"
+                onClick={() => elegirCandidato(candidato)}
+                aria-pressed={candidatoElegidoId === candidato.id}
+                className={clsx(
+                  "flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] border px-4 py-2.5 text-left transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+                  candidatoElegidoId === candidato.id
+                    ? "border-blue bg-blue-soft"
+                    : "border-border hover:bg-navy-soft",
+                )}
+              >
+                <span className="text-navy text-sm font-medium capitalize">
+                  {candidato.material} · {candidato.espesorMm}mm ·{" "}
+                  {candidato.operacion}
+                </span>
+                <span className="text-text-muted font-mono text-xs">
+                  {candidato.idPrueba} · {candidato.velocidadMmMin} mm/min ·{" "}
+                  {candidato.potenciaPct}%
+                </span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
       <Card className="flex flex-col gap-4 p-6">
         <fieldset className="flex flex-col gap-3">
           <legend className="text-navy text-base font-semibold">

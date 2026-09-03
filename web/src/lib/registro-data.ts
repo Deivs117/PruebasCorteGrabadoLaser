@@ -9,6 +9,7 @@ import { stringify as stringifyCsv } from "csv-stringify/sync";
 import { FOTOS_DIR, REGISTROS_DIR, REPO_ROOT } from "@/lib/fs-data";
 import { slug } from "@/lib/slug";
 import { COLUMNAS_REGISTRO, type FilaRegistro } from "@/lib/registro-schema";
+import { desmarcarCandidatosDeArchivo } from "@/lib/candidatos-final-run";
 
 const execFileAsync = promisify(execFile);
 
@@ -180,6 +181,8 @@ export async function eliminarCorrida(corridaId: string): Promise<boolean> {
   } catch {
     // sin fotos o carpeta inexistente: no es un error.
   }
+
+  await desmarcarCandidatosDeArchivo(`${corridaId}_registro.csv`);
 
   return true;
 }

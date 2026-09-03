@@ -6,6 +6,8 @@ import { Button, LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { INPUT_CLASSES } from "@/components/ui/field";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { ToastHost, type ToastData } from "@/components/ui/toast";
+import { CandidatoCell } from "@/components/registro/candidato-cell";
 import { PhotoCell } from "@/components/registro/photo-cell";
 import { StarRating } from "@/components/registro/star-rating";
 import type { FilaRegistro } from "@/lib/registro-schema";
@@ -13,6 +15,12 @@ import type { FilaRegistro } from "@/lib/registro-schema";
 interface RegistroEditorProps {
   archivo: string;
   filasIniciales: FilaRegistro[];
+  /** ids (`${corrida_id}::${id_prueba}`) ya marcados como candidatos a Final Run. */
+  candidatosIniciales: string[];
+}
+
+function idCandidato(fila: FilaRegistro): string {
+  return `${fila.corrida_id}::${fila.id_prueba}`;
 }
 
 type EstadoGuardado = "idle" | "guardando" | "ok" | "error";
@@ -28,6 +36,7 @@ function filaEvaluada(fila: FilaRegistro): boolean {
 export function RegistroEditor({
   archivo,
   filasIniciales,
+  candidatosIniciales,
 }: RegistroEditorProps) {
   const [filas, setFilas] = useState<FilaRegistro[]>(filasIniciales);
   const [kwhCorrida, setKwhCorrida] = useState(
@@ -38,8 +47,85 @@ export function RegistroEditor({
   );
   const [estadoGuardado, setEstadoGuardado] = useState<EstadoGuardado>("idle");
   const [mensajeError, setMensajeError] = useState("");
+  const [candidatos, setCandidatos] = useState<Set<string>>(
+    () => new Set(candidatosIniciales),
+  );
+  const [toasts, setToasts] = useState<ToastData[]>([]);
 
   const evaluadas = useMemo(() => filas.filter(filaEvaluada).length, [filas]);
+
+  function mostrarToast(mensaje: string, tono: ToastData["tono"] = "info") {
+    setToasts((anteriores) => [
+      ...anteriores,
+      { id: Date.now() + Math.random(), mensaje, tono },
+    ]);
+  }
+
+  function cerrarToast(id: number) {
+    setToasts((anteriores) => anteriores.filter((t) => t.id !== id));
+  }
+
+  async function marcarCandidata(fila: FilaRegistro) {
+    const id = idCandidato(fila);
+    setCandidatos((anteriores) => new Set(anteriores).add(id));
+    try {
+      const respuesta = await fetch("/api/candidatos-final-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          corridaId: fila.corrida_id,
+          idPrueba: fila.id_prueba,
+          archivo,
+          material: fila.material,
+          espesorMm: fila.espesor_mm,
+          operacion: fila.operacion,
+          velocidadMmMin: fila.velocidad_mm_min,
+          potenciaPct: fila.potencia_pct,
+        }),
+      });
+      const cuerpo = (await respuesta.json()) as { ok: boolean };
+      if (cuerpo.ok) {
+        mostrarToast(
+          `${fila.id_prueba} quedó marcada como candidata a Final Run.`,
+          "exito",
+        );
+      } else {
+        throw new Error("respuesta no ok");
+      }
+    } catch {
+      setCandidatos((anteriores) => {
+        const copia = new Set(anteriores);
+        copia.delete(id);
+        return copia;
+      });
+      mostrarToast("No se pudo marcar la celda. Intenta de nuevo.");
+    }
+  }
+
+  async function desmarcarCandidata(fila: FilaRegistro) {
+    const id = idCandidato(fila);
+    setCandidatos((anteriores) => {
+      const copia = new Set(anteriores);
+      copia.delete(id);
+      return copia;
+    });
+    try {
+      const respuesta = await fetch(
+        `/api/candidatos-final-run/${encodeURIComponent(id)}`,
+        { method: "DELETE" },
+      );
+      const cuerpo = (await respuesta.json()) as { ok: boolean };
+      if (cuerpo.ok) {
+        mostrarToast(`${fila.id_prueba} ya no es candidata a Final Run.`);
+      } else {
+        throw new Error("respuesta no ok");
+      }
+    } catch {
+      setCandidatos((anteriores) => new Set(anteriores).add(id));
+      mostrarToast("No se pudo quitar la marca. Intenta de nuevo.");
+    }
+  }
 
   function actualizarFila(indice: number, cambios: Partial<FilaRegistro>) {
     setEstadoGuardado("idle");
@@ -99,13 +185,7 @@ export function RegistroEditor({
           <thead className="border-border text-text-muted border-b text-xs uppercase">
             <tr>
               <th scope="col" className="px-4 py-3">
-                Celda
-              </th>
-              <th scope="col" className="px-4 py-3">
-                Velocidad
-              </th>
-              <th scope="col" className="px-4 py-3">
-                Potencia
+                Prueba
               </th>
               <th scope="col" className="px-4 py-3">
                 Corte pasante
@@ -127,14 +207,15 @@ export function RegistroEditor({
           <tbody className="divide-border divide-y">
             {filas.map((fila, indice) => (
               <tr key={fila.id_prueba}>
-                <td className="text-navy px-4 py-3 font-mono">
-                  {fila.id_prueba}
-                </td>
-                <td className="text-navy px-4 py-3 font-mono">
-                  {fila.velocidad_mm_min}
-                </td>
-                <td className="text-navy px-4 py-3 font-mono">
-                  {fila.potencia_pct}%
+                <td className="p-2">
+                  <CandidatoCell
+                    idPrueba={fila.id_prueba}
+                    velocidadMmMin={fila.velocidad_mm_min}
+                    potenciaPct={fila.potencia_pct}
+                    marcado={candidatos.has(idCandidato(fila))}
+                    onMarcar={() => marcarCandidata(fila)}
+                    onDesmarcar={() => desmarcarCandidata(fila)}
+                  />
                 </td>
                 <td className="px-4 py-3">
                   <div className="border-border inline-flex overflow-hidden rounded-[var(--radius-sm)] border">
@@ -272,6 +353,8 @@ export function RegistroEditor({
           </div>
         </div>
       </div>
+
+      <ToastHost toasts={toasts} onCerrar={cerrarToast} />
     </div>
   );
 }

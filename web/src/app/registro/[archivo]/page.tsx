@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { BackLink } from "@/components/ui/back-link";
 import { RegistroEditor } from "@/components/registro/registro-editor";
 import { leerRegistro } from "@/lib/registro-data";
+import { listarCandidatos } from "@/lib/candidatos-final-run";
 
 export const dynamic = "force-dynamic";
 
@@ -10,12 +11,19 @@ export default async function DetalleRegistro({
 }: PageProps<"/registro/[archivo]">) {
   const { archivo: archivoParam } = await params;
   const archivo = decodeURIComponent(archivoParam);
-  const filas = await leerRegistro(archivo);
+  const [filas, candidatos] = await Promise.all([
+    leerRegistro(archivo),
+    listarCandidatos(),
+  ]);
   const primera = filas?.[0];
 
   if (!filas || !primera) {
     notFound();
   }
+
+  const candidatosIniciales = candidatos
+    .filter((c) => c.archivo === archivo)
+    .map((c) => c.id);
 
   return (
     <div className="flex flex-col gap-6">
@@ -27,7 +35,11 @@ export default async function DetalleRegistro({
           lote {primera.lote}
         </p>
       </div>
-      <RegistroEditor archivo={archivo} filasIniciales={filas} />
+      <RegistroEditor
+        archivo={archivo}
+        filasIniciales={filas}
+        candidatosIniciales={candidatosIniciales}
+      />
     </div>
   );
 }
