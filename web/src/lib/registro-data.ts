@@ -16,6 +16,7 @@ const execFileAsync = promisify(execFile);
 export interface CorridaGenerada {
   archivo: string;
   corridaId: string;
+  material: string;
 }
 
 /** Nombre de archivo tal como lo entrega el listado — nunca una ruta con
@@ -83,6 +84,18 @@ export async function resumenRegistro(
   }
 }
 
+/** Solo el material de un csv recién generado (todavía sin las columnas
+ * manuales de `prepare-record`) — para poder filtrar por material en Hoja
+ * de Registro sin esperar a que la corrida esté preparada. */
+async function leerMaterialDeCsv(archivo: string): Promise<string> {
+  try {
+    const filas = await leerFilas(path.join(REGISTROS_DIR, archivo));
+    return filas[0]?.material ?? "";
+  } catch {
+    return "";
+  }
+}
+
 /** Corridas separadas en dos grupos: generadas (falta correr `prepare-record`)
  * y preparadas (ya tienen su Hoja de Registro, con progreso real). */
 export async function listarCorridas(): Promise<{
@@ -105,10 +118,13 @@ export async function listarCorridas(): Promise<{
       !preparadosSet.has(`${n.replace(/\.csv$/, "")}_registro.csv`),
   );
 
-  const generadas: CorridaGenerada[] = generados.map((archivo) => ({
-    archivo,
-    corridaId: archivo.replace(/\.csv$/, ""),
-  }));
+  const generadas: CorridaGenerada[] = await Promise.all(
+    generados.map(async (archivo) => ({
+      archivo,
+      corridaId: archivo.replace(/\.csv$/, ""),
+      material: await leerMaterialDeCsv(archivo),
+    })),
+  );
 
   const preparadas: CorridaPreparada[] = [];
   for (const archivo of preparadosSet) {

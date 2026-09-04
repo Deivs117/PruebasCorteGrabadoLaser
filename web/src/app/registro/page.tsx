@@ -1,13 +1,10 @@
-import Link from "next/link";
 import { ClipboardList } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
-import { ProgressBar } from "@/components/ui/progress-bar";
 import { Reveal } from "@/components/ui/reveal";
-import { DescargarBoton } from "@/components/registro/descargar-boton";
-import { EliminarCorridaButton } from "@/components/registro/eliminar-corrida-button";
-import { PrepararRegistroButton } from "@/components/registro/preparar-registro-button";
+import { RegistroListado } from "@/components/registro/registro-listado";
+import { colorDeMaterial } from "@/lib/material-color";
+import { leerCatalogoMateriales } from "@/lib/materiales-catalog";
 import { listarCorridas } from "@/lib/registro-data";
 
 // Se generan y preparan corridas en cualquier momento desde otras secciones
@@ -16,8 +13,20 @@ import { listarCorridas } from "@/lib/registro-data";
 export const dynamic = "force-dynamic";
 
 export default async function HojaDeRegistro() {
-  const { generadas, preparadas } = await listarCorridas();
+  const [{ generadas, preparadas }, catalogo] = await Promise.all([
+    listarCorridas(),
+    leerCatalogoMateriales(),
+  ]);
   const sinNada = generadas.length === 0 && preparadas.length === 0;
+
+  const familiaPorMaterial = new Map(
+    catalogo.map((m) => [m.nombre.toLowerCase(), m.familia]),
+  );
+  const conMaterial = <T extends { material: string }>(corrida: T) => ({
+    ...corrida,
+    familia: familiaPorMaterial.get(corrida.material.toLowerCase()) ?? "otro",
+    color: colorDeMaterial(corrida.material),
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -43,89 +52,10 @@ export default async function HojaDeRegistro() {
           />
         </Reveal>
       ) : (
-        <>
-          {generadas.length > 0 ? (
-            <Reveal>
-              <section className="flex flex-col gap-3">
-                <h2 className="text-navy text-base font-semibold">
-                  Corridas por preparar
-                </h2>
-                <p className="text-text-muted text-sm">
-                  Ya se generó su G-code, pero todavía no tienen la Hoja de
-                  Registro lista para completar.
-                </p>
-                <div className="flex flex-col gap-2">
-                  {generadas.map((corrida) => (
-                    <Card
-                      key={corrida.archivo}
-                      data-eliminable
-                      className="flex flex-wrap items-center justify-between gap-4 p-4"
-                    >
-                      <p className="text-navy font-mono text-sm">
-                        {corrida.corridaId}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <DescargarBoton
-                          archivo={corrida.archivo}
-                          etiqueta="Descargar CSV"
-                        />
-                        <DescargarBoton
-                          archivo={corrida.archivo.replace(/\.csv$/, ".gcode")}
-                          etiqueta="Descargar G-code"
-                        />
-                        <PrepararRegistroButton archivo={corrida.archivo} />
-                        <EliminarCorridaButton corridaId={corrida.corridaId} />
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </section>
-            </Reveal>
-          ) : null}
-
-          {preparadas.length > 0 ? (
-            <Reveal delayMs={60}>
-              <section className="flex flex-col gap-3">
-                <h2 className="text-navy text-base font-semibold">
-                  Registros preparados
-                </h2>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {preparadas.map((corrida) => (
-                    <Card
-                      key={corrida.archivo}
-                      data-eliminable
-                      className="flex flex-col gap-3 p-5"
-                    >
-                      <Link
-                        href={`/registro/${encodeURIComponent(corrida.archivo)}`}
-                        className="flex flex-col gap-3"
-                      >
-                        <p className="text-navy text-base font-semibold">
-                          {corrida.material}
-                        </p>
-                        <p className="text-text-muted text-sm capitalize">
-                          {corrida.operacion} · {corrida.espesorMm}mm
-                        </p>
-                        <ProgressBar
-                          label="Celdas evaluadas"
-                          value={corrida.celdasEvaluadas}
-                          total={corrida.totalCeldas}
-                        />
-                      </Link>
-                      <div className="border-border flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-                        <DescargarBoton
-                          archivo={corrida.corridaId + ".gcode"}
-                          etiqueta="G-code"
-                        />
-                        <EliminarCorridaButton corridaId={corrida.corridaId} />
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </section>
-            </Reveal>
-          ) : null}
-        </>
+        <RegistroListado
+          generadas={generadas.map(conMaterial)}
+          preparadas={preparadas.map(conMaterial)}
+        />
       )}
     </div>
   );
