@@ -1,0 +1,7 @@
+corrida_id,grupo_calibracion_id,ejecucion,id_prueba,lote,fecha,material,espesor_mm,operacion,velocidad_mm_min,potencia_pct,pasadas,x_mm,y_mm,tamano_celda_mm,area_material_mm2,tiempo_estimado_celda_s,corte_pasante,carbonizacion_1a5,kwh_corrida_medido,tiempo_real_corrida_s,foto,notas
+MDF-Trupan_3mm_corte_2026-09-03_L05,,,C-001,L05,2026-09-03,MDF Trupan,3.0,corte,180,85,1,0.0,0.0,15.0,225.0,24.13,si,1,0.03,228,,
+MDF-Trupan_3mm_corte_2026-09-03_L05,,,C-002,L05,2026-09-03,MDF Trupan,3.0,corte,210,85,1,18.5,0.0,15.0,225.0,20.69,no,5,0.03,228,,
+MDF-Trupan_3mm_corte_2026-09-03_L05,,,C-003,L05,2026-09-03,MDF Trupan,3.0,corte,240,85,1,37.0,0.0,15.0,225.0,18.1,no,5,0.03,228,,
+MDF-Trupan_3mm_corte_2026-09-03_L05,,,C-004,L05,2026-09-03,MDF Trupan,3.0,corte,240,100,1,37.0,18.5,15.0,225.0,18.1,si,5,0.03,228,,
+MDF-Trupan_3mm_corte_2026-09-03_L05,,,C-005,L05,2026-09-03,MDF Trupan,3.0,corte,210,100,1,18.5,18.5,15.0,225.0,20.69,no,5,0.03,228,,
+MDF-Trupan_3mm_corte_2026-09-03_L05,,,C-006,L05,2026-09-03,MDF Trupan,3.0,corte,180,100,1,0.0,18.5,15.0,225.0,24.13,si,1,0.03,228,,

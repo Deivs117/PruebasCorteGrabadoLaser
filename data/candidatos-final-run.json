@@ -1,0 +1,14 @@
+[
+  {
+    "id": "MDF-Trupan_3mm_corte_2026-09-03_L07::C-001",
+    "corridaId": "MDF-Trupan_3mm_corte_2026-09-03_L07",
+    "idPrueba": "C-001",
+    "archivo": "MDF-Trupan_3mm_corte_2026-09-03_L07_registro.csv",
+    "material": "MDF Trupan",
+    "espesorMm": "3.0",
+    "operacion": "corte",
+    "velocidadMmMin": "350",
+    "potenciaPct": "100",
+    "marcadoEn": "2026-09-04T00:29:56.252Z"
+  }
+]
