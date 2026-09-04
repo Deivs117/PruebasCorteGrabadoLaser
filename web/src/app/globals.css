@@ -130,6 +130,55 @@ body {
   animation: boton-ripple 500ms var(--ease-motion) forwards;
 }
 
+/* Parpadeo del ícono de Grabado (fuego) al pasar el mouse -- ver
+   FlameAnimado. 0%/100% iguales para que el loop no salte al repetirse. */
+@keyframes flame-parpadeo {
+  0%,
+  100% {
+    transform: scaleY(1) rotate(0deg);
+  }
+  50% {
+    transform: scaleY(1.08) rotate(-3deg);
+  }
+}
+
+/* Meneo sutil del ícono de editar (lápiz "escribiendo") al pasar el mouse
+   -- ver PencilAnimado. Amplitud chica a propósito: es un ícono de acción
+   secundaria, no debe competir por atención. */
+@keyframes pencil-escribe {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-4deg);
+  }
+}
+
+/* Tijeretazo repetido del ícono de Corte al pasar el mouse -- ver
+   ScissorsAnimado. Cada hoja pivota desde su propia base; las dos
+   keyframes son espejo para que las puntas se separen y vuelvan a juntarse
+   en sincronía, como cortando de verdad. */
+@keyframes tijera-corte {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-14deg);
+  }
+}
+
+@keyframes tijera-corte-espejo {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(14deg);
+  }
+}
+
 /* Respeta la preferencia de movimiento reducido del sistema operativo:
    morphicons y las transiciones de layout se saltan la animación, no el
    cambio de estado. */

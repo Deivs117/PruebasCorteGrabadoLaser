@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
+import { CopyAnimado } from "@/components/ui/icons/copy-animado";
 import { iconButtonClasses } from "@/lib/button-styles";
 import { loteSiguiente } from "@/lib/lote-siguiente";
 
@@ -86,7 +86,7 @@ export function DuplicarSuiteButton({
         aria-label={`Duplicar suite de ${material}`}
         className={iconButtonClasses()}
       >
-        <Copy className="size-4" strokeWidth={1.75} />
+        <CopyAnimado className="size-4" />
       </button>
       <dialog
         ref={dialogRef}

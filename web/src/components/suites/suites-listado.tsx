@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Filter, Pencil } from "lucide-react";
+import { Filter } from "lucide-react";
 import { clsx } from "clsx";
 import { Badge } from "@/components/ui/badge";
 import { Card, type CardAccent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PencilAnimado } from "@/components/ui/icons/pencil-animado";
 import { Reveal } from "@/components/ui/reveal";
 import { DuplicarSuiteButton } from "@/components/suites/duplicar-suite-button";
 import { EliminarSuiteButton } from "@/components/suites/eliminar-suite-button";
@@ -158,7 +159,7 @@ export function SuitesListado({ suites }: SuitesListadoProps) {
                           aria-label={`Editar suite de ${suite.material}`}
                           className={iconButtonClasses()}
                         >
-                          <Pencil className="size-4" strokeWidth={1.75} />
+                          <PencilAnimado className="size-4" />
                         </Link>
                         <DuplicarSuiteButton
                           archivo={suite.archivo}

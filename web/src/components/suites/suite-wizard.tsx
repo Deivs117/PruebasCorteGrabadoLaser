@@ -1,18 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import {
-  CircleCheck,
-  Flame,
-  Scissors,
-  Shapes,
-  Square,
-  TriangleAlert,
-} from "lucide-react";
+import { CircleCheck, Shapes, Square, TriangleAlert } from "lucide-react";
 import { clsx } from "clsx";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
+import { OperacionSelector } from "@/components/ui/operacion-selector";
 import { Reveal } from "@/components/ui/reveal";
 import { DescargarBoton } from "@/components/registro/descargar-boton";
 import { AreaDisponibleCheck } from "@/components/suites/area-disponible-check";
@@ -293,38 +287,10 @@ export function SuiteWizard({
               <legend className="text-navy text-base font-semibold">
                 ¿Qué operación vas a probar?
               </legend>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {[
-                  {
-                    valor: "corte" as const,
-                    etiqueta: "Corte",
-                    icono: Scissors,
-                  },
-                  {
-                    valor: "grabado" as const,
-                    etiqueta: "Grabado",
-                    icono: Flame,
-                  },
-                ].map(({ valor, etiqueta, icono: Icono }) => (
-                  <button
-                    key={valor}
-                    type="button"
-                    onClick={() => actualizar({ operacion: valor })}
-                    aria-pressed={form.operacion === valor}
-                    className={clsx(
-                      "flex flex-col items-center gap-2 rounded-[var(--radius-md)] border p-6 transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
-                      form.operacion === valor
-                        ? "border-blue bg-blue-soft"
-                        : "border-border hover:bg-navy-soft",
-                    )}
-                  >
-                    <Icono className="text-navy size-6" strokeWidth={1.75} />
-                    <span className="text-navy text-sm font-medium">
-                      {etiqueta}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <OperacionSelector
+                valor={form.operacion}
+                onSeleccionar={(operacion) => actualizar({ operacion })}
+              />
             </fieldset>
           ) : null}
 
