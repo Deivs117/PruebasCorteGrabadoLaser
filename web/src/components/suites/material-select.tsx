@@ -72,7 +72,9 @@ export function MaterialSelect({
       setAgregandoNuevo(false);
       onSeleccionar(nombre);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar el material.");
+      setError(
+        e instanceof Error ? e.message : "No se pudo guardar el material.",
+      );
     } finally {
       setGuardando(false);
     }

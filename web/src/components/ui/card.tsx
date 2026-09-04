@@ -1,3 +1,4 @@
+import type { HTMLAttributes } from "react";
 import { clsx } from "clsx";
 
 export type CardAccent = "blue" | "teal" | "orange" | "purple" | "navy";
@@ -10,18 +11,25 @@ const ACCENT_BORDER: Record<CardAccent, string> = {
   navy: "border-l-navy",
 };
 
-interface CardProps {
+interface CardOwnProps {
   accent?: CardAccent;
-  className?: string;
-  children: React.ReactNode;
 }
 
 /**
  * Contenedor de contenido autocontenido (resumen, grupo de datos). Con
  * `accent`, agrega el borde izquierdo de 4px que marca un encabezado de
  * sección (patrón de docs/ui-design/prompts-stitch.md).
+ *
+ * Acepta atributos HTML normales (ej. `data-eliminable`, usado por
+ * `colapsarYEsperar` para saber qué animar al borrar este elemento de una
+ * lista) porque en el fondo sigue siendo un div.
  */
-export function Card({ accent, className, children }: CardProps) {
+export function Card({
+  accent,
+  className,
+  children,
+  ...props
+}: CardOwnProps & HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={clsx(
@@ -29,6 +37,7 @@ export function Card({ accent, className, children }: CardProps) {
         accent && ["border-l-4", ACCENT_BORDER[accent]],
         className,
       )}
+      {...props}
     >
       {children}
     </div>

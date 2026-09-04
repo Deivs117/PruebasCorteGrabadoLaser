@@ -256,7 +256,7 @@ export function SvgWorkspace({ nombre, contenidoSvg }: SvgWorkspaceProps) {
         <Button
           variant="primary"
           onClick={generarVistaPrevia}
-          disabled={resultado.estado === "generando"}
+          loading={resultado.estado === "generando"}
         >
           {resultado.estado === "generando"
             ? "Generando…"

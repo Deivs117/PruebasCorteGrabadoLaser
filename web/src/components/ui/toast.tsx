@@ -22,7 +22,10 @@ interface ToastProps {
  */
 export function Toast({ toast, onCerrar, duracionMs = 3200 }: ToastProps) {
   useEffect(() => {
-    const temporizador = window.setTimeout(() => onCerrar(toast.id), duracionMs);
+    const temporizador = window.setTimeout(
+      () => onCerrar(toast.id),
+      duracionMs,
+    );
     return () => window.clearTimeout(temporizador);
   }, [toast.id, duracionMs, onCerrar]);
 

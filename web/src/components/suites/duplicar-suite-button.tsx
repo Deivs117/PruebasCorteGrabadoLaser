@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
+import { iconButtonClasses } from "@/lib/button-styles";
 import { loteSiguiente } from "@/lib/lote-siguiente";
 
 interface DuplicarSuiteButtonProps {
@@ -83,7 +84,7 @@ export function DuplicarSuiteButton({
         type="button"
         onClick={() => void abrir()}
         aria-label={`Duplicar suite de ${material}`}
-        className="text-text-muted hover:bg-navy-soft hover:text-navy flex size-7 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
+        className={iconButtonClasses()}
       >
         <Copy className="size-4" strokeWidth={1.75} />
       </button>
@@ -99,12 +100,14 @@ export function DuplicarSuiteButton({
           <p className="text-text-muted text-sm">
             Se abre el asistente con los mismos parámetros, listo para ajustar
             lo que necesites. Elegí un lote distinto al original (
-            <span className="font-mono">{loteActual}</span>) para que la
-            corrida generada no choque con esa suite.
+            <span className="font-mono">{loteActual}</span>) para que la corrida
+            generada no choque con esa suite.
           </p>
           <Field
             label="Nuevo lote"
-            hint={buscandoSugerencia ? "Buscando el próximo lote libre…" : undefined}
+            hint={
+              buscandoSugerencia ? "Buscando el próximo lote libre…" : undefined
+            }
             error={
               !buscandoSugerencia && lote.trim() === loteActual
                 ? "Tiene que ser distinto al lote original."

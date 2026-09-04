@@ -11,6 +11,7 @@ import { Reveal } from "@/components/ui/reveal";
 import { DuplicarSuiteButton } from "@/components/suites/duplicar-suite-button";
 import { EliminarSuiteButton } from "@/components/suites/eliminar-suite-button";
 import { MaterialIcon } from "@/components/suites/material-icon";
+import { iconButtonClasses } from "@/lib/button-styles";
 import type { SuiteConfig } from "@/lib/fs-data";
 import type { FamiliaMaterial } from "@/lib/materiales-catalog";
 import { tiempoRelativo } from "@/lib/tiempo-relativo";
@@ -32,10 +33,16 @@ export function SuitesListado({ suites }: SuitesListadoProps) {
   const [ocultos, setOcultos] = useState<Set<string>>(new Set());
 
   const materialesPresentes = useMemo(() => {
-    const vistos = new Map<string, { familia: FamiliaMaterial; color: CardAccent }>();
+    const vistos = new Map<
+      string,
+      { familia: FamiliaMaterial; color: CardAccent }
+    >();
     for (const suite of suites) {
       if (!vistos.has(suite.material)) {
-        vistos.set(suite.material, { familia: suite.familia, color: suite.color });
+        vistos.set(suite.material, {
+          familia: suite.familia,
+          color: suite.color,
+        });
       }
     }
     return [...vistos.entries()].sort(([a], [b]) => a.localeCompare(b, "es"));
@@ -109,6 +116,7 @@ export function SuitesListado({ suites }: SuitesListadoProps) {
           {suitesVisibles.map((suite, indice) => (
             <Reveal key={suite.archivo} delayMs={indice * 40}>
               <Card
+                data-eliminable
                 accent={suite.operacion === "corte" ? "blue" : "purple"}
                 className="flex flex-col gap-3 p-5"
               >
@@ -148,7 +156,7 @@ export function SuitesListado({ suites }: SuitesListadoProps) {
                         <Link
                           href={`/suites/${encodeURIComponent(suite.archivo)}/editar`}
                           aria-label={`Editar suite de ${suite.material}`}
-                          className="text-text-muted hover:bg-navy-soft hover:text-navy flex size-7 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
+                          className={iconButtonClasses()}
                         >
                           <Pencil className="size-4" strokeWidth={1.75} />
                         </Link>

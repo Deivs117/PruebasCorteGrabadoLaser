@@ -13,7 +13,10 @@ interface UseLongPressOptions {
  * click, para una acción que vale la pena confirmar con gesto en vez de con
  * otro formulario. Soltar antes de tiempo cancela sin efecto.
  */
-export function useLongPress({ duracionMs = 650, onLongPress }: UseLongPressOptions) {
+export function useLongPress({
+  duracionMs = 650,
+  onLongPress,
+}: UseLongPressOptions) {
   const [presionando, setPresionando] = useState(false);
   const timerRef = useRef<number | null>(null);
 

@@ -8,7 +8,10 @@ export async function POST(request: Request) {
 
   if (!analisis.success) {
     return NextResponse.json(
-      { ok: false, error: analisis.error.issues.map((i) => i.message).join(" ") },
+      {
+        ok: false,
+        error: analisis.error.issues.map((i) => i.message).join(" "),
+      },
       { status: 400 },
     );
   }

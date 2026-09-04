@@ -8,6 +8,10 @@ interface ConfirmDialogProps {
   title: string;
   description: string;
   confirmLabel?: string;
+  /** Muestra el spinner en el botón de confirmar (ver Button) mientras la
+   * acción está en curso — el label ya cambia a texto ("Eliminando…"), esto
+   * agrega la señal visual que faltaba. */
+  confirming?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -22,6 +26,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel = "Eliminar",
+  confirming = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -47,7 +52,12 @@ export function ConfirmDialog({
             la derecha, y ahí queda "Cancelar" — una acción destructiva no
             debe quedar donde cae el click por reflejo. */}
         <div className="flex justify-between gap-3">
-          <Button variant="danger" size="sm" onClick={onConfirm}>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={onConfirm}
+            loading={confirming}
+          >
             {confirmLabel}
           </Button>
           <Button variant="outline" size="sm" onClick={onCancel}>

@@ -17,12 +17,11 @@ export default async function NuevaSuite({
   const loteParam = parametros.lote;
   const archivoOrigen = typeof duplicar === "string" ? duplicar : undefined;
 
-  const [datosOrigen, svgsDisponibles, catalogoMateriales] =
-    await Promise.all([
-      archivoOrigen ? leerSuiteEditable(archivoOrigen) : Promise.resolve(null),
-      listarSvgsConContenido(),
-      leerCatalogoMateriales(),
-    ]);
+  const [datosOrigen, svgsDisponibles, catalogoMateriales] = await Promise.all([
+    archivoOrigen ? leerSuiteEditable(archivoOrigen) : Promise.resolve(null),
+    listarSvgsConContenido(),
+    leerCatalogoMateriales(),
+  ]);
   const materialesDisponibles = catalogoMateriales.map((m) => m.nombre);
 
   if (archivoOrigen && !datosOrigen) {

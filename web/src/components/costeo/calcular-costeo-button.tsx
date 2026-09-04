@@ -53,7 +53,7 @@ export function CalcularCosteoButton({
         variant={recalcular ? "outline" : "primary"}
         size="sm"
         onClick={calcular}
-        disabled={estado === "calculando"}
+        loading={estado === "calculando"}
       >
         {estado === "calculando"
           ? "Calculando…"

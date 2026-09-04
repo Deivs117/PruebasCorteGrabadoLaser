@@ -51,7 +51,10 @@ export async function marcarCandidato(
   datos: Omit<CandidatoFinalRun, "marcadoEn">,
 ): Promise<CandidatoFinalRun> {
   const candidatos = await leerTodos();
-  const candidato: CandidatoFinalRun = { ...datos, marcadoEn: new Date().toISOString() };
+  const candidato: CandidatoFinalRun = {
+    ...datos,
+    marcadoEn: new Date().toISOString(),
+  };
   const sinDuplicado = candidatos.filter((c) => c.id !== candidato.id);
   await guardarTodos([...sinDuplicado, candidato]);
   return candidato;
@@ -64,7 +67,9 @@ export async function desmarcarCandidato(id: string): Promise<void> {
 
 /** Al borrar una corrida entera, sus candidatos marcados quedan huérfanos —
  * los quita para no ofrecerlos luego en el selector de Final Run. */
-export async function desmarcarCandidatosDeArchivo(archivo: string): Promise<void> {
+export async function desmarcarCandidatosDeArchivo(
+  archivo: string,
+): Promise<void> {
   const candidatos = await leerTodos();
   await guardarTodos(candidatos.filter((c) => c.archivo !== archivo));
 }

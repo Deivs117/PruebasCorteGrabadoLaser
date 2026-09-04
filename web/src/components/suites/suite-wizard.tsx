@@ -673,7 +673,7 @@ export function SuiteWizard({
           <Button
             variant="primary"
             onClick={generar}
-            disabled={resultado.estado === "enviando"}
+            loading={resultado.estado === "enviando"}
           >
             {resultado.estado === "enviando"
               ? modoEdicion

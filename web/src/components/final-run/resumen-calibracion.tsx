@@ -105,7 +105,8 @@ export function ResumenCalibracion({
         variant="outline"
         size="sm"
         onClick={calcular}
-        disabled={!puedeCalcular || estado === "calculando"}
+        disabled={!puedeCalcular}
+        loading={estado === "calculando"}
       >
         {estado === "calculando" ? "Calculando…" : "Calcular resumen"}
       </Button>

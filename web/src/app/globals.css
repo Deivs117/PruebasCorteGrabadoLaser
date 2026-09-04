@@ -108,6 +108,28 @@ body {
   animation: toast-aparece var(--duration-standard) var(--ease-motion);
 }
 
+/* Onda que se expande desde el punto exacto del click, en botones y chips
+   interactivos (ver useRipple) — feedback físico de que el click se
+   registró, personalidad "Corporate": decisiva, sin rebote. */
+@keyframes boton-ripple {
+  from {
+    transform: scale(0);
+    opacity: 0.28;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+.boton-ripple {
+  position: absolute;
+  border-radius: 9999px;
+  background: currentColor;
+  pointer-events: none;
+  animation: boton-ripple 500ms var(--ease-motion) forwards;
+}
+
 /* Respeta la preferencia de movimiento reducido del sistema operativo:
    morphicons y las transiciones de layout se saltan la animación, no el
    cambio de estado. */

@@ -43,12 +43,10 @@ export function TiempoInput({ value, onChange }: TiempoInputProps) {
       <div className="flex items-center justify-between gap-3">
         <span className="text-navy font-medium">Tiempo real</span>
         <div className="border-border inline-flex overflow-hidden rounded-[var(--radius-sm)] border text-xs">
-          {(
-            [
-              { valor: "segundos" as const, etiqueta: "Segundos" },
-              { valor: "minseg" as const, etiqueta: "Min : Seg" },
-            ]
-          ).map(({ valor, etiqueta }) => (
+          {[
+            { valor: "segundos" as const, etiqueta: "Segundos" },
+            { valor: "minseg" as const, etiqueta: "Min : Seg" },
+          ].map(({ valor, etiqueta }) => (
             <button
               key={valor}
               type="button"

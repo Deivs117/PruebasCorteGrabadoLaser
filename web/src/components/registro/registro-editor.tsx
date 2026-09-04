@@ -344,7 +344,7 @@ export function RegistroEditor({
             <Button
               variant="primary"
               onClick={guardar}
-              disabled={estadoGuardado === "guardando"}
+              loading={estadoGuardado === "guardando"}
             >
               {estadoGuardado === "guardando"
                 ? "Guardando…"

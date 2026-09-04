@@ -180,7 +180,7 @@ export async function actualizarSuite(
     return {
       ok: false,
       error:
-        "Ya existe una Hoja de Registro preparada para este material, espesor, operación y lote de hoy. Guardar esta edición pisaría esas mediciones en silencio — usá \"Duplicar\" con un lote distinto en vez de editar esta suite.",
+        'Ya existe una Hoja de Registro preparada para este material, espesor, operación y lote de hoy. Guardar esta edición pisaría esas mediciones en silencio — usá "Duplicar" con un lote distinto en vez de editar esta suite.',
     };
   }
 

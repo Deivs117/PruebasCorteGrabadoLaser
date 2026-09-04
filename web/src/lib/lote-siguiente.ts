@@ -10,6 +10,8 @@ export function loteSiguiente(loteActual: string): string {
   if (prefijo === undefined || numero === undefined) {
     return actual ? `${actual}-2` : "L02";
   }
-  const siguiente = (Number(numero) + 1).toString().padStart(numero.length, "0");
+  const siguiente = (Number(numero) + 1)
+    .toString()
+    .padStart(numero.length, "0");
   return `${prefijo}${siguiente}`;
 }

@@ -49,7 +49,7 @@ export function PrepararRegistroButton({
         variant="primary"
         size="sm"
         onClick={preparar}
-        disabled={estado === "preparando"}
+        loading={estado === "preparando"}
       >
         {estado === "preparando" ? "Preparando…" : "Preparar Registro"}
       </Button>

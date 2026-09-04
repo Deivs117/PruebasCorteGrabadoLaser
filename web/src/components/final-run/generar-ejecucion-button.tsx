@@ -52,7 +52,7 @@ export function GenerarEjecucionButton({
         variant="secondary"
         size="sm"
         onClick={generar}
-        disabled={estado === "generando"}
+        loading={estado === "generando"}
       >
         {estado === "generando"
           ? "Generando…"

@@ -58,6 +58,7 @@ export default async function HojaDeRegistro() {
                   {generadas.map((corrida) => (
                     <Card
                       key={corrida.archivo}
+                      data-eliminable
                       className="flex flex-wrap items-center justify-between gap-4 p-4"
                     >
                       <p className="text-navy font-mono text-sm">
@@ -92,6 +93,7 @@ export default async function HojaDeRegistro() {
                   {preparadas.map((corrida) => (
                     <Card
                       key={corrida.archivo}
+                      data-eliminable
                       className="flex flex-col gap-3 p-5"
                     >
                       <Link

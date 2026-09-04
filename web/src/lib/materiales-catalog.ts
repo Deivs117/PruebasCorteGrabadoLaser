@@ -11,7 +11,12 @@ const RUTA = path.join(REPO_ROOT, "data", "materiales-catalog.json");
  * trabajo y riesgos bien distintos). Se elige a mano al agregar el material
  * (ver MaterialSelect): adivinarla por el nombre sería frágil apenas
  * aparezca un material con un nombre que no anticipamos. */
-export const FAMILIAS_MATERIAL = ["madera", "polimero", "metal", "otro"] as const;
+export const FAMILIAS_MATERIAL = [
+  "madera",
+  "polimero",
+  "metal",
+  "otro",
+] as const;
 export type FamiliaMaterial = (typeof FAMILIAS_MATERIAL)[number];
 
 export interface MaterialCatalogado {
@@ -50,7 +55,9 @@ async function leerAgregados(): Promise<MaterialCatalogado[]> {
   }
 }
 
-async function guardarAgregados(materiales: MaterialCatalogado[]): Promise<void> {
+async function guardarAgregados(
+  materiales: MaterialCatalogado[],
+): Promise<void> {
   await writeFile(RUTA, JSON.stringify(materiales, null, 2), "utf-8");
 }
 
@@ -66,7 +73,10 @@ function unirSinDuplicados(
       if (nombre === "") continue;
       const clave = nombre.toLowerCase();
       const existente = vistos.get(clave);
-      if (!existente || (existente.familia === "otro" && item.familia !== "otro")) {
+      if (
+        !existente ||
+        (existente.familia === "otro" && item.familia !== "otro")
+      ) {
         vistos.set(clave, { nombre, familia: item.familia });
       }
     }
@@ -122,5 +132,8 @@ export async function agregarMaterialCatalogo(
   const agregados = await leerAgregados();
   await guardarAgregados([...agregados, { nombre: limpio, familia }]);
 
-  return { ok: true, catalogo: unirSinDuplicados(actual, [{ nombre: limpio, familia }]) };
+  return {
+    ok: true,
+    catalogo: unirSinDuplicados(actual, [{ nombre: limpio, familia }]),
+  };
 }

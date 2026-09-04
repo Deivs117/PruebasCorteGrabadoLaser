@@ -28,6 +28,7 @@ export function SvgGaleria({ items, seleccionado }: SvgGaleriaProps) {
           return (
             <Card
               key={item.nombre}
+              data-eliminable
               className={clsx(
                 "flex flex-col gap-2 p-3",
                 activo ? "border-blue" : undefined,

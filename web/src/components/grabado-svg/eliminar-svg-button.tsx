@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { iconButtonClasses } from "@/lib/button-styles";
+import { useEliminar } from "@/lib/use-eliminar";
 
 interface EliminarSvgButtonProps {
   nombre: string;
@@ -14,31 +14,25 @@ export function EliminarSvgButton({
   nombre,
   seleccionado,
 }: EliminarSvgButtonProps) {
-  const router = useRouter();
-  const [abierto, setAbierto] = useState(false);
-  const [eliminando, setEliminando] = useState(false);
-
-  async function eliminar() {
-    setEliminando(true);
-    await fetch(`/api/svgs/${encodeURIComponent(nombre)}`, {
-      method: "DELETE",
-    });
-    setAbierto(false);
-    setEliminando(false);
-    if (seleccionado) {
-      router.push("/grabado-svg");
-    } else {
-      router.refresh();
-    }
-  }
+  const { botonRef, abierto, setAbierto, eliminando, eliminar } = useEliminar({
+    url: `/api/svgs/${encodeURIComponent(nombre)}`,
+    alTerminar: (router) => {
+      if (seleccionado) {
+        router.push("/grabado-svg");
+      } else {
+        router.refresh();
+      }
+    },
+  });
 
   return (
     <>
       <button
+        ref={botonRef}
         type="button"
         onClick={() => setAbierto(true)}
         aria-label={`Eliminar ${nombre}`}
-        className="text-text-muted hover:bg-danger-soft hover:text-danger flex size-7 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
+        className={iconButtonClasses("danger")}
       >
         <Trash2 className="size-4" strokeWidth={1.75} />
       </button>
@@ -49,6 +43,7 @@ export function EliminarSvgButton({
         onCancel={() => setAbierto(false)}
         onConfirm={eliminar}
         confirmLabel={eliminando ? "Eliminando…" : "Eliminar"}
+        confirming={eliminando}
       />
     </>
   );

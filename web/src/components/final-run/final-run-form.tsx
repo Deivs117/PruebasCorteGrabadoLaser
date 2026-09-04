@@ -395,7 +395,8 @@ export function FinalRunForm({ candidatos }: FinalRunFormProps) {
         <Button
           variant="primary"
           onClick={enviar}
-          disabled={!puedeEnviar(form) || resultado.estado === "enviando"}
+          disabled={!puedeEnviar(form)}
+          loading={resultado.estado === "enviando"}
         >
           {resultado.estado === "enviando"
             ? "Generando…"

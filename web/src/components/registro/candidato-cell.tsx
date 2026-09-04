@@ -66,9 +66,7 @@ export function CandidatoCell({
         borderColor: presionando ? "var(--color-orange)" : undefined,
       }}
     >
-      <span className="text-navy relative font-mono text-sm">
-        {idPrueba}
-      </span>
+      <span className="text-navy relative font-mono text-sm">{idPrueba}</span>
       <span className="text-text-muted relative font-mono text-xs">
         {velocidadMmMin} mm/min · {potenciaPct}%
       </span>

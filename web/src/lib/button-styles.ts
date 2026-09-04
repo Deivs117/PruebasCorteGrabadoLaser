@@ -5,9 +5,13 @@ export type ButtonVariant =
 export type ButtonSize = "sm" | "md" | "lg";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-[var(--radius-sm)] font-medium " +
-  "transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)] focus-visible:outline-2 focus-visible:outline-offset-2 " +
-  "focus-visible:outline-blue disabled:cursor-not-allowed disabled:opacity-50";
+  "relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-[var(--radius-sm)] font-medium " +
+  "transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--duration-quick)] ease-[var(--ease-motion)] " +
+  // Feedback físico: se eleva un poco al pasar el mouse, se "achica" al
+  // hacer click (sin rebote — personalidad "Corporate", ver globals.css).
+  "hover:-translate-y-px hover:shadow-sm active:translate-y-0 active:scale-[0.97] " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-blue disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:active:scale-100";
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-blue text-white hover:bg-blue-hover",
@@ -29,4 +33,22 @@ export function buttonClasses(
   className?: string,
 ): string {
   return clsx(BASE, VARIANTS[variant], SIZES[size], className);
+}
+
+/** Botón de ícono chico (editar/duplicar/eliminar en una fila o tarjeta) —
+ * antes cada uno repetía esta misma cadena de clases a mano en 6 archivos
+ * distintos, ya divergiendo en detalles. */
+export function iconButtonClasses(
+  tono: "neutral" | "danger" = "neutral",
+  className?: string,
+): string {
+  return clsx(
+    "relative flex size-7 items-center justify-center overflow-hidden rounded-[var(--radius-sm)]",
+    "transition-[color,background-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+    "active:scale-90",
+    tono === "danger"
+      ? "text-text-muted hover:bg-danger-soft hover:text-danger"
+      : "text-text-muted hover:bg-navy-soft hover:text-navy",
+    className,
+  );
 }

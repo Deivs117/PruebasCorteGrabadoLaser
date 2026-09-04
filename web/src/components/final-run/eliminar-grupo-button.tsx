@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { iconButtonClasses } from "@/lib/button-styles";
+import { useEliminar } from "@/lib/use-eliminar";
 
 interface EliminarGrupoButtonProps {
   grupoId: string;
@@ -16,27 +16,18 @@ export function EliminarGrupoButton({
   grupoId,
   material,
 }: EliminarGrupoButtonProps) {
-  const router = useRouter();
-  const [abierto, setAbierto] = useState(false);
-  const [eliminando, setEliminando] = useState(false);
-
-  async function eliminar() {
-    setEliminando(true);
-    await fetch(`/api/final-run/${encodeURIComponent(grupoId)}`, {
-      method: "DELETE",
-    });
-    setAbierto(false);
-    setEliminando(false);
-    router.refresh();
-  }
+  const { botonRef, abierto, setAbierto, eliminando, eliminar } = useEliminar({
+    url: `/api/final-run/${encodeURIComponent(grupoId)}`,
+  });
 
   return (
     <>
       <button
+        ref={botonRef}
         type="button"
         onClick={() => setAbierto(true)}
         aria-label={`Eliminar grupo de calibración de ${material}`}
-        className="text-text-muted hover:bg-danger-soft hover:text-danger flex size-7 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
+        className={iconButtonClasses("danger")}
       >
         <Trash2 className="size-4" strokeWidth={1.75} />
       </button>
@@ -47,6 +38,7 @@ export function EliminarGrupoButton({
         onCancel={() => setAbierto(false)}
         onConfirm={eliminar}
         confirmLabel={eliminando ? "Eliminando…" : "Eliminar"}
+        confirming={eliminando}
       />
     </>
   );

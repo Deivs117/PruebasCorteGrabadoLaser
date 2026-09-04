@@ -62,6 +62,7 @@ export default async function FinalRun() {
             return (
               <Reveal key={grupo.grupoId} delayMs={indice * 40}>
                 <Card
+                  data-eliminable
                   accent={grupo.operacion === "corte" ? "blue" : "purple"}
                   className="flex flex-col gap-4 p-5"
                 >
