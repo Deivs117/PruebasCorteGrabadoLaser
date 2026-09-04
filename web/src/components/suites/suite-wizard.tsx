@@ -15,7 +15,9 @@ import { Card } from "@/components/ui/card";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
 import { Reveal } from "@/components/ui/reveal";
 import { DescargarBoton } from "@/components/registro/descargar-boton";
+import { AreaDisponibleCheck } from "@/components/suites/area-disponible-check";
 import { GridPreview } from "@/components/suites/grid-preview";
+import { MaterialSelect } from "@/components/suites/material-select";
 import { NumberChipsInput } from "@/components/suites/number-chips-input";
 import { NumberStepper } from "@/components/suites/number-stepper";
 import { SvgPicker } from "@/components/suites/svg-picker";
@@ -119,12 +121,14 @@ interface SuiteWizardProps {
   archivoExistente?: string;
   datosIniciales?: SuiteFormData;
   svgsDisponibles: SvgDisponible[];
+  materialesDisponibles: string[];
 }
 
 export function SuiteWizard({
   archivoExistente,
   datosIniciales,
   svgsDisponibles,
+  materialesDisponibles,
 }: SuiteWizardProps) {
   const modoEdicion = archivoExistente !== undefined;
   const [paso, setPaso] = useState(0);
@@ -328,13 +332,11 @@ export function SuiteWizard({
             <div className="flex flex-col gap-4">
               <Field label="Material">
                 {(id) => (
-                  <input
+                  <MaterialSelect
                     id={id}
-                    type="text"
-                    value={form.material}
-                    onChange={(e) => actualizar({ material: e.target.value })}
-                    placeholder="Ej. MDF Trupan"
-                    className={INPUT_CLASSES}
+                    disponibles={materialesDisponibles}
+                    seleccionado={form.material}
+                    onSeleccionar={(material) => actualizar({ material })}
                   />
                 )}
               </Field>
@@ -435,6 +437,12 @@ export function SuiteWizard({
               <GridPreview
                 velocidadesMmMin={form.velocidadesMmMin}
                 potenciasPct={form.potenciasPct}
+              />
+              <AreaDisponibleCheck
+                velocidadesMmMin={form.velocidadesMmMin}
+                potenciasPct={form.potenciasPct}
+                tamanoCeldaMm={form.tamanoCeldaMm}
+                espaciadoMm={form.espaciadoMm}
               />
             </div>
           ) : null}

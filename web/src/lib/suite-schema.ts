@@ -48,3 +48,32 @@ export function totalCeldas(datos: {
 }): number {
   return datos.velocidadesMmMin.length * datos.potenciasPct.length;
 }
+
+// Espejo de `dimensiones_totales_mm` en src/laser_toolkit/gcode/writer.py:
+// mismos dos números mágicos (alto y margen de la etiqueta de ID grabada
+// arriba de la fila superior). Si esos valores cambian del lado Python, hay
+// que actualizarlos acá también — están cubiertos por tests en ambos lados.
+const ALTO_ETIQUETA_MM = 2.0;
+const MARGEN_ETIQUETA_MM = 3.0;
+
+/** Ancho x alto reales (mm) que va a ocupar la grilla completa de la suite
+ * sobre el material, dado lo que el técnico ya cargó en el wizard (velocidades,
+ * potencias, tamaño de celda, espaciado) — para avisar de antemano si no cabe
+ * en una pieza de área restringida (ej. una carcasa de teléfono). */
+export function dimensionesTotalesMm(datos: {
+  velocidadesMmMin: number[];
+  potenciasPct: number[];
+  tamanoCeldaMm: number;
+  espaciadoMm: number;
+}): { anchoMm: number; altoMm: number } {
+  const paso = datos.tamanoCeldaMm + datos.espaciadoMm;
+  const nColumnas = datos.velocidadesMmMin.length;
+  const nFilas = datos.potenciasPct.length;
+  const anchoMm = (nColumnas - 1) * paso + datos.tamanoCeldaMm;
+  const altoMm =
+    (nFilas - 1) * paso +
+    datos.tamanoCeldaMm +
+    MARGEN_ETIQUETA_MM +
+    ALTO_ETIQUETA_MM;
+  return { anchoMm, altoMm };
+}

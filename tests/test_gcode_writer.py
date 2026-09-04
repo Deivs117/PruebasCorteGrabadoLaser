@@ -1,6 +1,26 @@
-from laser_toolkit.config import MachineConfig
+from laser_toolkit.config import MachineConfig, SuiteConfig
 from laser_toolkit.gcode.grid import Celda
-from laser_toolkit.gcode.writer import cortar_cuadrado, grabar_relleno
+from laser_toolkit.gcode.writer import (
+    ALTO_ETIQUETA_MM,
+    MARGEN_ETIQUETA_MM,
+    cortar_cuadrado,
+    dimensiones_totales_mm,
+    grabar_relleno,
+)
+
+
+def _suite_config(**overrides: object) -> SuiteConfig:
+    base = {
+        "material": "MDF Trupan",
+        "espesor_mm": 3.0,
+        "operacion": "corte",
+        "velocidades_mm_min": [200, 220, 240],
+        "potencias_pct": [80, 100],
+        "tamano_celda_mm": 15.0,
+        "espaciado_mm": 5.0,
+    }
+    base.update(overrides)
+    return SuiteConfig.model_validate(base)
 
 
 def _celda(
@@ -55,3 +75,18 @@ def test_grabar_relleno_apaga_laser_al_final():
     lineas = grabar_relleno(_celda(), machine, resolucion_linea_mm=1.0)
     assert lineas[-1] == "M5"
     assert lineas[1].startswith("M4 S")
+
+
+def test_dimensiones_totales_mm_una_sola_celda():
+    config = _suite_config(velocidades_mm_min=[200], potencias_pct=[100])
+    ancho_mm, alto_mm = dimensiones_totales_mm(config)
+    assert ancho_mm == 15.0
+    assert alto_mm == 15.0 + MARGEN_ETIQUETA_MM + ALTO_ETIQUETA_MM
+
+
+def test_dimensiones_totales_mm_cuenta_pasos_entre_celdas():
+    config = _suite_config(velocidades_mm_min=[200, 220, 240], potencias_pct=[80, 100])
+    ancho_mm, alto_mm = dimensiones_totales_mm(config)
+    paso = config.tamano_celda_mm + config.espaciado_mm
+    assert ancho_mm == 2 * paso + config.tamano_celda_mm
+    assert alto_mm == 1 * paso + config.tamano_celda_mm + MARGEN_ETIQUETA_MM + ALTO_ETIQUETA_MM

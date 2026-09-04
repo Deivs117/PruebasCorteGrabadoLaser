@@ -9,7 +9,7 @@ quemados cuando la maquina desacelera en las esquinas.
 
 from __future__ import annotations
 
-from laser_toolkit.config import MachineConfig
+from laser_toolkit.config import MachineConfig, SuiteConfig
 from laser_toolkit.gcode.grid import Celda
 from laser_toolkit.gcode.label_font import trazos_texto
 
@@ -85,6 +85,26 @@ def grabar_relleno(celda: Celda, machine: MachineConfig, resolucion_linea_mm: fl
         ida = not ida
     lineas.append("M5")
     return lineas
+
+
+def dimensiones_totales_mm(config: SuiteConfig) -> tuple[float, float]:
+    """Ancho x alto reales (mm) que va a ocupar la grilla completa de la suite
+    sobre el material, incluyendo el margen de la etiqueta de ID grabada arriba
+    de la fila superior -- para poder avisar de antemano si una suite no cabe
+    en una pieza de area restringida (ej. una carcasa de telefono) antes de
+    generarla, no despues de gastar material.
+    """
+    paso = config.tamano_celda_mm + config.espaciado_mm
+    n_columnas = len(config.velocidades_mm_min)
+    n_filas = len(config.potencias_pct)
+    ancho_mm = (n_columnas - 1) * paso + config.tamano_celda_mm
+    alto_mm = (
+        (n_filas - 1) * paso
+        + config.tamano_celda_mm
+        + MARGEN_ETIQUETA_MM
+        + ALTO_ETIQUETA_MM
+    )
+    return ancho_mm, alto_mm
 
 
 def grabar_etiqueta(

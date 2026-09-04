@@ -1,21 +1,29 @@
-import Link from "next/link";
-import { FlaskConical, Pencil } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { FlaskConical } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
-import { DuplicarSuiteButton } from "@/components/suites/duplicar-suite-button";
-import { EliminarSuiteButton } from "@/components/suites/eliminar-suite-button";
+import { SuitesListado } from "@/components/suites/suites-listado";
 import { listarSuites } from "@/lib/fs-data";
-import { tiempoRelativo } from "@/lib/tiempo-relativo";
+import { colorDeMaterial } from "@/lib/material-color";
+import { leerCatalogoMateriales } from "@/lib/materiales-catalog";
 
 // Nuevas suites se agregan en cualquier momento (desde el asistente o a
 // mano), así que esta lista no se puede congelar como estática en el build.
 export const dynamic = "force-dynamic";
 
 export default async function SuitesDePrueba() {
-  const suites = await listarSuites();
+  const [suites, catalogo] = await Promise.all([
+    listarSuites(),
+    leerCatalogoMateriales(),
+  ]);
+  const familiaPorMaterial = new Map(
+    catalogo.map((m) => [m.nombre.toLowerCase(), m.familia]),
+  );
+  const suitesConMaterial = suites.map((suite) => ({
+    ...suite,
+    familia: familiaPorMaterial.get(suite.material.toLowerCase()) ?? "otro",
+    color: colorDeMaterial(suite.material),
+  }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -46,68 +54,7 @@ export default async function SuitesDePrueba() {
           />
         </Reveal>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {suites.map((suite, indice) => (
-            <Reveal key={suite.archivo} delayMs={indice * 40}>
-              <Card
-                accent={suite.operacion === "corte" ? "blue" : "purple"}
-                className="flex flex-col gap-3 p-5"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-navy text-base font-semibold">
-                    {suite.material}
-                  </p>
-                  <Badge tone={suite.tipo === "final_run" ? "ok" : "neutral"}>
-                    {suite.tipo === "final_run" ? "Final run" : "Barrido"}
-                  </Badge>
-                </div>
-                <p className="text-text-muted text-sm capitalize">
-                  {suite.operacion} · {suite.espesorMm}mm
-                </p>
-                {suite.tipo === "barrido" ? (
-                  <p className="text-navy font-mono text-sm">
-                    {(suite.velocidadesMmMin?.length ?? 0) *
-                      (suite.potenciasPct?.length ?? 0)}{" "}
-                    celdas
-                  </p>
-                ) : (
-                  <p className="text-navy font-mono text-sm">
-                    {suite.velocidadMmMin} mm/min · {suite.potenciaPct}%
-                  </p>
-                )}
-                <div className="border-border flex items-center justify-between gap-2 border-t pt-3">
-                  <p className="text-text-muted text-xs">
-                    Creada {tiempoRelativo(suite.creadoEn)}
-                  </p>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {suite.tipo === "barrido" ? (
-                      <>
-                        <Link
-                          href={`/suites/${encodeURIComponent(suite.archivo)}/editar`}
-                          aria-label={`Editar suite de ${suite.material}`}
-                          className="text-text-muted hover:bg-navy-soft hover:text-navy flex size-7 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
-                        >
-                          <Pencil className="size-4" strokeWidth={1.75} />
-                        </Link>
-                        <DuplicarSuiteButton
-                          archivo={suite.archivo}
-                          material={suite.material}
-                          espesorMm={suite.espesorMm}
-                          operacion={suite.operacion}
-                          loteActual={suite.lote}
-                        />
-                      </>
-                    ) : null}
-                    <EliminarSuiteButton
-                      archivo={suite.archivo}
-                      material={suite.material}
-                    />
-                  </div>
-                </div>
-              </Card>
-            </Reveal>
-          ))}
-        </div>
+        <SuitesListado suites={suitesConMaterial} />
       )}
     </div>
   );

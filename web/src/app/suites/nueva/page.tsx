@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { BackLink } from "@/components/ui/back-link";
 import { SuiteWizard } from "@/components/suites/suite-wizard";
 import { leerSuiteEditable } from "@/lib/generar-suite";
+import { leerCatalogoMateriales } from "@/lib/materiales-catalog";
 import { listarSvgsConContenido } from "@/lib/svg-data";
 
 // La galería de SVGs disponibles cambia en cualquier momento desde Grabado
@@ -16,10 +17,13 @@ export default async function NuevaSuite({
   const loteParam = parametros.lote;
   const archivoOrigen = typeof duplicar === "string" ? duplicar : undefined;
 
-  const [datosOrigen, svgsDisponibles] = await Promise.all([
-    archivoOrigen ? leerSuiteEditable(archivoOrigen) : Promise.resolve(null),
-    listarSvgsConContenido(),
-  ]);
+  const [datosOrigen, svgsDisponibles, catalogoMateriales] =
+    await Promise.all([
+      archivoOrigen ? leerSuiteEditable(archivoOrigen) : Promise.resolve(null),
+      listarSvgsConContenido(),
+      leerCatalogoMateriales(),
+    ]);
+  const materialesDisponibles = catalogoMateriales.map((m) => m.nombre);
 
   if (archivoOrigen && !datosOrigen) {
     notFound();
@@ -51,6 +55,7 @@ export default async function NuevaSuite({
       <SuiteWizard
         datosIniciales={datosIniciales}
         svgsDisponibles={svgsDisponibles}
+        materialesDisponibles={materialesDisponibles}
       />
     </div>
   );
