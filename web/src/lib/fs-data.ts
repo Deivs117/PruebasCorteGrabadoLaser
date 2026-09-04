@@ -65,7 +65,12 @@ function esYamlDeSuite(nombre: string): boolean {
   return (
     nombre.endsWith(".yaml") &&
     !nombre.includes("tarifas") &&
-    !nombre.includes("example")
+    !nombre.includes("example") &&
+    // "ejemplo-dev_*" son las suites de ejemplo que documentan README.md,
+    // el docstring de cli.py y el Plan Maestro (make generate-cut CONFIG=...) —
+    // configs reales que hay que conservar, no ruido: solo se ocultan de este
+    // panel para no mezclarse con las suites reales del taller.
+    !nombre.startsWith("ejemplo-dev")
   );
 }
 
