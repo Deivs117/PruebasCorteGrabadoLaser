@@ -1,7 +1,7 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { TrashCanAnimado } from "@/components/ui/icons/trash-can-animado";
 import { iconButtonClasses } from "@/lib/button-styles";
 import { useEliminar } from "@/lib/use-eliminar";
 
@@ -26,7 +26,7 @@ export function EliminarCorridaButton({
         aria-label="Eliminar esta corrida"
         className={iconButtonClasses("danger")}
       >
-        <Trash2 className="size-4" strokeWidth={1.75} />
+        <TrashCanAnimado className="size-4" />
       </button>
       <ConfirmDialog
         open={abierto}

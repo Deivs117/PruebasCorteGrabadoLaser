@@ -43,7 +43,10 @@ export function iconButtonClasses(
   className?: string,
 ): string {
   return clsx(
-    "relative flex size-7 items-center justify-center overflow-hidden rounded-[var(--radius-sm)]",
+    // "group" no aplica ningún estilo por sí solo -- es el gancho que usan
+    // los íconos animados (ver components/ui/icons/) para reaccionar al
+    // hover del botón completo, no solo del ícono.
+    "group relative flex size-7 items-center justify-center overflow-hidden rounded-[var(--radius-sm)]",
     "transition-[color,background-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
     "active:scale-90",
     tono === "danger"
