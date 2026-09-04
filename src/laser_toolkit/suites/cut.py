@@ -9,7 +9,7 @@ from datetime import date
 from laser_toolkit.config import MachineConfig, SuiteConfig
 from laser_toolkit.gcode.grid import construir_grilla
 from laser_toolkit.gcode.timing import tiempo_corte_celda_s
-from laser_toolkit.gcode.writer import MARGEN_ETIQUETA_MM, cortar_cuadrado, encabezado, grabar_etiqueta, pie
+from laser_toolkit.gcode.writer import cortar_cuadrado, encabezado, grabar_etiqueta, pie, tamano_etiqueta_mm
 from laser_toolkit.naming import nombre_base
 from laser_toolkit.svg.api import cargar_subpaths_svg, tiempo_estimado_svg_s
 from laser_toolkit.svg.gcode import gcode_contorno
@@ -62,6 +62,7 @@ def generar_suite_corte(config: SuiteConfig) -> tuple[list[str], list[dict]]:
 
     gcode = encabezado(f"Suite de CORTE -- {config.material} {config.espesor_mm}mm -- lote {config.lote}")
     filas: list[dict] = []
+    margen_etiqueta_mm, alto_etiqueta_mm = tamano_etiqueta_mm(config.espaciado_mm)
 
     for celda in celdas:
         if subpaths_svg is not None:
@@ -87,8 +88,11 @@ def generar_suite_corte(config: SuiteConfig) -> tuple[list[str], list[dict]]:
             x_mm=celda.x_mm,
             # Arriba de la celda (dentro del espaciado hacia la fila siguiente): a
             # diferencia de "debajo", esto nunca cae en Y negativo para la fila 0.
-            y_mm=celda.y_mm + celda.tamano_mm + MARGEN_ETIQUETA_MM,
+            # margen/alto se reducen si `espaciado_mm` es chico, para no invadir
+            # la celda de la fila de arriba (ver `tamano_etiqueta_mm`).
+            y_mm=celda.y_mm + celda.tamano_mm + margen_etiqueta_mm,
             machine=config.machine,
+            alto_mm=alto_etiqueta_mm,
         )
         filas.append(
             {

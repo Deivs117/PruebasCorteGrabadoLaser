@@ -11,7 +11,7 @@ from enum import Enum
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # Se importa desde `svg.modo` (no `svg.api`) a proposito: `svg.api` depende de
 # `MachineConfig` de este mismo modulo, y ese import si crearia un ciclo.
@@ -53,6 +53,47 @@ class MachineConfig(BaseModel):
         description=(
             "Calibracion tecnica del respaldo de estimacion de energia (Plan Maestro, 6.1): se ajusta "
             "una vez comparando kWh estimados vs. medidos. Parametro tecnico, no una tarifa de negocio."
+        ),
+    )
+    punto_focal_mm: float = Field(
+        default=0.08,
+        gt=0,
+        description=(
+            "Diametro del punto focal (spot) del modulo, en mm -- 0.08mm en el LT-80W-F45 "
+            "(lente de haz comprimido, ver docs/materiales/MDF/Analisis Tecnico MDF - "
+            "LT-80W-F45.md). Define el paso de linea (mm entre pasadas de barrido) que usa "
+            "el relleno tipo trama del grabado generico de una suite: un paso mas ancho que "
+            "el spot deja franjas sin quemar entre lineas; uno mas angosto que el spot solo "
+            "duplica el tiempo de maquina sin grabar mas oscuro. Ver "
+            "`laser_toolkit.gcode.writer.grabar_relleno` y "
+            "`laser_toolkit.gcode.timing.tiempo_grabado_celda_s`."
+        ),
+    )
+    velocidad_max_mm_min: int = Field(
+        default=2000,
+        gt=0,
+        description=(
+            "Velocidad maxima real de los ejes X/Y (parametros $110/$111 de GRBL de esta "
+            "maquina). GRBL clampea en silencio cualquier F por encima de esto -- programar "
+            "una velocidad mayor no produce una celda mas rapida, produce una celda IDENTICA "
+            "a la del limite real, gastando material en una fila de la grilla que no aporta "
+            "informacion nueva. `SuiteConfig`/`FinalRunConfig` validan las velocidades "
+            "pedidas contra este limite antes de generar G-code."
+        ),
+    )
+    aceleracion_mm_s2: float = Field(
+        default=50.0,
+        gt=0,
+        description=(
+            "Aceleracion maxima de los ejes X/Y (parametros $120/$121 de GRBL de esta "
+            "maquina, en mm/s^2 -- 50.0 confirmado en la CNC 3018 real de este taller). "
+            "Usada para calcular el sobre-recorrido (overscan) del relleno tipo trama de "
+            "grabado: la distancia que la maquina necesita para alcanzar la velocidad "
+            "programada antes de entrar a la zona visible de la celda -- ver "
+            "`laser_toolkit.gcode.writer.grabar_relleno`. Un valor mas chico que la "
+            "aceleracion real subestima el sobre-recorrido necesario (menos proteccion "
+            "contra el sobre-quemado en los bordes); uno mas grande lo sobreestima (mas "
+            "tiempo de maquina de lo necesario, topado por SOBRERECORRIDO_MAX_MM igual)."
         ),
     )
 
@@ -115,6 +156,20 @@ class SuiteConfig(BaseModel):
                 raise ValueError(f"potencia fuera de rango (0, 100]: {p}")
         return valores
 
+    @model_validator(mode="after")
+    def _velocidades_dentro_del_limite_real(self) -> SuiteConfig:
+        limite = self.machine.velocidad_max_mm_min
+        excedidas = sorted({v for v in self.velocidades_mm_min if v > limite})
+        if excedidas:
+            raise ValueError(
+                f"velocidades_mm_min {excedidas} superan el limite real de la maquina "
+                f"(machine.velocidad_max_mm_min={limite} mm/min, de $110/$111 en GRBL). "
+                "GRBL las clampea en silencio a ese limite: no serian una velocidad "
+                "distinta, serian una celda duplicada de la del limite. Bajalas, o si "
+                "cambiaste $110/$111 en la maquina, actualiza machine.velocidad_max_mm_min."
+            )
+        return self
+
     @classmethod
     def from_yaml(cls, ruta: str | Path) -> SuiteConfig:
         datos = yaml.safe_load(Path(ruta).read_text(encoding="utf-8"))
@@ -165,6 +220,18 @@ class FinalRunConfig(BaseModel):
         default=None, description="Formato AAAA-MM-DD. Si se omite, se usa la fecha del dia de generacion."
     )
     machine: MachineConfig = Field(default_factory=lambda: MachineConfig())
+
+    @model_validator(mode="after")
+    def _velocidad_dentro_del_limite_real(self) -> FinalRunConfig:
+        limite = self.machine.velocidad_max_mm_min
+        if self.velocidad_mm_min > limite:
+            raise ValueError(
+                f"velocidad_mm_min={self.velocidad_mm_min} supera el limite real de la maquina "
+                f"(machine.velocidad_max_mm_min={limite} mm/min, de $110/$111 en GRBL). GRBL la "
+                "clampea en silencio a ese limite. Bajala, o si cambiaste $110/$111 en la "
+                "maquina, actualiza machine.velocidad_max_mm_min."
+            )
+        return self
 
     @classmethod
     def from_yaml(cls, ruta: str | Path) -> FinalRunConfig:

@@ -45,6 +45,60 @@ def test_ids_de_filas_csv_coinciden_con_prefijo_de_operacion():
     assert all(fila["id_prueba"].startswith("C-") for fila in filas_grabado)  # prefijo por defecto es "C"
 
 
+def test_suite_grabado_generico_usa_punto_focal_como_paso_de_linea():
+    # Con un punto focal mas angosto entran mas lineas de barrido en la misma
+    # celda -- mas tiempo de maquina y mas lineas G1 en el gcode -- prueba de
+    # que `machine.punto_focal_mm` maneja el paso en vez de una constante fija.
+    config_spot_ancho = SuiteConfig.model_validate(
+        {
+            "material": "MDF Trupan",
+            "espesor_mm": 3.0,
+            "operacion": "grabado",
+            "velocidades_mm_min": [1500],
+            "potencias_pct": [50],
+            "tamano_celda_mm": 7.0,
+            "fecha": "2026-08-28",
+            "machine": {"punto_focal_mm": 0.2},
+        }
+    )
+    config_spot_angosto = config_spot_ancho.model_copy(
+        update={"machine": config_spot_ancho.machine.model_copy(update={"punto_focal_mm": 0.08})}
+    )
+
+    gcode_ancho, filas_ancho = generar_suite_grabado(config_spot_ancho)
+    gcode_angosto, filas_angosto = generar_suite_grabado(config_spot_angosto)
+
+    assert len(gcode_angosto) > len(gcode_ancho)
+    assert filas_angosto[0]["tiempo_estimado_celda_s"] > filas_ancho[0]["tiempo_estimado_celda_s"]
+
+
+def test_suite_grabado_generico_desplaza_la_columna_0_para_el_overscan():
+    # Bug real reportado: la columna 0 (x_mm=0 sin este fix) perdia el
+    # sobre-recorrido hacia la izquierda porque grabar_relleno lo recorta
+    # contra X=0 -- el gcode solo tenia overscan del lado derecho.
+    from laser_toolkit.gcode.writer import margen_seguridad_columna_cero_mm
+
+    config = SuiteConfig.model_validate(
+        {
+            "material": "MDF Trupan",
+            "espesor_mm": 3.0,
+            "operacion": "grabado",
+            "velocidades_mm_min": [1000, 1500, 2000],
+            "potencias_pct": [20, 35],
+            "tamano_celda_mm": 5.0,
+            "espaciado_mm": 3.0,
+            "fecha": "2026-08-28",
+        }
+    )
+    _, filas = generar_suite_grabado(config)
+    margen_esperado = margen_seguridad_columna_cero_mm(config.velocidades_mm_min, config.machine)
+
+    columna_0 = [fila for fila in filas if fila["x_mm"] == pytest.approx(margen_esperado)]
+    assert columna_0, "ninguna celda quedo en la columna 0 desplazada por el margen de seguridad"
+    assert margen_esperado > 0
+    assert not any(fila["x_mm"] < margen_esperado - 1e-9 for fila in filas)
+
+
 def test_suite_grabado_con_svg_path_produce_gcode_de_curvas(tmp_path):
     if not LOGO_EMPRESA.exists():
         return  # el logo real no viene incluido en cada checkout de forma obligatoria

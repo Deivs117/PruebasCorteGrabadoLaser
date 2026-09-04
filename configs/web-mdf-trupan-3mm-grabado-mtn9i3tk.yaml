@@ -1,0 +1,15 @@
+material: MDF Trupan
+espesor_mm: 3
+operacion: grabado
+velocidades_mm_min:
+  - 1500
+  - 1750
+  - 2000
+potencias_pct:
+  - 20
+  - 35
+pasadas: 1
+tamano_celda_mm: 4.5
+espaciado_mm: 3
+id_prefijo: G
+lote: L03

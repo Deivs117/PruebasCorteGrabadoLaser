@@ -1,0 +1,4 @@
+corrida_id,grupo_calibracion_id,ejecucion,id_prueba,lote,fecha,material,espesor_mm,operacion,velocidad_mm_min,potencia_pct,pasadas,x_mm,y_mm,tamano_celda_mm,area_material_mm2,tiempo_estimado_celda_s,corte_pasante,carbonizacion_1a5,kwh_corrida_medido,tiempo_real_corrida_s,foto,notas
+MDF-Comercial_3mm_corte_2026-09-04_L15,,,C-001,L15,2026-09-04,MDF Comercial,3.0,corte,440,100,3,0.0,0.0,10.0,100.0,19.75,si,3,0.01,121,,
+MDF-Comercial_3mm_corte_2026-09-04_L15,,,C-002,L15,2026-09-04,MDF Comercial,3.0,corte,500,100,3,13.5,0.0,10.0,100.0,17.38,no,3,0.01,121,,
+MDF-Comercial_3mm_corte_2026-09-04_L15,,,C-003,L15,2026-09-04,MDF Comercial,3.0,corte,600,100,3,27.0,0.0,10.0,100.0,14.48,no,3,0.01,121,,

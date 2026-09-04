@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from laser_toolkit.config import FinalRunConfig
 from laser_toolkit.suites.final_run import construir_replicas, generar_final_run
 
@@ -15,6 +18,11 @@ def _config(**overrides: object) -> FinalRunConfig:
     }
     base.update(overrides)
     return FinalRunConfig.model_validate(base)
+
+
+def test_velocidad_por_encima_del_limite_real_de_la_maquina_falla():
+    with pytest.raises(ValidationError):
+        _config(velocidad_mm_min=2500)
 
 
 def test_construir_replicas_cantidad_y_parametros_identicos():

@@ -52,6 +52,23 @@ def test_svg_path_en_grabado_es_valido():
     assert config.svg_path == "assets/svg/logo-empresa.svg"
 
 
+def test_velocidad_por_encima_del_limite_real_de_la_maquina_falla():
+    # machine.velocidad_max_mm_min default es 2000 ($110/$111 de GRBL) -- GRBL
+    # clampea en silencio cualquier F mayor, asi que programarlo es un error de
+    # configuracion, no una velocidad valida.
+    with pytest.raises(ValidationError):
+        SuiteConfig.model_validate(_config_base(velocidades_mm_min=[200, 2500]))
+
+
+def test_velocidad_dentro_del_limite_configurado_es_valida():
+    # Si el tecnico realmente subio $110/$111 en la maquina, puede reflejarlo
+    # en machine.velocidad_max_mm_min para habilitar velocidades mayores.
+    config = SuiteConfig.model_validate(
+        _config_base(velocidades_mm_min=[3000], machine={"velocidad_max_mm_min": 4000})
+    )
+    assert config.velocidades_mm_min == [3000]
+
+
 def test_from_yaml_roundtrip(tmp_path: Path):
     contenido = """
 material: "MDF Trupan"

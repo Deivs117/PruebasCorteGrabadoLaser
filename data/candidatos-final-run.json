@@ -10,5 +10,17 @@
     "velocidadMmMin": "350",
     "potenciaPct": "100",
     "marcadoEn": "2026-09-04T00:29:56.252Z"
+  },
+  {
+    "id": "MDF-Comercial_3mm_corte_2026-09-04_L15::C-001",
+    "corridaId": "MDF-Comercial_3mm_corte_2026-09-04_L15",
+    "idPrueba": "C-001",
+    "archivo": "MDF-Comercial_3mm_corte_2026-09-04_L15_registro.csv",
+    "material": "MDF Comercial",
+    "espesorMm": "3.0",
+    "operacion": "corte",
+    "velocidadMmMin": "440",
+    "potenciaPct": "100",
+    "marcadoEn": "2026-09-04T16:34:03.138Z"
   }
 ]

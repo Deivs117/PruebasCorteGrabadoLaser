@@ -49,12 +49,43 @@ export function totalCeldas(datos: {
   return datos.velocidadesMmMin.length * datos.potenciasPct.length;
 }
 
-// Espejo de `dimensiones_totales_mm` en src/laser_toolkit/gcode/writer.py:
-// mismos dos números mágicos (alto y margen de la etiqueta de ID grabada
-// arriba de la fila superior). Si esos valores cambian del lado Python, hay
-// que actualizarlos acá también — están cubiertos por tests en ambos lados.
+// Espejo de `dimensiones_totales_mm` / `tamano_etiqueta_mm` en
+// src/laser_toolkit/gcode/writer.py: mismos números mágicos (alto y margen
+// de la etiqueta de ID grabada arriba de cada fila, y sus pisos legibles). Si
+// esos valores cambian del lado Python, hay que actualizarlos acá también —
+// están cubiertos por tests en ambos lados.
 const ALTO_ETIQUETA_MM = 2.0;
 const MARGEN_ETIQUETA_MM = 3.0;
+const ALTO_ETIQUETA_MIN_MM = 1.0;
+const MARGEN_ETIQUETA_MIN_MM = 0.5;
+const BUFFER_ETIQUETA_MM = 0.3;
+
+/** Espejo de `tamano_etiqueta_mm`: con espaciado chico (grillas de shades tipo
+ * 7mm de celda / 3mm de separación) reduce el margen y el alto de la etiqueta
+ * de ID para que quepan dentro del espaciado sin invadir la celda de la fila
+ * siguiente — con espaciado amplio devuelve los valores por defecto. */
+function tamanoEtiquetaMm(espaciadoMm: number): { margenMm: number; altoMm: number } {
+  const totalDefecto = MARGEN_ETIQUETA_MM + ALTO_ETIQUETA_MM;
+  if (espaciadoMm >= totalDefecto) {
+    return { margenMm: MARGEN_ETIQUETA_MM, altoMm: ALTO_ETIQUETA_MM };
+  }
+
+  const disponible = espaciadoMm - BUFFER_ETIQUETA_MM;
+  const totalMinimo = MARGEN_ETIQUETA_MIN_MM + ALTO_ETIQUETA_MIN_MM;
+  if (disponible < totalMinimo) {
+    // El wizard no bloquea acá (eso lo hace el CLI Python al generar) — solo
+    // devuelve el piso para no mostrar un tamaño de grilla negativo o absurdo.
+    return { margenMm: MARGEN_ETIQUETA_MIN_MM, altoMm: ALTO_ETIQUETA_MIN_MM };
+  }
+
+  const margenMm = Math.max(MARGEN_ETIQUETA_MIN_MM, disponible * (MARGEN_ETIQUETA_MM / totalDefecto));
+  let altoMm = disponible - margenMm;
+  if (altoMm < ALTO_ETIQUETA_MIN_MM) {
+    altoMm = ALTO_ETIQUETA_MIN_MM;
+    return { margenMm: disponible - altoMm, altoMm };
+  }
+  return { margenMm, altoMm };
+}
 
 /** Ancho x alto reales (mm) que va a ocupar la grilla completa de la suite
  * sobre el material, dado lo que el técnico ya cargó en el wizard (velocidades,
@@ -69,11 +100,8 @@ export function dimensionesTotalesMm(datos: {
   const paso = datos.tamanoCeldaMm + datos.espaciadoMm;
   const nColumnas = datos.velocidadesMmMin.length;
   const nFilas = datos.potenciasPct.length;
+  const { margenMm, altoMm: altoEtiquetaMm } = tamanoEtiquetaMm(datos.espaciadoMm);
   const anchoMm = (nColumnas - 1) * paso + datos.tamanoCeldaMm;
-  const altoMm =
-    (nFilas - 1) * paso +
-    datos.tamanoCeldaMm +
-    MARGEN_ETIQUETA_MM +
-    ALTO_ETIQUETA_MM;
+  const altoMm = (nFilas - 1) * paso + datos.tamanoCeldaMm + margenMm + altoEtiquetaMm;
   return { anchoMm, altoMm };
 }
