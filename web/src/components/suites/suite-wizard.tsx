@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { CircleCheck, Shapes, Square, TriangleAlert } from "lucide-react";
 import { clsx } from "clsx";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
+import { CircleCheckAnimado } from "@/components/ui/icons/circle-check-animado";
+import { ShapesAnimado } from "@/components/ui/icons/shapes-animado";
+import { SquareAnimado } from "@/components/ui/icons/square-animado";
+import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
 import { OperacionSelector } from "@/components/ui/operacion-selector";
 import { Reveal } from "@/components/ui/reveal";
 import { DescargarBoton } from "@/components/registro/descargar-boton";
@@ -218,7 +221,7 @@ export function SuiteWizard({
             className="bg-teal-soft text-teal flex size-12 items-center justify-center rounded-full"
             aria-hidden="true"
           >
-            <CircleCheck className="size-6" strokeWidth={1.75} />
+            <CircleCheckAnimado className="size-6" strokeWidth={1.75} />
           </span>
           <div aria-live="polite">
             <p className="text-navy text-base font-semibold">
@@ -426,13 +429,13 @@ export function SuiteWizard({
                     onClick={() => actualizar({ geometria: "generica" })}
                     aria-pressed={form.geometria === "generica"}
                     className={clsx(
-                      "flex flex-col items-center gap-2 rounded-[var(--radius-md)] border p-6 transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+                      "group flex flex-col items-center gap-2 rounded-[var(--radius-md)] border p-6 transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
                       form.geometria === "generica"
                         ? "border-blue bg-blue-soft"
                         : "border-border hover:bg-navy-soft",
                     )}
                   >
-                    <Square className="text-navy size-6" strokeWidth={1.75} />
+                    <SquareAnimado className="text-navy size-6" strokeWidth={1.75} />
                     <span className="text-navy text-sm font-medium">
                       Cuadrado genérico
                     </span>
@@ -442,13 +445,13 @@ export function SuiteWizard({
                     onClick={() => actualizar({ geometria: "svg" })}
                     aria-pressed={form.geometria === "svg"}
                     className={clsx(
-                      "flex flex-col items-center gap-2 rounded-[var(--radius-md)] border p-6 transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+                      "group flex flex-col items-center gap-2 rounded-[var(--radius-md)] border p-6 transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
                       form.geometria === "svg"
                         ? "border-blue bg-blue-soft"
                         : "border-border hover:bg-navy-soft",
                     )}
                   >
-                    <Shapes className="text-navy size-6" strokeWidth={1.75} />
+                    <ShapesAnimado className="text-navy size-6" strokeWidth={1.75} />
                     <span className="text-navy text-sm font-medium">
                       Importar SVG
                     </span>
@@ -607,10 +610,7 @@ export function SuiteWizard({
                   aria-live="polite"
                   className="border-orange/30 bg-orange-soft flex items-start gap-2 rounded-[var(--radius-sm)] border p-3"
                 >
-                  <TriangleAlert
-                    className="text-orange mt-0.5 size-4 shrink-0"
-                    aria-hidden="true"
-                  />
+                  <TriangleAlertAnimado className="text-orange mt-0.5 size-4 shrink-0" />
                   <p className="text-navy text-sm">{resultado.mensaje}</p>
                 </div>
               ) : null}

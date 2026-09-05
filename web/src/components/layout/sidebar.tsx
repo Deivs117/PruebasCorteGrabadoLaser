@@ -58,7 +58,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
                     onClick={onNavigate}
                     aria-current={activo ? "page" : undefined}
                     className={clsx(
-                      "flex items-center gap-3 rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-medium",
+                      "group flex items-center gap-3 rounded-[var(--radius-sm)] px-3 py-2.5 text-sm font-medium",
                       "transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
                       activo
                         ? "bg-blue text-white"

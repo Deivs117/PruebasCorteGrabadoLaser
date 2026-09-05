@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
 
 interface PrepararRegistroButtonProps {
   archivo: string;
@@ -55,7 +55,7 @@ export function PrepararRegistroButton({
       </Button>
       {estado === "error" ? (
         <p role="alert" className="text-orange flex items-center gap-1 text-xs">
-          <TriangleAlert className="size-3.5" aria-hidden="true" />
+          <TriangleAlertAnimado className="size-3.5" />
           {mensaje}
         </p>
       ) : null}

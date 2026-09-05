@@ -2,8 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UploadCloud } from "lucide-react";
 import { clsx } from "clsx";
+import { UploadCloudAnimado } from "@/components/ui/icons/upload-cloud-animado";
 
 /** Sube un SVG real (drag&drop o selector de archivo) y navega a su vista
  * previa apenas el servidor confirma que quedó guardado. */
@@ -12,11 +12,15 @@ export function SvgDropzone() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [sobreZona, setSobreZona] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
+  const [rebotar, setRebotar] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
   async function subir(archivo: File) {
     setSubiendo(true);
     setError(undefined);
+    // Rebote chico de la nube al soltar/elegir el archivo -- una vez, se
+    // apaga solo cuando termina la keyframe (ver onAnimationEnd más abajo).
+    setRebotar(true);
     const formulario = new FormData();
     formulario.append("archivo", archivo);
 
@@ -66,10 +70,12 @@ export function SvgDropzone() {
             : "border-border hover:bg-navy-soft",
         )}
       >
-        <UploadCloud
+        <UploadCloudAnimado
           className="text-blue size-8"
           strokeWidth={1.5}
-          aria-hidden="true"
+          arrastrando={sobreZona}
+          rebotar={rebotar}
+          onAnimationEnd={() => setRebotar(false)}
         />
         <div>
           <p className="text-navy text-sm font-medium">

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CircleCheck, TriangleAlert } from "lucide-react";
 import { clsx } from "clsx";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
+import { CircleCheckAnimado } from "@/components/ui/icons/circle-check-animado";
+import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
 import { OperacionSelector } from "@/components/ui/operacion-selector";
 import { NumberStepper } from "@/components/suites/number-stepper";
 import { DescargarBoton } from "@/components/registro/descargar-boton";
@@ -146,7 +147,7 @@ export function FinalRunForm({ candidatos }: FinalRunFormProps) {
           className="bg-teal-soft text-teal flex size-12 items-center justify-center rounded-full"
           aria-hidden="true"
         >
-          <CircleCheck className="size-6" strokeWidth={1.75} />
+          <CircleCheckAnimado className="size-6" strokeWidth={1.75} />
         </span>
         <div aria-live="polite">
           <p className="text-navy text-base font-semibold">
@@ -364,10 +365,7 @@ export function FinalRunForm({ candidatos }: FinalRunFormProps) {
           aria-live="polite"
           className="border-orange/30 bg-orange-soft flex items-start gap-2 rounded-[var(--radius-sm)] border p-3"
         >
-          <TriangleAlert
-            className="text-orange mt-0.5 size-4 shrink-0"
-            aria-hidden="true"
-          />
+          <TriangleAlertAnimado className="text-orange mt-0.5 size-4 shrink-0" />
           <p className="text-navy text-sm">{resultado.mensaje}</p>
         </div>
       ) : null}

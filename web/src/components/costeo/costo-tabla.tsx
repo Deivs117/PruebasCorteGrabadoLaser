@@ -1,5 +1,5 @@
-import { TriangleAlert } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
 import type { FilaCosteada } from "@/lib/registro-schema";
 
 interface CostoTablaProps {
@@ -14,7 +14,7 @@ function Costo({ valor, moneda }: { valor: string; moneda: string }) {
         className="text-orange inline-flex items-center gap-1 text-xs italic"
         title="Falta cargar la tarifa correspondiente en Tarifas."
       >
-        <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" />
+        <TriangleAlertAnimado className="size-3.5 shrink-0" />
         Sin tarifa
       </span>
     );

@@ -1,8 +1,12 @@
-import { FlaskConical, Shapes, Gauge, ClipboardList } from "lucide-react";
+import { FlaskConical } from "lucide-react";
 import { AlertBanner } from "@/components/ui/alert-banner";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
+import { ClipboardListAnimado } from "@/components/ui/icons/clipboard-list-animado";
+import { FlaskConicalAnimado } from "@/components/ui/icons/flask-conical-animado";
+import { GaugeAnimado } from "@/components/ui/icons/gauge-animado";
+import { ShapesAnimado } from "@/components/ui/icons/shapes-animado";
 import { Reveal } from "@/components/ui/reveal";
 import { StatTile } from "@/components/ui/stat-tile";
 import { getDashboardSummary } from "@/lib/fs-data";
@@ -93,19 +97,19 @@ export default async function Inicio() {
           </h2>
           <Card className="flex flex-wrap gap-3 p-4">
             <LinkButton href="/suites" variant="primary">
-              <FlaskConical className="size-4" strokeWidth={1.75} />
+              <FlaskConicalAnimado className="size-4" strokeWidth={1.75} />
               Nueva suite de prueba
             </LinkButton>
             <LinkButton href="/grabado-svg" variant="secondary">
-              <Shapes className="size-4" strokeWidth={1.75} />
+              <ShapesAnimado className="size-4" strokeWidth={1.75} />
               Importar SVG
             </LinkButton>
             <LinkButton href="/final-run" variant="secondary">
-              <Gauge className="size-4" strokeWidth={1.75} />
+              <GaugeAnimado className="size-4" strokeWidth={1.75} />
               Nueva Final Run
             </LinkButton>
             <LinkButton href="/registro" variant="outline">
-              <ClipboardList className="size-4" strokeWidth={1.75} />
+              <ClipboardListAnimado className="size-4" strokeWidth={1.75} />
               Hoja de Registro
             </LinkButton>
           </Card>

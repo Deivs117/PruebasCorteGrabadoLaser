@@ -1,4 +1,3 @@
-import { Check } from "lucide-react";
 import { clsx } from "clsx";
 
 interface WizardStepperProps {
@@ -34,7 +33,27 @@ export function WizardStepper({
             )}
           >
             {completado ? (
-              <Check className="size-4" strokeWidth={2.5} />
+              // Se dibuja progresivamente (stroke-dashoffset) en vez de
+              // aparecer de golpe, la primera vez que el paso queda listo
+              // -- pathLength={1} normaliza el largo del trazo a 0..1 sin
+              // tener que calcular el largo real del path a mano.
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-4"
+                aria-hidden="true"
+              >
+                <path
+                  d="M20 6 9 17l-5-5"
+                  pathLength={1}
+                  strokeDasharray={1}
+                  className="animate-[check-dibujo_350ms_ease-out]"
+                />
+              </svg>
             ) : (
               indice + 1
             )}

@@ -5,7 +5,10 @@ export type ButtonVariant =
 export type ButtonSize = "sm" | "md" | "lg";
 
 const BASE =
-  "relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-[var(--radius-sm)] font-medium " +
+  // "group" es el gancho que usan los íconos animados dentro de <Button>/
+  // <LinkButton> (ver components/ui/icons/) para reaccionar al hover del
+  // botón completo -- no aplica ningún estilo por sí solo.
+  "group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-[var(--radius-sm)] font-medium " +
   "transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--duration-quick)] ease-[var(--ease-motion)] " +
   // Feedback físico: se eleva un poco al pasar el mouse, se "achica" al
   // hacer click (sin rebote — personalidad "Corporate", ver globals.css).

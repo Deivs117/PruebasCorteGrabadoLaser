@@ -179,6 +179,223 @@ body {
   }
 }
 
+/* --- Backlog de íconos animados (docs/ui-design/propuesta-iconos-animados.md) --- */
+
+/* Burbujas del frasco (Suites de Prueba, sidebar) -- suben y desvanecen en
+   loop mientras dura el hover; cada una usa esta misma keyframe con un
+   animation-delay distinto (ver FlaskConicalAnimado) para no subir juntas. */
+@keyframes flask-burbuja {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-5px);
+    opacity: 0;
+  }
+}
+
+/* Aguja de Final Run (sidebar): barrido de dos actos -- primero gira hasta
+   el máximo (esta keyframe, se dispara una sola vez por hover), y recién
+   ahí aparece el check de "calibración cumplida" (ver GaugeAnimado, que
+   demora la aparición del check con transition-delay hasta que el barrido
+   termina). Pedido explícito del técnico. */
+@keyframes gauge-barrido {
+  from {
+    transform: rotate(-38deg);
+  }
+  to {
+    transform: rotate(28deg);
+  }
+}
+
+/* Destello de Fichas de Parámetro (sidebar): un brillo diagonal recorre la
+   medalla una vez al pasar el mouse -- no es un loop, es un "shine" único. */
+@keyframes filebadge-destello {
+  from {
+    transform: translateX(-140%) rotate(20deg);
+  }
+  to {
+    transform: translateX(140%) rotate(20deg);
+  }
+}
+
+/* Perilla derecha de Máquina (sidebar): se desliza en vaivén sobre su riel
+   en loop mientras dura el hover, como ajustando. */
+@keyframes settings2-ajuste {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-2px);
+  }
+}
+
+/* Moneda de Tarifas (sidebar): rebote vertical corto, una vez por hover,
+   como si acabara de caer. */
+@keyframes dollarsign-rebote {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-3px);
+  }
+  55% {
+    transform: translateY(1px);
+  }
+  80% {
+    transform: translateY(-0.5px);
+  }
+}
+
+/* Signo de pregunta de Ayuda (sidebar): balanceo suave y lento en loop
+   mientras dura el hover -- invita a hacer click, sin urgencia. */
+@keyframes helpcircle-balanceo {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-8deg);
+  }
+}
+
+/* Ícono de filtro por material (leyenda de chips): goteo/vibración muy
+   sutil en loop mientras dura el hover sobre la leyenda completa. */
+@keyframes filter-goteo {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(1.5px);
+  }
+}
+
+/* Advertencia/error (TriangleAlert): tiembla horizontalmente al aparecer,
+   una sola vez -- patrón "Error Shake", sin rebote. */
+@keyframes trianglealert-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-2.5px);
+  }
+  40% {
+    transform: translateX(2.5px);
+  }
+  60% {
+    transform: translateX(-1.5px);
+  }
+  80% {
+    transform: translateX(1.5px);
+  }
+}
+
+/* Confirmación de éxito (CircleCheck): aparece con un "pop" -- escala de
+   más grande a su tamaño final con un rebote chico, una sola vez al
+   montarse. Patrón "Success State" del skill de motion. */
+@keyframes circlecheck-pop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Paso completado del wizard (Check): se dibuja progresivamente en vez de
+   aparecer de golpe, la primera vez que el paso queda listo -- ver
+   CheckAnimado (stroke-dasharray = stroke-dashoffset inicial). */
+@keyframes check-dibujo {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Barras de Reportes (sidebar): "crecen" de nuevo desde la base, una vez
+   por hover y escalonadas -- ver BarChart3Animado (cada barra usa esta
+   keyframe con un animation-delay distinto). */
+@keyframes barchart-crecer {
+  0% {
+    transform: scaleY(1);
+  }
+  25% {
+    transform: scaleY(0.15);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+/* Diafragma de la cámara (subir/reemplazar foto): parpadeo breve tipo
+   flash, una vez por hover. */
+@keyframes camera-flash {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.6);
+  }
+}
+
+/* Feedback "+1"/"-1" de contadores (pasadas del láser): el texto flota
+   hacia arriba desvaneciéndose, una vez por click -- ver useContadorFeedback. */
+@keyframes counter-flota {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-14px);
+    opacity: 0;
+  }
+}
+
+/* Flecha de subida de SVG: sube hacia la nube en loop lento mientras se
+   arrastra un archivo encima de la zona (estado, no hover -- ver
+   SvgDropzone). */
+@keyframes uploadcloud-flota {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+/* Rebote chico de la nube al soltar el archivo -- una vez, ver SvgDropzone. */
+@keyframes uploadcloud-rebote {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(2px) scale(0.94);
+  }
+  70% {
+    transform: translateY(-1px) scale(1.03);
+  }
+}
+
 /* Respeta la preferencia de movimiento reducido del sistema operativo:
    morphicons y las transiciones de layout se saltan la animación, no el
    cambio de estado. */

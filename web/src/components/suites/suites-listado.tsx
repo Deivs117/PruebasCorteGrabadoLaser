@@ -7,6 +7,7 @@ import { clsx } from "clsx";
 import { Badge } from "@/components/ui/badge";
 import { Card, type CardAccent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { FilterAnimado } from "@/components/ui/icons/filter-animado";
 import { PencilAnimado } from "@/components/ui/icons/pencil-animado";
 import { Reveal } from "@/components/ui/reveal";
 import { DuplicarSuiteButton } from "@/components/suites/duplicar-suite-button";
@@ -69,12 +70,11 @@ export function SuitesListado({ suites }: SuitesListadoProps) {
         <div
           role="group"
           aria-label="Filtrar por material"
-          className="flex flex-wrap items-center gap-2"
+          className="group flex flex-wrap items-center gap-2"
         >
-          <Filter
+          <FilterAnimado
             className="text-text-muted size-3.5 shrink-0"
             strokeWidth={1.75}
-            aria-hidden="true"
           />
           {materialesPresentes.map(([material, { familia, color }]) => {
             const visible = !ocultos.has(material);

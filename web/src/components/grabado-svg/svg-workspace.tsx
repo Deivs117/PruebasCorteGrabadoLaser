@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { TriangleAlert } from "lucide-react";
 import { clsx } from "clsx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
+import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
 import { DescargarBoton } from "@/components/registro/descargar-boton";
 import { SvgOriginalPreview } from "@/components/grabado-svg/svg-original-preview";
 import { ToolpathPreview } from "@/components/grabado-svg/toolpath-preview";
@@ -244,10 +244,7 @@ export function SvgWorkspace({ nombre, contenidoSvg }: SvgWorkspaceProps) {
           aria-live="polite"
           className="border-orange/30 bg-orange-soft flex items-start gap-2 rounded-[var(--radius-sm)] border p-3"
         >
-          <TriangleAlert
-            className="text-orange mt-0.5 size-4 shrink-0"
-            aria-hidden="true"
-          />
+          <TriangleAlertAnimado className="text-orange mt-0.5 size-4 shrink-0" />
           <p className="text-navy text-sm">{resultado.mensaje}</p>
         </div>
       ) : null}

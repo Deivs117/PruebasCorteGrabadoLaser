@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
+import { XAnimado } from "@/components/ui/icons/x-animado";
 import type { TarifasFormData } from "@/lib/tarifas-schema";
 
 interface TarifasFormProps {
@@ -205,9 +206,9 @@ export function TarifasForm({ inicial }: TarifasFormProps) {
                   type="button"
                   onClick={() => quitarMaterial(indice)}
                   aria-label={`Quitar ${precio.material || "este material"}`}
-                  className="text-text-muted hover:bg-danger-soft hover:text-danger flex size-9 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
+                  className="group text-text-muted hover:bg-danger-soft hover:text-danger flex size-9 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
                 >
-                  <X className="size-4" strokeWidth={1.75} />
+                  <XAnimado className="size-4" strokeWidth={1.75} />
                 </button>
               </div>
             ))}

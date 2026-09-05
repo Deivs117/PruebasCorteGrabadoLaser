@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DownloadAnimado } from "@/components/ui/icons/download-animado";
 import type { ButtonVariant } from "@/lib/button-styles";
 import { descargarArchivo } from "@/lib/descargar-archivo";
 
@@ -43,7 +43,7 @@ export function DescargarBoton({
         onClick={descargar}
         disabled={descargando}
       >
-        <Download className="size-4" strokeWidth={1.75} />
+        <DownloadAnimado className="size-4" strokeWidth={1.75} />
         {descargando ? "Descargando…" : etiqueta}
       </Button>
       {error ? (

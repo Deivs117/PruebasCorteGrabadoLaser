@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { MorphIcon } from "morphicons/react";
 import { ChevronDown, ChevronUp } from "lucide";
-import { TriangleAlert } from "lucide-react";
+import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
 
 interface AlertBannerProps {
   title: string;
@@ -30,10 +30,7 @@ export function AlertBanner({ title, items }: AlertBannerProps) {
         aria-controls={contenidoId}
         className="flex w-full items-center gap-3 px-4 py-3 text-left"
       >
-        <TriangleAlert
-          className="text-orange size-5 shrink-0"
-          aria-hidden="true"
-        />
+        <TriangleAlertAnimado className="text-orange size-5 shrink-0" />
         <span className="text-navy flex-1 text-sm font-semibold">{title}</span>
         <MorphIcon
           icon={abierto ? ChevronUp : ChevronDown}

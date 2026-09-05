@@ -1,27 +1,38 @@
 # Propuesta: animar todos los íconos de la app
 
-**Estado: backlog, sin implementar.** Esto es una lista de ideas para que el
-técnico las revise y refine — no se construye nada de esto hasta que se
-confirme cuáles quedan y con qué ajustes. Nace de la primera tanda de
-íconos animados (papelera, tijera, fuego, duplicar, lápiz), que salió bien
-y se quiere extender a toda la app.
+**Estado: implementado.** Todo el backlog de esta tanda (navegación +
+acciones/feedback) quedó construido, salvo los íconos decorativos de
+familia de material (`Atom`/`TreePine`/`Magnet`), que el técnico dejó
+explícitamente afuera por ahora. Nace de la primera tanda de íconos
+animados (papelera, tijera, fuego, duplicar, lápiz), que salió bien y se
+extendió a toda la app.
 
-## Cómo se construyen (mecánica, ya probada)
+## Cómo se construyen (mecánica)
 
-Sin librerías nuevas — mismo mecanismo en los 5 ya hechos:
+Sin librerías nuevas:
 
 - El ícono se reconstruye como SVG propio (no el de `lucide-react`), con
-  las partes que se van a mover separadas en sus propios `<g>`.
-- El botón/tarjeta que lo contiene lleva la clase `group` (ya la trae
-  `iconButtonClasses`); el ícono reacciona con `group-hover:`.
-- Movimiento simple (una sola apertura/cierre) → `transition-transform` +
-  clase condicional. Movimiento en loop mientras dura el hover (parpadeo,
-  meneo, tijeretazo repetido) → `@keyframes` en `globals.css` +
-  `group-hover:animate-[nombre_duración_easing_infinite]`.
+  las partes que se van a mover separadas en sus propios `<g>` -- salvo
+  cuando el movimiento es del ícono completo (ej. rotar, deslizar), donde
+  alcanza con envolver el SVG en una sola clase de transición.
+- El botón/tarjeta/ítem que lo contiene lleva la clase `group` (la traen
+  `iconButtonClasses` y `buttonClasses`; se agregó a mano donde el
+  contenedor no pasa por esos helpers); el ícono reacciona con
+  `group-hover:`.
+- Movimiento simple (una sola apertura/cierre, un giro) →
+  `transition-transform` + clase condicional. Movimiento en loop mientras
+  dura el hover (parpadeo, meneo, burbujas) → `@keyframes` en
+  `globals.css` + `group-hover:animate-[nombre_duración_easing_infinite]`.
+  Movimiento de una vez al **montarse** (no al hover) -- confirmaciones de
+  éxito, errores, un paso que se completa -- usa la misma keyframe pero
+  aplicada directo vía `style={{ animation: ... }}`, sin `group-hover`: el
+  componente que lo usa solo monta el ícono cuando el evento real ocurrió.
 - Todo respeta `prefers-reduced-motion` automáticamente (la regla global
   en `globals.css` ya frena cualquier animación/transición a ~0ms).
 
-## Ya implementado
+## Implementado
+
+### Primera tanda
 
 | Ícono | Dónde | Animación |
 |---|---|---|
@@ -31,61 +42,57 @@ Sin librerías nuevas — mismo mecanismo en los 5 ya hechos:
 | Duplicar (`Copy`) | Botón "Duplicar suite" | El cuadro de atrás se desliza y se separa del de adelante. |
 | Lápiz (`Pencil`) | Botón "Editar suite" | Meneo muy sutil, como escribiendo. |
 
-## Propuestas para el resto
-
-Agrupadas por dónde aparecen. La columna "Esfuerzo" es una estimación
-gruesa de cuánto trabajo de "afinar a ojo" lleva cada uno (bajo = un par de
-iteraciones, alto = necesita varias vueltas para que se vea bien).
-
 ### Navegación (sidebar)
 
-| Ícono | Dónde | Propuesta | Esfuerzo |
-|---|---|---|---|
-| `Home` | Inicio | Al pasar el mouse, un leve "asentamiento" (el techo baja 1-2px y vuelve), como si la casa se posara. | Bajo |
-| `FlaskConical` | Suites de Prueba | Una o dos burbujas chiquitas suben dentro del frasco en loop mientras dura el hover. | Medio |
-| `Shapes` | Grabado Vectorial (SVG) | Las 2-3 formas rotan levemente y de forma escalonada (stagger chico), como "tomando forma". | Medio |
-| `ClipboardList` | Hoja de Registro | Una de las líneas de la lista se "tilda" (aparece un check chico al lado) al pasar el mouse. | Medio |
-| `Calculator` | Costeo | Una de las teclas del teclado numérico se hunde (translateY chico) al pasar el mouse, como si se presionara. | Bajo |
-| `Gauge` | Final Run (Calibración) | **Pedido explícito del técnico:** la aguja arranca baja y barre hasta el máximo: al llegar, se transforma en (o aparece) un check chico — referencia visual a "calibración cumplida". Animación de dos actos (barrido + confirmación), no solo un movimiento continuo. | Alto |
-| `FileBadge` | Fichas de Parámetro | Un destello (brillo diagonal) recorre la medalla una vez al pasar el mouse. | Bajo |
-| `Layers` | Materiales | Las capas se separan levemente en el eje Y (efecto "vista explotada") al pasar el mouse. | Medio |
-| `Settings2` | Máquina | El control deslizante/engranaje gira o se desliza levemente en loop mientras dura el hover, como ajustando. | Medio |
-| `History` | Historial | La manecilla del reloj da una vuelta completa al pasar el mouse. | Bajo |
-| `BarChart3` | Reportes | Las barras "crecen" de abajo hacia arriba, escalonadas, al pasar el mouse. | Medio |
-| `CircleDollarSign` | Tarifas | El símbolo de moneda hace un pequeño rebote vertical (como si cayera una moneda) al pasar el mouse. | Bajo |
-| `HelpCircle` | Ayuda | El signo de pregunta se balancea suave (rotate chico, loop lento) — invita a hacer click. | Bajo |
+| Ícono | Dónde | Animación |
+|---|---|---|
+| `Home` | Inicio | El techo+paredes baja 1-2px y vuelve al pasar el mouse; la puerta queda fija. |
+| `FlaskConical` | Suites de Prueba | Dos burbujas suben y desvanecen en loop dentro del frasco mientras dura el hover. |
+| `Shapes` | Grabado Vectorial (SVG) | El triángulo y el cuadrado rotan escalonados; el círculo (simétrico, rotarlo no se nota) se agranda en su lugar. |
+| `ClipboardList` | Hoja de Registro | La última línea de la lista se oculta y en su lugar aparece un check chico con un "pop". |
+| `Calculator` | Costeo | La tecla central se hunde (translateY) al pasar el mouse. |
+| `Gauge` | Final Run (Calibración) | **Pedido explícito del técnico:** la aguja barre una vez hasta el máximo y, recién al terminar (`transition-delay`), aparece un check chico debajo -- animación de dos actos. |
+| `FileBadge` | Fichas de Parámetro | Un brillo diagonal recorre la medalla una vez, recortado a su círculo con un `clipPath`. |
+| `Layers` | Materiales | Las capas se separan en el eje Y (vista explotada) al pasar el mouse. |
+| `Settings2` | Máquina | Es un par de controles deslizantes, no engranajes con dientes -- la perilla derecha se desliza en vaivén sobre su riel en loop; la izquierda queda fija. |
+| `History` | Historial | La manecilla del reloj da una vuelta completa (una vez) al pasar el mouse. |
+| `BarChart3` | Reportes | Las 3 barras "crecen" de nuevo desde la base, escalonadas, al pasar el mouse. |
+| `CircleDollarSign` | Tarifas | El símbolo completo rebota verticalmente una vez, como una moneda cayendo. |
+| `HelpCircle` | Ayuda | El signo de pregunta se balancea suave en loop lento mientras dura el hover. |
 
-### Acciones y feedback (usados en varias pantallas)
+### Acciones y feedback
 
-| Ícono | Dónde | Propuesta | Esfuerzo |
-|---|---|---|---|
-| `ArrowLeft` | Volver (BackLink) | Se desliza 2-3px hacia la izquierda al pasar el mouse, reforzando la dirección. | Bajo |
-| `Download` | Descargar CSV/G-code | La flecha "cae" hacia la bandeja (translateY) al pasar el mouse. | Bajo |
-| `Filter` | Chips de filtro por material | Vibración/goteo muy sutil al pasar el mouse sobre la leyenda. | Bajo |
-| `Check` | Paso completado del wizard | Se dibuja progresivamente (stroke-dashoffset) en vez de aparecer de golpe, la primera vez que el paso se marca como listo. | Medio |
-| `CircleCheck` | Confirmaciones de éxito (suite generada, registro guardado) | Aparece con un "pop" (scale-in con rebote chico) — sigue el patrón "Success State" que ya usa el skill de motion. | Bajo |
-| `TriangleAlert` | Errores y advertencias | Al aparecer, un temblor horizontal corto (2-3 oscilaciones, sin rebote) — patrón "Error Shake". | Bajo |
-| `X` | Cerrar foto / quitar chip | Gira 90° al pasar el mouse, como "confirmando" el cierre antes del click. | Bajo |
-| `Minus` / `Plus` | Contador de pasadas, Tarifas | Al hacer click, un "+1"/"-1" chico aparece y flota hacia arriba/abajo desvaneciéndose (feedback tipo contador). | Medio |
-| `Square` | Paso "Geometría genérica" del wizard | Gira 90° suave al pasar el mouse. | Bajo |
-| `Star` | Calificación de carbonización | Al pasar el mouse sobre una estrella, esa y las anteriores hacen un "pop" en cascada (patrón común de rating). | Medio |
-| `Camera` | Subir foto en Hoja de Registro | El diafragma "parpadea" (flash breve) al pasar el mouse. | Medio |
-| `UploadCloud` | Subir SVG | La flecha sube hacia la nube en loop lento mientras se arrastra un archivo encima; rebote chico al soltarlo. | Medio |
+| Ícono | Dónde | Animación |
+|---|---|---|
+| `ArrowLeft` | Volver (BackLink) | Se desliza hacia la izquierda al pasar el mouse. |
+| `Download` | Descargar CSV/G-code | La flecha (separada de la bandeja) cae hacia ella al pasar el mouse. |
+| `Filter` | Leyenda de chips de filtro por material (Suites, Hoja de Registro) | Vibración/goteo sutil en loop sobre la leyenda completa. |
+| `Check` | Paso completado del wizard | Se dibuja progresivamente con `stroke-dashoffset` (`pathLength={1}` normaliza el largo del trazo) al quedar listo. |
+| `CircleCheck` | Confirmaciones de éxito (suite generada, ejecución de Final Run generada) | "Pop" con rebote chico al montarse -- no depende de hover, solo se monta cuando el éxito es real. |
+| `TriangleAlert` | Errores y advertencias (8 puntos: banner, botones de generar/calcular/preparar, resumen de calibración, tabla de costeo, wizard, SVG workspace) | Temblor horizontal corto al aparecer (patrón "Error Shake"), reemplazado por un único componente reusable. |
+| `X` | Quitar foto (Hoja de Registro), quitar chip de velocidad/potencia, quitar fila de material (Tarifas) | Gira 90° al pasar el mouse. |
+| `Minus` / `Plus` | Contador de pasadas (`NumberStepper`) | Al hacer click, un "+1"/"-1" flota hacia arriba y se desvanece (`useContadorFeedback`, se retira solo del DOM al terminar la animación). |
+| `Square` | Paso "Geometría genérica" del wizard | Gira 90° suave al pasar el mouse. |
+| `Star` | Calificación de carbonización | Al pasar el mouse sobre una estrella, esa y las anteriores escalan con un `transition-delay` creciente hacia atrás -- efecto cascada sin necesitar una keyframe. |
+| `Camera` | Subir/reemplazar foto en Hoja de Registro | El diafragma tiene un flash breve (círculo que aparece y desvanece) al pasar el mouse. |
+| `UploadCloud` | Subir SVG (dropzone) | La flecha sube hacia la nube en loop mientras se arrastra un archivo encima (`sobreZona`, estado real); rebote chico al soltarlo/elegirlo. |
 
-### Íconos de familia de material (decorativos, prioridad baja)
+### Ajustes hechos sobre la propuesta original
+
+- **`Settings2`**: la propuesta hablaba de "engranaje", pero el ícono de
+  lucide es en realidad dos controles deslizantes (círculo + riel, sin
+  dientes) -- se implementó como deslizamiento, no como giro.
+- **Círculo de `Shapes`**: un círculo es simétrico, así que "rotarlo" no
+  se nota -- se cambió por un agrandamiento (`scale`) en su lugar.
+- **`Plus` de Tarifas**: el documento agrupaba "Contador de pasadas,
+  Tarifas" bajo un mismo ícono, pero el `Plus` de Tarifas es "agregar una
+  fila de material" (no un contador +/-) -- se dejó sin el feedback
+  flotante, que sí se implementó en `NumberStepper` (pasadas del láser).
+
+### Fuera de esta tanda
 
 `Atom` (polímero), `TreePine` (madera) y `Magnet` (metal) en los chips de
-`MaterialIcon` ya llevan color e identidad — son indicadores, no botones de
-acción, así que una animación acá es puramente decorativa. Si se quiere de
-todos modos: `Atom` con un electrón orbitando lento, `TreePine` con una
-hoja cayendo, `Magnet` con líneas de campo pulsando. Baja prioridad frente
-al resto de la lista.
+`MaterialIcon`: decorativos, prioridad baja, el técnico los dejó afuera al
+confirmar el alcance de esta tanda.
 
-`Loader2` (spinner) ya está siempre animado (gira mientras dura la carga)
-— no necesita una propuesta nueva.
-
-## Siguiente paso
-
-Ninguno todavía — esto queda para que el técnico marque cuáles quiere
-(todos, algunos, o ninguno por ahora) y en qué orden, antes de construir
-nada.
+`Loader2` (spinner) ya estaba siempre animado -- no necesitaba nada nuevo.

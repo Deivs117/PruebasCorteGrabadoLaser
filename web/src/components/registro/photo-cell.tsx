@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CameraAnimado } from "@/components/ui/icons/camera-animado";
+import { XAnimado } from "@/components/ui/icons/x-animado";
 
 interface PhotoCellProps {
   corridaId: string;
@@ -85,9 +86,9 @@ export function PhotoCell({
               disabled={subiendo}
               aria-label="Reemplazar foto"
               title="Reemplazar foto"
-              className="text-navy hover:bg-navy-soft flex size-8 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)] disabled:opacity-40"
+              className="group text-navy hover:bg-navy-soft flex size-8 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)] disabled:opacity-40"
             >
-              <Camera className="size-4" strokeWidth={1.75} />
+              <CameraAnimado className="size-4" strokeWidth={1.75} />
             </button>
             <button
               type="button"
@@ -95,9 +96,9 @@ export function PhotoCell({
               disabled={subiendo}
               aria-label="Quitar foto"
               title="Quitar foto"
-              className="text-text-muted hover:bg-danger-soft hover:text-danger flex size-8 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)] disabled:opacity-40"
+              className="group text-text-muted hover:bg-danger-soft hover:text-danger flex size-8 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)] disabled:opacity-40"
             >
-              <X className="size-4" strokeWidth={1.75} />
+              <XAnimado className="size-4" strokeWidth={1.75} />
             </button>
           </>
         ) : (
@@ -108,7 +109,7 @@ export function PhotoCell({
             onClick={() => inputRef.current?.click()}
             disabled={subiendo}
           >
-            <Camera className="size-4" strokeWidth={1.75} />
+            <CameraAnimado className="size-4" strokeWidth={1.75} />
             {subiendo ? "Subiendo…" : "Subir foto"}
           </Button>
         )}

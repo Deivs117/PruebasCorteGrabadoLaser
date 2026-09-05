@@ -6,6 +6,7 @@ import { Filter } from "lucide-react";
 import { clsx } from "clsx";
 import { Card, type CardAccent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { FilterAnimado } from "@/components/ui/icons/filter-animado";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { Reveal } from "@/components/ui/reveal";
 import { DescargarBoton } from "@/components/registro/descargar-boton";
@@ -75,12 +76,11 @@ export function RegistroListado({
         <div
           role="group"
           aria-label="Filtrar por material"
-          className="flex flex-wrap items-center gap-2"
+          className="group flex flex-wrap items-center gap-2"
         >
-          <Filter
+          <FilterAnimado
             className="text-text-muted size-3.5 shrink-0"
             strokeWidth={1.75}
-            aria-hidden="true"
           />
           {materialesPresentes.map(([material, { familia, color }]) => {
             const visible = !ocultos.has(material);

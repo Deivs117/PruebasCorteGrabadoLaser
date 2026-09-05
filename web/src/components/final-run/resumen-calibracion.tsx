@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
 
 interface ResumenCalibracionProps {
   grupoId: string;
@@ -117,7 +117,7 @@ export function ResumenCalibracion({
       ) : null}
       {estado === "error" ? (
         <p role="alert" className="text-orange flex items-center gap-1 text-xs">
-          <TriangleAlert className="size-3.5" aria-hidden="true" />
+          <TriangleAlertAnimado className="size-3.5" />
           {mensajeError}
         </p>
       ) : null}

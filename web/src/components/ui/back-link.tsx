@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeftAnimado } from "@/components/ui/icons/arrow-left-animado";
 
 interface BackLinkProps {
   href: string;
@@ -12,9 +12,9 @@ export function BackLink({ href, label }: BackLinkProps) {
   return (
     <Link
       href={href}
-      className="text-text-muted hover:text-navy inline-flex w-fit items-center gap-1.5 text-sm transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
+      className="group text-text-muted hover:text-navy inline-flex w-fit items-center gap-1.5 text-sm transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
     >
-      <ArrowLeft className="size-4" strokeWidth={1.75} />
+      <ArrowLeftAnimado className="size-4" strokeWidth={1.75} />
       {label}
     </Link>
   );

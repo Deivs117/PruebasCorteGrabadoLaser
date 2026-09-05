@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
 import { Field } from "@/components/ui/field";
+import { XAnimado } from "@/components/ui/icons/x-animado";
 
 interface NumberChipsInputProps {
   label: string;
@@ -74,9 +74,9 @@ export function NumberChipsInput({
                   type="button"
                   onClick={() => quitar(numero)}
                   aria-label={`Quitar ${numero}${unit}`}
-                  className="hover:bg-blue/20 flex size-5 items-center justify-center rounded-full"
+                  className="group hover:bg-blue/20 flex size-5 items-center justify-center rounded-full"
                 >
-                  <X className="size-3" strokeWidth={2} />
+                  <XAnimado className="size-3" strokeWidth={2} />
                 </button>
               </span>
             ))}
