@@ -1,12 +1,16 @@
-# Pruebas de Corte y Grabado Láser
+# Laser Toolkit
 
-Proyecto interno para estandarizar, documentar y costear los procesos de corte y grabado láser (CNC 3018 + módulo Laser Tree LT-80W-F45, controlado con LaserGRBL).
+Herramienta interna de [Flux Solutions](https://github.com/Flux-Solutions-Cali) para el taller que opera una CNC láser (CNC 3018 + módulo Laser Tree LT-80W-F45, controlada con LaserGRBL/GRBL): estandariza, documenta y costea los procesos de corte y grabado láser, y sirve como base para diseñar y producir piezas propias sin depender de software de pago.
 
-## Objetivo
+## Qué resuelve
 
 Que ejecutar una prueba sea solo **"abrir un G-code y enviarlo"**, que cada corrida quede documentada y costeada (energía + material + tiempo de máquina), y que el resultado se convierta en **Fichas de Parámetro Estándar** oficiales por material/espesor/operación — reemplazando el ajuste "a ojo" por un proceso repetible y auditable.
 
-El sistema está diseñado para ser **agnóstico al material**: hoy arranca con MDF, pero la estructura (script generador, hoja de registro, fichas) escala a acrílico, contrachapado, cuero, cartón, etc. sin rediseñar nada.
+El sistema está diseñado para ser **agnóstico al material**: hoy arranca con MDF, pero la estructura (generador de G-code, hoja de registro, fichas) escala a acrílico, contrachapado, cuero, cartón, etc. sin rediseñar nada.
+
+## Hacia dónde va
+
+"Laser Toolkit" empezó como un CLI de Python para estandarizar pruebas de material, y ese sigue siendo el motor del sistema — pero el alcance del proyecto es más amplio: una herramienta de escritorio interna, accesible desde el navegador por todo el equipo, que además de las pruebas de material permita **diseñar piezas propias** (subir un SVG, posicionarlo, exportar G-code listo para la máquina) usando el mismo motor de conversión ya construido. La interfaz web (`apps/web`) ya cubre generación de suites de prueba, hoja de registro, costeo, calibración (Final Run) y grabado vectorial de SVG; el resto del roadmap (qué falta, en qué orden, quién lo está trabajando) se gestiona en el [GitHub Project del equipo](https://github.com/orgs/Flux-Solutions-Cali/projects/1), no en este documento.
 
 ## Estructura del repositorio
 
@@ -136,6 +140,19 @@ make generate-engrave CONFIG=configs/ejemplo-dev_logo_grabado.yaml
 
 Limitaciones conocidas: no soporta arcos SVG (`A`/`a`, falla con un error claro en vez de dibujar mal) ni el atributo `transform` (falla igual) — exportar el SVG con las transformaciones aplanadas y las curvas como Bezier/rectas.
 
+## Frontend web
+
+`apps/web` (Next.js + React + Tailwind) es la interfaz por la que el equipo usa el sistema sin tocar la terminal — habla con el mismo paquete `laser_toolkit` de abajo, nunca reimplementa su lógica.
+
+```
+cd apps/web
+pnpm install
+pnpm dev              # http://localhost:3000
+pnpm run check        # lint + typecheck + format:check, antes de cada commit
+```
+
+Ver `apps/web/CLAUDE.md`/`apps/web/README.md` para detalles propios de Next.js.
+
 ## Convenciones del proyecto Python
 
 - **Entorno y dependencias:** `uv` (`uv sync`, `uv add`, `uv run`) — nunca `pip` ni un venv creado a mano.
@@ -144,21 +161,11 @@ Limitaciones conocidas: no soporta arcos SVG (`A`/`a`, falla con un error claro 
 - **Testing:** `pytest` (`make test`), un archivo `tests/test_*.py` por módulo (109 casos).
 - **Antes de cada commit:** `make check` (lint + typecheck + test).
 
-## Estado del proyecto
+## Arquitectura completa y roadmap
 
-Ver **[Plan Maestro](docs/Plan%20Maestro%20-%20Estandarizacion%20Pruebas%20Laser.md)** para el detalle de arquitectura, roadmap de fases (F1–F7) y pendientes de negocio (tarifa eléctrica, costo de material, tarifa hora-máquina — hoy configurables como parámetros editables).
+**[Plan Maestro](docs/Plan%20Maestro%20-%20Estandarizacion%20Pruebas%20Laser.md)** documenta el diseño de fondo de todo el sistema (generador de G-code, SOP de taller, Hoja de Registro, motor de costeo, Final Run, grabado vectorial de SVG) y por qué está construido así.
 
-| Fase | Entregable | Estado |
-|---|---|---|
-| F1 | Script generador de G-code | Listo (`laser_toolkit`) |
-| F2 | Hoja de Registro + motor de costeo | Listo (`prepare-record`/`compute-costs`, 49 tests) |
-| F3 | SOP de una página para el taller | Listo — [`docs/sop/SOP-corrida-de-prueba.md`](docs/sop/SOP-corrida-de-prueba.md) |
-| F4 | Corrida piloto MDF 3mm | Pendiente |
-| F5 | Calibración de energía (Final Run) | Listo — `generate-final-run`/`summarize-final-run` |
-| F6 | Ficha de Parámetro Estándar v1 — MDF | Pendiente |
-| F7 | Extensión a un segundo material | Pendiente |
-
-Adicional (fuera de la numeración F1–F7, pero ya integrado): grabado de artes vectoriales SVG (`laser_toolkit.svg`) — ver sección "Grabado de SVG" arriba y sección 11 del Plan Maestro.
+El estado del trabajo en curso — qué falta, en qué orden, quién lo está trabajando — vive en el [GitHub Project del equipo](https://github.com/orgs/Flux-Solutions-Cali/projects/1), no en este README.
 
 ## Material de referencia
 
