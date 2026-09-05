@@ -25,12 +25,17 @@ class Celda:
     tamano_mm: float
 
 
-def construir_grilla(config: SuiteConfig) -> list[Celda]:
+def construir_grilla(config: SuiteConfig, origen_x_mm: float = 0.0) -> list[Celda]:
     """Arma la lista de celdas de la suite a partir de la configuracion.
 
     El identificador de cada celda sigue el orden de recorrido de la maquina
     (serpenteado), pero su posicion (x, y) siempre corresponde a su lugar real
     en la grilla (fila = indice de potencia, columna = indice de velocidad).
+
+    `origen_x_mm` desplaza toda la grilla en X (por defecto 0, sin desplazar).
+    Lo usa `suites/engrave.py` para dejarle al sobre-recorrido (overscan) del
+    relleno tipo trama espacio hacia la izquierda de la columna 0 sin caer en
+    coordenadas negativas -- ver `laser_toolkit.gcode.writer.grabar_relleno`.
     """
     celdas: list[Celda] = []
     paso = config.tamano_celda_mm + config.espaciado_mm
@@ -47,7 +52,7 @@ def construir_grilla(config: SuiteConfig) -> list[Celda]:
                     velocidad_mm_min=velocidad,
                     potencia_pct=potencia,
                     pasadas=config.pasadas,
-                    x_mm=columna * paso,
+                    x_mm=origen_x_mm + columna * paso,
                     y_mm=fila * paso,
                     tamano_mm=config.tamano_celda_mm,
                 )

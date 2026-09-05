@@ -24,9 +24,13 @@ from laser_toolkit.tarifas import TarifasConfig
 # COMPLETA (no de una celda individual): se anota el mismo valor en todas las
 # filas que comparten `corrida_id`. `calcular_costos_registro` valida que no
 # haya valores distintos dentro de una misma corrida.
+#
+# Se elimino `calidad_borde_1a5` (existia antes junto a `carbonizacion_1a5`):
+# en la practica del taller, un corte o pasa limpio o no pasa -- si no pasa,
+# el borde ya queda mal por definicion. `corte_pasante` + `carbonizacion_1a5`
+# cubren la evaluacion completa sin una columna redundante.
 COLUMNAS_MANUALES = [
     "corte_pasante",
-    "calidad_borde_1a5",
     "carbonizacion_1a5",
     "kwh_corrida_medido",
     "tiempo_real_corrida_s",

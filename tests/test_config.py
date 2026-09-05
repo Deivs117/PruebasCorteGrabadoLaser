@@ -22,7 +22,7 @@ def test_carga_configuracion_minima_valida():
     config = SuiteConfig.model_validate(_config_base())
     assert config.operacion is Operacion.CORTE
     assert config.pasadas == 1
-    assert config.machine.laser_max_s == 1000
+    assert config.machine.laser_max_s == 10000
 
 
 def test_potencia_fuera_de_rango_falla():
@@ -35,9 +35,14 @@ def test_velocidad_no_positiva_falla():
         SuiteConfig.model_validate(_config_base(velocidades_mm_min=[0, 200]))
 
 
-def test_svg_path_en_corte_falla():
-    with pytest.raises(ValidationError, match="svg_path"):
-        SuiteConfig.model_validate(_config_base(operacion="corte", svg_path="assets/svg/logo-empresa.svg"))
+def test_svg_path_en_corte_es_valido():
+    # Cortar el contorno de un SVG es una operacion valida (ver
+    # suites/cut.py): a diferencia de grabado, corte ignora modo_grabado_svg
+    # y siempre traza solo el contorno.
+    config = SuiteConfig.model_validate(
+        _config_base(operacion="corte", svg_path="assets/svg/logo-empresa.svg")
+    )
+    assert config.svg_path == "assets/svg/logo-empresa.svg"
 
 
 def test_svg_path_en_grabado_es_valido():
@@ -45,6 +50,23 @@ def test_svg_path_en_grabado_es_valido():
         _config_base(operacion="grabado", velocidades_mm_min=[1000], svg_path="assets/svg/logo-empresa.svg")
     )
     assert config.svg_path == "assets/svg/logo-empresa.svg"
+
+
+def test_velocidad_por_encima_del_limite_real_de_la_maquina_falla():
+    # machine.velocidad_max_mm_min default es 2000 ($110/$111 de GRBL) -- GRBL
+    # clampea en silencio cualquier F mayor, asi que programarlo es un error de
+    # configuracion, no una velocidad valida.
+    with pytest.raises(ValidationError):
+        SuiteConfig.model_validate(_config_base(velocidades_mm_min=[200, 2500]))
+
+
+def test_velocidad_dentro_del_limite_configurado_es_valida():
+    # Si el tecnico realmente subio $110/$111 en la maquina, puede reflejarlo
+    # en machine.velocidad_max_mm_min para habilitar velocidades mayores.
+    config = SuiteConfig.model_validate(
+        _config_base(velocidades_mm_min=[3000], machine={"velocidad_max_mm_min": 4000})
+    )
+    assert config.velocidades_mm_min == [3000]
 
 
 def test_from_yaml_roundtrip(tmp_path: Path):

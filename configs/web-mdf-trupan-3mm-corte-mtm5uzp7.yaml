@@ -1,0 +1,15 @@
+material: MDF Trupan
+espesor_mm: 3
+operacion: corte
+velocidades_mm_min:
+  - 240
+  - 270
+  - 300
+potencias_pct:
+  - 100
+pasadas: 2
+tamano_celda_mm: 15
+espaciado_mm: 3.5
+id_prefijo: C
+lote: L06
+svg_path: data/svgs/simbolo-flux-negro-mtlxpstx.svg

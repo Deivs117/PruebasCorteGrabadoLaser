@@ -99,7 +99,7 @@ Esto por sí solo ya estandariza cómo se nombran y archivan las pruebas.
    - Lectura de energía final (kWh acumulados) o revisar consumo de la corrida en la app del enchufe si el rango de tiempo es identificable.
 6. **Evaluar el cupón** (offline, sin máquina):
    - Foto del cupón completo con buena luz.
-   - Por cada celda: ¿corte pasante? (sí/no), calidad de borde (escala 1–5), carbonización (escala 1–5), notas.
+   - Por cada celda: ¿corte pasante? (sí/no), carbonización (escala 1–5), notas.
 7. **Cargar resultados** a la Hoja de Registro (importando el `.csv` hermano + agregando las columnas de evaluación y energía).
 
 > Este SOP es el documento que se cuelga físicamente en el taller — una sola página, checklist.
@@ -123,7 +123,6 @@ Una fila = una **celda de prueba** (no una corrida completa). Columnas propuesta
 | `potencia_pct` | csv hermano | 100 |
 | `pasadas` | csv hermano | 1 |
 | `corte_pasante` | evaluación manual | sí |
-| `calidad_borde_1a5` | evaluación manual | 4 |
 | `carbonizacion_1a5` | evaluación manual | 2 |
 | `tiempo_corrida_min` | LaserGRBL (tiempo total de la suite, prorrateado) | — |
 | `kwh_corrida` | medidor (total de la suite, prorrateado) | — |
@@ -258,7 +257,7 @@ que el sistema funcione con datos parciales.
 
 Sigue pendiente de definir (fuera del alcance del costeo, es un criterio operativo):
 
-- Umbral de aceptación de carbonización/calidad de borde para considerar una prueba "aprobada" (Fase F6/F7).
+- Umbral de aceptación de carbonización para considerar una prueba "aprobada" (Fase F6/F7).
 
 ---
 
@@ -288,8 +287,8 @@ No soportado (falla con error explícito, nunca dibuja mal en silencio): arcos S
 ### 11.3 Dos formas de uso
 
 1. **Herramienta suelta**: `laser-toolkit svg-to-gcode <archivo.svg> --ancho-mm --alto-mm --velocidad --potencia -o salida.gcode`. No depende de `SuiteConfig` ni de ningún otro concepto del sistema de pruebas.
-2. **Integrado en una suite de barrido**: `SuiteConfig.svg_path` (solo válido con `operacion: grabado`) hace que `generar_suite_grabado` grabe ese SVG —escalado a `tamano_celda_mm`— en cada celda de la grilla, en vez del relleno genérico. `modo_grabado_svg` (`contorno`, `relleno`, `contorno_y_relleno`) y `svg_resolucion_relleno_mm` controlan el resultado. El resto del pipeline (csv hermano, `prepare-record`, `compute-costs`) funciona exactamente igual, sin cambios.
+2. **Integrado en una suite de barrido**: `SuiteConfig.svg_path` hace que la suite use ese SVG —escalado a `tamano_celda_mm`— en cada celda de la grilla, en vez de la geometría genérica. En **grabado**, `generar_suite_grabado` respeta `modo_grabado_svg` (`contorno`, `relleno`, `contorno_y_relleno`) y `svg_resolucion_relleno_mm`. En **corte**, `generar_suite_corte` siempre traza solo el **contorno** del SVG (ignora `modo_grabado_svg`: cortar no admite relleno tipo trama, no tiene sentido físico "cortar un rayado"), repetido `pasadas` veces igual que el cuadrado genérico — el área de material cobrada sigue siendo la celda completa, no el área encerrada por la forma (sección 6.2). El resto del pipeline (csv hermano, `prepare-record`, `compute-costs`) funciona exactamente igual, sin cambios.
 
 ### 11.4 Archivo de referencia
 
-`assets/svg/logo-empresa.svg` es el SVG por defecto del sistema para pruebas de grabado — el formato que se usa casi el 100% de las veces en producción. `configs/logo_grabado.yaml` es la suite de ejemplo que lo usa.
+`assets/svg/logo-empresa.svg` es el SVG por defecto del sistema para pruebas de grabado — el formato que se usa casi el 100% de las veces en producción. `configs/ejemplo-dev_logo_grabado.yaml` es la suite de ejemplo que lo usa.

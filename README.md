@@ -78,8 +78,8 @@ flowchart TD
 
 ```
 make install                                    # uv sync -- instala el entorno
-make generate-cut CONFIG=configs/mdf_3mm_corte.yaml
-make generate-engrave CONFIG=configs/mdf_3mm_grabado.yaml
+make generate-cut CONFIG=configs/ejemplo-dev_mdf_3mm_corte.yaml
+make generate-engrave CONFIG=configs/ejemplo-dev_mdf_3mm_grabado.yaml
 make prepare-record CSV=data/registros/<corrida>.csv
 # ... correr en la maquina, medir, evaluar, completar a mano el _registro.csv ...
 cp configs/tarifas.example.yaml configs/tarifas.yaml   # completar con el area financiera
@@ -90,7 +90,7 @@ make check                                      # lint + typecheck + test, todo 
 **Flujo de la Hoja de Registro (Fase F2):**
 
 1. `generate-cut`/`generate-engrave` producen el `.gcode` y su `.csv` hermano (una fila por celda: velocidad, potencia, pasadas, `area_material_mm2`, `tiempo_estimado_celda_s` — todo derivado de la configuración, sin medición manual).
-2. `prepare-record` agrega las columnas que se completan **a mano** tras correr la corrida real en la máquina: evaluación visual (`corte_pasante`, `calidad_borde_1a5`, `carbonizacion_1a5`, `foto`, `notas`) y las dos mediciones de la corrida completa (`kwh_corrida_medido`, `tiempo_real_corrida_s`).
+2. `prepare-record` agrega las columnas que se completan **a mano** tras correr la corrida real en la máquina: evaluación visual (`corte_pasante`, `carbonizacion_1a5`, `foto`, `notas`) y las dos mediciones de la corrida completa (`kwh_corrida_medido`, `tiempo_real_corrida_s`).
 3. `compute-costs` toma ese registro completado + `configs/tarifas.yaml` y calcula, celda por celda, los **tres componentes de costo por separado** (`costo_energia_celda`, `costo_material_celda`, `costo_tiempo_maquina_celda`) más un `costo_total_celda` de conveniencia — nunca inventa una tarifa: mientras `tarifas.yaml` tenga un valor en `null`, esa columna queda vacía en vez de asumir un número.
 
 `configs/tarifas.yaml` es el **único** archivo del sistema con valores monetarios (tarifa eléctrica, precio de material, tarifa hora-máquina) — lo completa el área financiera/comercial, no el desarrollo. Está en `.gitignore`; solo se versiona `configs/tarifas.example.yaml` como plantilla.
@@ -100,7 +100,7 @@ make check                                      # lint + typecheck + test, todo 
 Una suite de barrido reparte el kWh medido entre celdas por *peso de tiempo*, no por potencia real — suficiente para *elegir* la combinación ganadora, pero es una aproximación. Una vez elegida, una **Final Run** fija esa única combinación y la repite en celdas físicamente idénticas, de modo que el reparto del kWh deja de ser aproximado.
 
 ```
-make generate-final-run CONFIG=configs/mdf_3mm_corte_final_run.yaml EJECUCION=1
+make generate-final-run CONFIG=configs/ejemplo-dev_mdf_3mm_corte_final_run.yaml EJECUCION=1
 # ... correr en la maquina, medir, evaluar (mismo SOP) ...
 make prepare-record CSV=data/registros/FINAL_..._ejec1.csv
 # repetir con EJECUCION=2, EJECUCION=3 en momentos independientes (minimo 3)
@@ -109,7 +109,7 @@ make summarize-final-run CSVS="data/registros/FINAL_..._ejec1_registro.csv data/
 
 `summarize-final-run` agrupa por combinación (material/espesor/operación/velocidad/potencia, sin importar fecha ni ejecución) y reporta **kWh por unidad** y **tiempo por unidad**, cada uno con su desviación estándar y coeficiente de variación entre ejecuciones — y si ya hay suficientes ejecuciones (mínimo 3) para considerarlo `CALIBRADO`. Ese número calibrado es el que se documenta en la futura Ficha de Parámetro Estándar (F6), no una nueva estimación.
 
-**Grabado de SVG (logo de la empresa y artes vectoriales):**
+**Grabado y corte de SVG (logo de la empresa y artes vectoriales):**
 
 El paquete `laser_toolkit.svg` es un conversor SVG → G-code propio, sin dependencias pesadas (parser de `path`/`ellipse`/`circle`/`rect`/`line`/`polyline`/`polygon`, aplanado de curvas Bezier, transformación a milímetros, relleno vectorial por trama con regla par-impar). Está deliberadamente desacoplado en piezas atómicas y reutilizables — `cargar_subpaths_svg` da la geometría pura sin G-code, útil para integraciones futuras (nesting, previsualización) que no necesiten emitir G-code.
 
@@ -121,10 +121,10 @@ make svg-to-gcode SVG=assets/svg/logo-empresa.svg ANCHO=30 ALTO=30 \
     VELOCIDAD=1200 POTENCIA=25 SALIDA=data/registros/logo.gcode
 
 # 2. Integrado en una suite de barrido: graba el logo en cada celda de la grilla
-make generate-engrave CONFIG=configs/logo_grabado.yaml
+make generate-engrave CONFIG=configs/ejemplo-dev_logo_grabado.yaml
 ```
 
-`assets/svg/logo-empresa.svg` es el archivo de referencia por defecto del sistema para pruebas de grabado vectorial — casi todo grabado real de producción parte de un SVG así, no de un relleno genérico. El modo (`contorno`, `relleno`, o `contorno_y_relleno`) y la resolución del relleno se configuran en el YAML de la suite (`svg_path`, `modo_grabado_svg`, `svg_resolucion_relleno_mm`) o como flags del comando suelto.
+`assets/svg/logo-empresa.svg` es el archivo de referencia por defecto del sistema para pruebas de grabado vectorial — casi todo grabado real de producción parte de un SVG así, no de un relleno genérico. `svg_path` en el YAML de la suite (o como flag del comando suelto) funciona tanto en `operacion: grabado` como en `operacion: corte`: en grabado se puede elegir el modo (`contorno`, `relleno`, o `contorno_y_relleno`) y la resolución del relleno (`modo_grabado_svg`, `svg_resolucion_relleno_mm`); en corte siempre se traza únicamente el contorno del SVG, repetido según `pasadas` — cortar no admite relleno tipo trama.
 
 Limitaciones conocidas: no soporta arcos SVG (`A`/`a`, falla con un error claro en vez de dibujar mal) ni el atributo `transform` (falla igual) — exportar el SVG con las transformaciones aplanadas y las curvas como Bezier/rectas.
 

@@ -1,0 +1,55 @@
+import { useId } from "react";
+
+interface FileBadgeAnimadoProps {
+  className?: string;
+  strokeWidth?: number;
+}
+
+/**
+ * Reemplazo de `FileBadge` (lucide-react): un destello diagonal recorre la
+ * medalla una vez al pasar el mouse -- no es un loop, es un "shine" único
+ * (ver @keyframes filebadge-destello). El brillo queda recortado a la
+ * medalla circular mediante un <clipPath> propio de esta instancia.
+ */
+export function FileBadgeAnimado({
+  className,
+  strokeWidth = 1.75,
+}: FileBadgeAnimadoProps) {
+  const clipId = useId();
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <defs>
+        <clipPath id={clipId}>
+          <circle cx="6" cy="14" r="3" />
+        </clipPath>
+      </defs>
+      <path d="M13 22h5a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v3.3" />
+      <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+      <path d="m7.69 16.479 1.29 4.88a.5.5 0 0 1-.698.591l-1.843-.849a1 1 0 0 0-.879.001l-1.846.85a.5.5 0 0 1-.692-.593l1.29-4.88" />
+      <circle cx="6" cy="14" r="3" />
+      {/* Destello -- una franja clara que cruza la medalla, recortada por
+          el clipPath de arriba. */}
+      <g clipPath={`url(#${clipId})`}>
+        <rect
+          x="3"
+          y="9.5"
+          width="1.6"
+          height="9"
+          fill="currentColor"
+          stroke="none"
+          className="opacity-0 group-hover:animate-[filebadge-destello_650ms_ease-in-out] group-hover:opacity-40"
+        />
+      </g>
+    </svg>
+  );
+}

@@ -1,0 +1,411 @@
+@import "tailwindcss";
+
+/*
+ * Tokens del sistema de diseño "Laser Toolkit" (paleta Flux).
+ * Fuente de verdad: docs/ui-design/prompts-stitch.md
+ * Los hex son literales — no inventar variaciones no documentadas.
+ */
+:root {
+  --color-navy: #003452; /* headers, sidebar, texto principal */
+  --color-navy-hover: color-mix(in srgb, var(--color-navy) 85%, black);
+  --color-navy-soft: color-mix(in srgb, var(--color-navy) 8%, white);
+
+  --color-blue: #246bce; /* acciones primarias, links, acentos */
+  --color-blue-hover: color-mix(in srgb, var(--color-blue) 85%, black);
+  --color-blue-soft: color-mix(in srgb, var(--color-blue) 10%, white);
+
+  --color-teal: #1fc1b1; /* estados positivos: Listo, Calibrado, OK */
+  --color-teal-soft: color-mix(in srgb, var(--color-teal) 15%, white);
+
+  --color-orange: #ff9f43; /* advertencias: Pendiente, Sin definir */
+  --color-orange-soft: color-mix(in srgb, var(--color-orange) 15%, white);
+
+  --color-purple: #e056fd; /* acento del módulo financiero / Tarifas */
+  --color-purple-soft: color-mix(in srgb, var(--color-purple) 15%, white);
+
+  /* No está en docs/ui-design/prompts-stitch.md (esa paleta no contemplaba
+     acciones destructivas) — rojo estándar, exclusivo para eliminar. */
+  --color-danger: #dc2626;
+  --color-danger-hover: color-mix(in srgb, var(--color-danger) 85%, black);
+  --color-danger-soft: color-mix(in srgb, var(--color-danger) 12%, white);
+
+  --color-canvas: #f4f7f9; /* fondo general de la app */
+  --color-surface: #ffffff; /* fondo de tarjetas/paneles */
+  --color-border: #e2e8f0; /* bordes sutiles */
+
+  --color-text-main: #003452;
+  --color-text-muted: #5a7184;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+
+  --shell-topbar-h: 4rem;
+  --shell-sidebar-w: 17rem;
+  --shell-sidebar-w-collapsed: 4.75rem;
+
+  /*
+   * Identidad de movimiento (skill motion-design de LottieFiles):
+   * personalidad "Corporate" — decisiva pero nunca juguetona, sin overshoot.
+   * Un solo easing de marca + tres duraciones, en vez de valores sueltos por
+   * componente.
+   */
+  --ease-motion: cubic-bezier(0.2, 0, 0, 1); /* Material Design 3, on-screen */
+  --duration-quick: 150ms; /* toggles, íconos */
+  --duration-standard: 250ms; /* tarjetas, paneles, drawer */
+  --duration-slow: 400ms; /* transición de página / reveal inicial */
+}
+
+@theme inline {
+  --color-navy: var(--color-navy);
+  --color-navy-hover: var(--color-navy-hover);
+  --color-navy-soft: var(--color-navy-soft);
+  --color-blue: var(--color-blue);
+  --color-blue-hover: var(--color-blue-hover);
+  --color-blue-soft: var(--color-blue-soft);
+  --color-teal: var(--color-teal);
+  --color-teal-soft: var(--color-teal-soft);
+  --color-orange: var(--color-orange);
+  --color-orange-soft: var(--color-orange-soft);
+  --color-purple: var(--color-purple);
+  --color-purple-soft: var(--color-purple-soft);
+  --color-danger: var(--color-danger);
+  --color-danger-hover: var(--color-danger-hover);
+  --color-danger-soft: var(--color-danger-soft);
+  --color-canvas: var(--color-canvas);
+  --color-surface: var(--color-surface);
+  --color-border: var(--color-border);
+  --color-text-main: var(--color-text-main);
+  --color-text-muted: var(--color-text-muted);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --font-sans: var(--font-urbanist);
+  --font-mono: var(--font-dm-mono);
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-text-main);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Entrada del toast de confirmación (marcar/desmarcar candidato a Final Run). */
+@keyframes toast-aparece {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-aparece {
+  animation: toast-aparece var(--duration-standard) var(--ease-motion);
+}
+
+/* Onda que se expande desde el punto exacto del click, en botones y chips
+   interactivos (ver useRipple) — feedback físico de que el click se
+   registró, personalidad "Corporate": decisiva, sin rebote. */
+@keyframes boton-ripple {
+  from {
+    transform: scale(0);
+    opacity: 0.28;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+.boton-ripple {
+  position: absolute;
+  border-radius: 9999px;
+  background: currentColor;
+  pointer-events: none;
+  animation: boton-ripple 500ms var(--ease-motion) forwards;
+}
+
+/* Parpadeo del ícono de Grabado (fuego) al pasar el mouse -- ver
+   FlameAnimado. 0%/100% iguales para que el loop no salte al repetirse. */
+@keyframes flame-parpadeo {
+  0%,
+  100% {
+    transform: scaleY(1) rotate(0deg);
+  }
+  50% {
+    transform: scaleY(1.08) rotate(-3deg);
+  }
+}
+
+/* Meneo sutil del ícono de editar (lápiz "escribiendo") al pasar el mouse
+   -- ver PencilAnimado. Amplitud chica a propósito: es un ícono de acción
+   secundaria, no debe competir por atención. */
+@keyframes pencil-escribe {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-4deg);
+  }
+}
+
+/* Tijeretazo repetido del ícono de Corte al pasar el mouse -- ver
+   ScissorsAnimado. Cada hoja pivota desde su propia base; las dos
+   keyframes son espejo para que las puntas se separen y vuelvan a juntarse
+   en sincronía, como cortando de verdad. */
+@keyframes tijera-corte {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-14deg);
+  }
+}
+
+@keyframes tijera-corte-espejo {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(14deg);
+  }
+}
+
+/* --- Backlog de íconos animados (docs/ui-design/propuesta-iconos-animados.md) --- */
+
+/* Burbujas del frasco (Suites de Prueba, sidebar) -- suben y desvanecen en
+   loop mientras dura el hover; cada una usa esta misma keyframe con un
+   animation-delay distinto (ver FlaskConicalAnimado) para no subir juntas. */
+@keyframes flask-burbuja {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-5px);
+    opacity: 0;
+  }
+}
+
+/* Aguja de Final Run (sidebar): barrido de dos actos -- primero gira hasta
+   el máximo (esta keyframe, se dispara una sola vez por hover), y recién
+   ahí aparece el check de "calibración cumplida" (ver GaugeAnimado, que
+   demora la aparición del check con transition-delay hasta que el barrido
+   termina). Pedido explícito del técnico. */
+@keyframes gauge-barrido {
+  from {
+    transform: rotate(-38deg);
+  }
+  to {
+    transform: rotate(28deg);
+  }
+}
+
+/* Destello de Fichas de Parámetro (sidebar): un brillo diagonal recorre la
+   medalla una vez al pasar el mouse -- no es un loop, es un "shine" único. */
+@keyframes filebadge-destello {
+  from {
+    transform: translateX(-140%) rotate(20deg);
+  }
+  to {
+    transform: translateX(140%) rotate(20deg);
+  }
+}
+
+/* Perilla derecha de Máquina (sidebar): se desliza en vaivén sobre su riel
+   en loop mientras dura el hover, como ajustando. */
+@keyframes settings2-ajuste {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-2px);
+  }
+}
+
+/* Moneda de Tarifas (sidebar): rebote vertical corto, una vez por hover,
+   como si acabara de caer. */
+@keyframes dollarsign-rebote {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-3px);
+  }
+  55% {
+    transform: translateY(1px);
+  }
+  80% {
+    transform: translateY(-0.5px);
+  }
+}
+
+/* Signo de pregunta de Ayuda (sidebar): balanceo suave y lento en loop
+   mientras dura el hover -- invita a hacer click, sin urgencia. */
+@keyframes helpcircle-balanceo {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-8deg);
+  }
+}
+
+/* Ícono de filtro por material (leyenda de chips): goteo/vibración muy
+   sutil en loop mientras dura el hover sobre la leyenda completa. */
+@keyframes filter-goteo {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(1.5px);
+  }
+}
+
+/* Advertencia/error (TriangleAlert): tiembla horizontalmente al aparecer,
+   una sola vez -- patrón "Error Shake", sin rebote. */
+@keyframes trianglealert-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-2.5px);
+  }
+  40% {
+    transform: translateX(2.5px);
+  }
+  60% {
+    transform: translateX(-1.5px);
+  }
+  80% {
+    transform: translateX(1.5px);
+  }
+}
+
+/* Confirmación de éxito (CircleCheck): aparece con un "pop" -- escala de
+   más grande a su tamaño final con un rebote chico, una sola vez al
+   montarse. Patrón "Success State" del skill de motion. */
+@keyframes circlecheck-pop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Paso completado del wizard (Check): se dibuja progresivamente en vez de
+   aparecer de golpe, la primera vez que el paso queda listo -- ver
+   CheckAnimado (stroke-dasharray = stroke-dashoffset inicial). */
+@keyframes check-dibujo {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Barras de Reportes (sidebar): "crecen" de nuevo desde la base, una vez
+   por hover y escalonadas -- ver BarChart3Animado (cada barra usa esta
+   keyframe con un animation-delay distinto). */
+@keyframes barchart-crecer {
+  0% {
+    transform: scaleY(1);
+  }
+  25% {
+    transform: scaleY(0.15);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+/* Diafragma de la cámara (subir/reemplazar foto): parpadeo breve tipo
+   flash, una vez por hover. */
+@keyframes camera-flash {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.6);
+  }
+}
+
+/* Feedback "+1"/"-1" de contadores (pasadas del láser): el texto flota
+   hacia arriba desvaneciéndose, una vez por click -- ver useContadorFeedback. */
+@keyframes counter-flota {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-14px);
+    opacity: 0;
+  }
+}
+
+/* Flecha de subida de SVG: sube hacia la nube en loop lento mientras se
+   arrastra un archivo encima de la zona (estado, no hover -- ver
+   SvgDropzone). */
+@keyframes uploadcloud-flota {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+/* Rebote chico de la nube al soltar el archivo -- una vez, ver SvgDropzone. */
+@keyframes uploadcloud-rebote {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(2px) scale(0.94);
+  }
+  70% {
+    transform: translateY(-1px) scale(1.03);
+  }
+}
+
+/* Respeta la preferencia de movimiento reducido del sistema operativo:
+   morphicons y las transiciones de layout se saltan la animación, no el
+   cambio de estado. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
