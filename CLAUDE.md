@@ -30,19 +30,21 @@ Si `gh` no tiene un subcomando para lo que hace falta, cae a `gh api` antes que 
 
 ```
 master                              ← producción, deploy automático (Vercel)
- └── feat                           ← espejo/staging de master, "primera comprobación"
-       ├── feat/frontend
-       ├── feat/backend
-       ├── feat/data
-       └── feat/deploy
-             └── <sub-rama por tarea puntual>   ej. feat/data/schema-supabase
+ └── develop                        ← espejo/staging de master, "primera comprobación"
+       ├── feature/frontend
+       ├── feature/backend
+       ├── feature/data
+       └── feature/deploy
+             └── <sub-rama por tarea puntual>   ej. feature/data/schema-supabase
 ```
 
-- Las tareas puntuales (agénticas o no) salen de la rama de categoría correspondiente (`feat/frontend`, `feat/backend`, `feat/data`, `feat/deploy`), nunca directo de `master` ni de `feat`.
-- Orden de promoción, siempre por PR: sub-rama → `feat/<categoría>` → `feat` → `master`. Cada salto corre el CI completo (`.github/workflows/ci.yml`); no saltarse ninguno.
+(Nota: originalmente se pensó nombrar la rama de staging `feat`, pero Git no permite que coexistan una rama `feat` y ramas `feat/algo` — el nombre colisiona con el propio namespace de refs. `develop` es además el nombre estándar de la industria para este rol exacto, ver GitFlow.)
+
+- Las tareas puntuales (agénticas o no) salen de la rama de categoría correspondiente (`feature/frontend`, `feature/backend`, `feature/data`, `feature/deploy`), nunca directo de `master` ni de `develop`.
+- Orden de promoción, siempre por PR: sub-rama → `feature/<categoría>` → `develop` → `master`. Cada salto corre el CI completo (`.github/workflows/ci.yml`); no saltarse ninguno.
 - `master` tiene branch protection: requiere que el CI esté en verde antes de mergear.
 - **Todo commit sigue Conventional Commits** (`tipo(área): mensaje`, ver `.pre-commit-config.yaml`) y **todo PR referencia un ticket** (`Closes #N` o `Refs #N`, ver `.github/PULL_REQUEST_TEMPLATE.md`) — es lo que da trazabilidad entre código y el [GitHub Project](https://github.com/orgs/Flux-Solutions-Cali/projects/1).
 
 ## CI/CD
 
-`.github/workflows/ci.yml` corre en cada push/PR a `master`/`feat`/`feat/**`: un job de backend (`ruff` + `pyright` + `pytest` sobre `packages/laser_toolkit`) y un job de frontend (`lint` + `typecheck` + `format:check` + `build` sobre `apps/web`). El deploy en sí no vive en GitHub Actions — lo maneja la integración nativa de Vercel con el repo (preview por rama, producción en push a `master`).
+`.github/workflows/ci.yml` corre en cada push/PR a `master`/`develop`/`feature/**`: un job de backend (`ruff` + `pyright` + `pytest` sobre `packages/laser_toolkit`) y un job de frontend (`lint` + `typecheck` + `format:check` + `build` sobre `apps/web`). El deploy en sí no vive en GitHub Actions — lo maneja la integración nativa de Vercel con el repo (preview por rama, producción en push a `master`).

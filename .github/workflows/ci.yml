@@ -5,7 +5,7 @@ name: CI
 # nativa con GitHub -- este workflow solo valida que el código esté sano.
 on:
   push:
-    branches: [master, feat, "feat/**"]
+    branches: [master, develop, "feature/**"]
   pull_request:
 
 concurrency:
