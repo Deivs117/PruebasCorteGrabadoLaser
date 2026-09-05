@@ -1,0 +1,15 @@
+material: MDF Comercial
+espesor_mm: 3
+operacion: grabado
+velocidades_mm_min:
+  - 2000
+potencias_pct:
+  - 3
+  - 10
+  - 20
+  - 35
+pasadas: 1
+tamano_celda_mm: 4.5
+espaciado_mm: 3
+id_prefijo: G
+lote: L05
