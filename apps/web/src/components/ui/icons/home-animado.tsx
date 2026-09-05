@@ -9,7 +9,10 @@ interface HomeAnimadoProps {
  * de la casa baja 1-2px y vuelve -- un leve "asentamiento", como si la casa
  * se posara sobre el terreno.
  */
-export function HomeAnimado({ className, strokeWidth = 1.75 }: HomeAnimadoProps) {
+export function HomeAnimado({
+  className,
+  strokeWidth = 1.75,
+}: HomeAnimadoProps) {
   return (
     <svg
       viewBox="0 0 24 24"
