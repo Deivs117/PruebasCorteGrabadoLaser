@@ -10,20 +10,27 @@ El sistema está diseñado para ser **agnóstico al material**: hoy arranca con 
 
 ## Estructura del repositorio
 
+Monorepo: `apps/` para lo desplegable, `packages/` para el código compartido. `configs/`, `data/`, `docs/` y `assets/` quedan en la raíz porque los consumen ambos lados (el CLI de escritorio y el frontend web).
+
 ```
 .
-├── src/laser_toolkit/                                     ← paquete Python (la herramienta en sí)
-│   ├── config.py                                           ← validacion del YAML de configuracion (pydantic)
-│   ├── tarifas.py                                           ← UNICO lugar con valores monetarios (tarifas de negocio)
-│   ├── costos.py                                            ← motor de costeo: energia/material/tiempo, siempre separados
-│   ├── naming.py                                            ← nomenclatura estandar de archivos y grupos de calibracion
-│   ├── calibracion.py                                       ← estadistica entre ejecuciones independientes de Final Run
-│   ├── cli.py                                                ← comandos `laser-toolkit generate-*/prepare-record/compute-costs`
-│   ├── gcode/                                                ← construccion de la grilla, temporizado y emision de G-code
-│   ├── suites/                                               ← orquestacion de suites de barrido y de Final Run
-│   ├── svg/                                                   ← parser SVG propio + conversion a G-code (contorno y relleno)
-│   └── io/                                                    ← csv hermano + Hoja de Registro (registro.py)
-├── tests/                                                  ← pytest (109 casos, ver `make test`)
+├── apps/
+│   └── web/                                                ← frontend Next.js (dashboard, suites, costeo, etc.)
+├── packages/
+│   └── laser_toolkit/                                      ← paquete Python (la herramienta en sí)
+│       ├── pyproject.toml / uv.lock                        ← dependencias gestionadas con uv
+│       ├── src/laser_toolkit/
+│       │   ├── config.py                                   ← validacion del YAML de configuracion (pydantic)
+│       │   ├── tarifas.py                                   ← UNICO lugar con valores monetarios (tarifas de negocio)
+│       │   ├── costos.py                                    ← motor de costeo: energia/material/tiempo, siempre separados
+│       │   ├── naming.py                                    ← nomenclatura estandar de archivos y grupos de calibracion
+│       │   ├── calibracion.py                                ← estadistica entre ejecuciones independientes de Final Run
+│       │   ├── cli.py                                        ← comandos `laser-toolkit generate-*/prepare-record/compute-costs`
+│       │   ├── gcode/                                        ← construccion de la grilla, temporizado y emision de G-code
+│       │   ├── suites/                                       ← orquestacion de suites de barrido y de Final Run
+│       │   ├── svg/                                           ← parser SVG propio + conversion a G-code (contorno y relleno)
+│       │   └── io/                                            ← csv hermano + Hoja de Registro (registro.py)
+│       └── tests/                                          ← pytest (109 casos, ver `make test`)
 ├── configs/                                                ← YAML de ejemplo (suites) + plantilla de tarifas
 ├── assets/svg/                                             ← SVG de referencia para pruebas de grabado (logo-empresa.svg)
 ├── docs/
@@ -36,9 +43,10 @@ El sistema está diseñado para ser **agnóstico al material**: hoy arranca con 
 ├── data/
 │   ├── registros/                                           ← G-code + csv generados, hojas de registro por corrida
 │   └── fotos/                                                ← fotos de cupones de prueba evaluados
-├── pyproject.toml / uv.lock                                ← dependencias gestionadas con uv
-└── Makefile                                                ← interfaz unica de comandos (`make help`)
+└── Makefile                                                ← interfaz unica de comandos (`make help`), sabe donde vive cada paquete
 ```
+
+`make` sigue siendo la interfaz única: internamente usa `uv run --project packages/laser_toolkit` para los comandos de generación (mantienen el directorio de trabajo en la raíz del repo, porque `configs/`/`data/` se referencian con rutas relativas a la raíz) y `uv run --directory packages/laser_toolkit` para lint/typecheck/test (que sí asumen estar parados dentro del paquete). No hace falta que lo pienses al usar `make`, solo si tocás el Makefile.
 
 ### Arquitectura interna del paquete `laser_toolkit`
 

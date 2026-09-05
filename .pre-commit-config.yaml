@@ -1,0 +1,21 @@
+# Instalar una vez por clon: `pre-commit install --hook-type commit-msg`
+# (requiere `pipx install pre-commit` o `uv tool install pre-commit`).
+#
+# Valida que el mensaje de commit siga Conventional Commits: tipo(área): mensaje
+# — la misma convención que ya usan los tickets del repo (ver CLAUDE.md).
+repos:
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.2.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args:
+          - feat
+          - fix
+          - chore
+          - docs
+          - refactor
+          - test
+          - style
+          - perf
+          - ci
