@@ -8,6 +8,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import {
   CONFIGS_DIR,
   FOTOS_DIR,
+  PY_PROJECT_ARGS,
   REGISTROS_DIR,
   REPO_ROOT,
   eliminarSuite,
@@ -81,6 +82,7 @@ export async function generarFinalRun(
       "uv",
       [
         "run",
+        ...PY_PROJECT_ARGS,
         "laser-toolkit",
         "generate-final-run",
         rutaConfig,
@@ -322,6 +324,7 @@ export async function resumirCalibracion(
       "uv",
       [
         "run",
+        ...PY_PROJECT_ARGS,
         "laser-toolkit",
         "summarize-final-run",
         ...rutas,

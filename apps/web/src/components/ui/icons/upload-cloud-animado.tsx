@@ -44,7 +44,8 @@ export function UploadCloudAnimado({
       <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
       <g
         className={clsx(
-          arrastrando && "animate-[uploadcloud-flota_1200ms_ease-in-out_infinite]",
+          arrastrando &&
+            "animate-[uploadcloud-flota_1200ms_ease-in-out_infinite]",
         )}
       >
         <path d="M12 13v8" />

@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { REPO_ROOT } from "@/lib/fs-data";
+import { PY_PROJECT_ARGS, REPO_ROOT } from "@/lib/fs-data";
 import { slug } from "@/lib/slug";
 import type { ConversionSvgData } from "@/lib/svg-schema";
 
@@ -153,6 +153,7 @@ export async function convertirSvg(
       "uv",
       [
         "run",
+        ...PY_PROJECT_ARGS,
         "laser-toolkit",
         "svg-to-gcode",
         rutaSvg,

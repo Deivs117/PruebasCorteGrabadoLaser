@@ -1,0 +1,53 @@
+name: CI
+
+# Portero de calidad antes de cualquier deploy. Vercel se encarga del deploy
+# en sí (preview por rama, producción en push a master) via su integración
+# nativa con GitHub -- este workflow solo valida que el código esté sano.
+on:
+  push:
+    branches: [master, develop, "feature/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (packages/laser_toolkit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/laser_toolkit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: packages/laser_toolkit/uv.lock
+      - run: uv sync
+      - run: uv run ruff check src tests
+      - run: uv run pyright
+      - run: uv run pytest tests/ -v
+
+  web:
+    name: Frontend (apps/web)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run typecheck
+      - run: pnpm run format:check
+      - run: pnpm run build

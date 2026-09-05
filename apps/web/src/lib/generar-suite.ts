@@ -5,7 +5,12 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { CONFIGS_DIR, REGISTROS_DIR, REPO_ROOT } from "@/lib/fs-data";
+import {
+  CONFIGS_DIR,
+  PY_PROJECT_ARGS,
+  REGISTROS_DIR,
+  REPO_ROOT,
+} from "@/lib/fs-data";
 import { existeArchivo, predecirCorridaId } from "@/lib/corrida-id";
 import { slug } from "@/lib/slug";
 import { idPrefijo, type SuiteFormData } from "@/lib/suite-schema";
@@ -97,7 +102,7 @@ async function escribirYGenerar(
   try {
     const { stdout } = await execFileAsync(
       "uv",
-      ["run", "laser-toolkit", comando, rutaConfig],
+      ["run", ...PY_PROJECT_ARGS, "laser-toolkit", comando, rutaConfig],
       { cwd: REPO_ROOT, timeout: 30_000 },
     );
 

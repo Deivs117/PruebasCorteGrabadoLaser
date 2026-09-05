@@ -16,7 +16,13 @@ import { parse as parseYaml } from "yaml";
  * taller una ruta de archivo ni el nombre de una carpeta del sistema.
  */
 
-export const REPO_ROOT = path.resolve(process.cwd(), "..");
+// apps/web/ vive dos niveles bajo la raiz del monorepo (raiz/apps/web).
+export const REPO_ROOT = path.resolve(process.cwd(), "..", "..");
+// El paquete Python (pyproject.toml/uv.lock) vive en packages/laser_toolkit/.
+// "uv run --project" le dice a uv donde esta el proyecto sin cambiar el cwd
+// del proceso hijo -- los comandos que invocamos siguen recibiendo rutas de
+// config/registro relativas a REPO_ROOT, igual que antes de moverlo.
+export const PY_PROJECT_ARGS = ["--project", "packages/laser_toolkit"];
 export const CONFIGS_DIR = path.join(REPO_ROOT, "configs");
 export const REGISTROS_DIR = path.join(REPO_ROOT, "data", "registros");
 export const FOTOS_DIR = path.join(REPO_ROOT, "data", "fotos");

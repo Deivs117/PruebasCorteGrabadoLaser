@@ -435,7 +435,10 @@ export function SuiteWizard({
                         : "border-border hover:bg-navy-soft",
                     )}
                   >
-                    <SquareAnimado className="text-navy size-6" strokeWidth={1.75} />
+                    <SquareAnimado
+                      className="text-navy size-6"
+                      strokeWidth={1.75}
+                    />
                     <span className="text-navy text-sm font-medium">
                       Cuadrado genérico
                     </span>
@@ -451,7 +454,10 @@ export function SuiteWizard({
                         : "border-border hover:bg-navy-soft",
                     )}
                   >
-                    <ShapesAnimado className="text-navy size-6" strokeWidth={1.75} />
+                    <ShapesAnimado
+                      className="text-navy size-6"
+                      strokeWidth={1.75}
+                    />
                     <span className="text-navy text-sm font-medium">
                       Importar SVG
                     </span>

@@ -64,7 +64,10 @@ const BUFFER_ETIQUETA_MM = 0.3;
  * 7mm de celda / 3mm de separación) reduce el margen y el alto de la etiqueta
  * de ID para que quepan dentro del espaciado sin invadir la celda de la fila
  * siguiente — con espaciado amplio devuelve los valores por defecto. */
-function tamanoEtiquetaMm(espaciadoMm: number): { margenMm: number; altoMm: number } {
+function tamanoEtiquetaMm(espaciadoMm: number): {
+  margenMm: number;
+  altoMm: number;
+} {
   const totalDefecto = MARGEN_ETIQUETA_MM + ALTO_ETIQUETA_MM;
   if (espaciadoMm >= totalDefecto) {
     return { margenMm: MARGEN_ETIQUETA_MM, altoMm: ALTO_ETIQUETA_MM };
@@ -78,7 +81,10 @@ function tamanoEtiquetaMm(espaciadoMm: number): { margenMm: number; altoMm: numb
     return { margenMm: MARGEN_ETIQUETA_MIN_MM, altoMm: ALTO_ETIQUETA_MIN_MM };
   }
 
-  const margenMm = Math.max(MARGEN_ETIQUETA_MIN_MM, disponible * (MARGEN_ETIQUETA_MM / totalDefecto));
+  const margenMm = Math.max(
+    MARGEN_ETIQUETA_MIN_MM,
+    disponible * (MARGEN_ETIQUETA_MM / totalDefecto),
+  );
   let altoMm = disponible - margenMm;
   if (altoMm < ALTO_ETIQUETA_MIN_MM) {
     altoMm = ALTO_ETIQUETA_MIN_MM;
@@ -100,8 +106,11 @@ export function dimensionesTotalesMm(datos: {
   const paso = datos.tamanoCeldaMm + datos.espaciadoMm;
   const nColumnas = datos.velocidadesMmMin.length;
   const nFilas = datos.potenciasPct.length;
-  const { margenMm, altoMm: altoEtiquetaMm } = tamanoEtiquetaMm(datos.espaciadoMm);
+  const { margenMm, altoMm: altoEtiquetaMm } = tamanoEtiquetaMm(
+    datos.espaciadoMm,
+  );
   const anchoMm = (nColumnas - 1) * paso + datos.tamanoCeldaMm;
-  const altoMm = (nFilas - 1) * paso + datos.tamanoCeldaMm + margenMm + altoEtiquetaMm;
+  const altoMm =
+    (nFilas - 1) * paso + datos.tamanoCeldaMm + margenMm + altoEtiquetaMm;
   return { anchoMm, altoMm };
 }
