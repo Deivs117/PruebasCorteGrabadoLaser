@@ -1,4 +1,5 @@
 import { ClipboardList } from "lucide-react";
+import { AyudaLink } from "@/components/ui/ayuda-link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
@@ -36,6 +37,7 @@ export default async function HojaDeRegistro() {
           Evaluación celda por celda de las corridas que ya se corrieron en la
           máquina.
         </p>
+        <AyudaLink seccion="registro" />
       </div>
 
       {sinNada ? (

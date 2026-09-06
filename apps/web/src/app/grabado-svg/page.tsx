@@ -1,3 +1,4 @@
+import { AyudaLink } from "@/components/ui/ayuda-link";
 import { SvgDropzone } from "@/components/grabado-svg/svg-dropzone";
 import { SvgGaleria } from "@/components/grabado-svg/svg-galeria";
 import { SvgWorkspace } from "@/components/grabado-svg/svg-workspace";
@@ -28,6 +29,7 @@ export default async function GrabadoVectorialSVG({
           Convertí un diseño SVG a G-code de contorno y/o relleno, viendo el
           toolpath real antes de correrlo en la máquina.
         </p>
+        <AyudaLink seccion="grabado-svg" />
       </div>
 
       {nombreSeleccionado && contenidoSeleccionado ? (
