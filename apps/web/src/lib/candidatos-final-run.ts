@@ -51,12 +51,3 @@ export async function desmarcarCandidato(id: string): Promise<void> {
   });
   await pyDelete(`candidatos?${parametros.toString()}`);
 }
-
-/** Al borrar una corrida entera, sus candidatos marcados quedan huérfanos —
- * los quita para no ofrecerlos luego en el selector de Final Run. */
-export async function desmarcarCandidatosDeArchivo(
-  archivo: string,
-): Promise<void> {
-  const parametros = new URLSearchParams({ archivo });
-  await pyDelete(`candidatos?${parametros.toString()}`);
-}

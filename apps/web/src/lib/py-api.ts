@@ -58,3 +58,17 @@ export async function pyDelete<T>(ruta: string): Promise<T> {
   const respuesta = await fetch(new URL(ruta, baseUrl()), { method: "DELETE" });
   return manejarRespuesta<T>(respuesta);
 }
+
+/** Reenvía un `FormData` (ej. la foto de una celda, C/#60) tal cual --
+ * `fetch` arma el `multipart/form-data` solo con pasarlo como `body`, no
+ * hace falta serializarlo a mano. */
+export async function pyPostForm<T>(
+  ruta: string,
+  formData: FormData,
+): Promise<T> {
+  const respuesta = await fetch(new URL(ruta, baseUrl()), {
+    method: "POST",
+    body: formData,
+  });
+  return manejarRespuesta<T>(respuesta);
+}

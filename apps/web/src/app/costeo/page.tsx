@@ -7,8 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
 import { CalcularCosteoButton } from "@/components/costeo/calcular-costeo-button";
-import { DescargarBoton } from "@/components/registro/descargar-boton";
-import { existeArchivoTarifas } from "@/lib/fs-data";
+import { getDashboardSummary } from "@/lib/fs-data";
 import { listarCosteables } from "@/lib/costeo-data";
 
 // Se generan/completan registros y se cargan tarifas en cualquier momento
@@ -17,9 +16,9 @@ import { listarCosteables } from "@/lib/costeo-data";
 export const dynamic = "force-dynamic";
 
 export default async function Costeo() {
-  const tarifasCargadas = await existeArchivoTarifas();
+  const { tarifasConfiguradas } = await getDashboardSummary();
 
-  if (!tarifasCargadas) {
+  if (!tarifasConfiguradas) {
     return (
       <div className="flex flex-col gap-6">
         <div>
@@ -75,7 +74,7 @@ export default async function Costeo() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {costeables.map((corrida, indice) => (
-            <Reveal key={corrida.archivoRegistro} delayMs={indice * 40}>
+            <Reveal key={corrida.corridaId} delayMs={indice * 40}>
               <Card className="flex flex-col gap-3 p-5">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-navy text-base font-semibold">
@@ -95,7 +94,7 @@ export default async function Costeo() {
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                   {corrida.costeado ? (
                     <Link
-                      href={`/costeo/${encodeURIComponent(corrida.archivoCosteado)}`}
+                      href={`/costeo/${encodeURIComponent(corrida.corridaId)}`}
                       className="text-blue hover:text-blue-hover text-sm font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
                     >
                       Ver costos
@@ -103,19 +102,10 @@ export default async function Costeo() {
                   ) : (
                     <span />
                   )}
-                  <div className="flex items-center gap-2">
-                    {corrida.costeado ? (
-                      <DescargarBoton
-                        archivo={corrida.archivoCosteado}
-                        etiqueta="Descargar"
-                      />
-                    ) : null}
-                    <CalcularCosteoButton
-                      archivoRegistro={corrida.archivoRegistro}
-                      archivoCosteado={corrida.archivoCosteado}
-                      recalcular={corrida.costeado}
-                    />
-                  </div>
+                  <CalcularCosteoButton
+                    corridaId={corrida.corridaId}
+                    recalcular={corrida.costeado}
+                  />
                 </div>
               </Card>
             </Reveal>

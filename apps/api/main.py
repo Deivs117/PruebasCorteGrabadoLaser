@@ -109,13 +109,8 @@ def marcar_candidato(body: IdentidadCandidatoBody) -> dict:
 
 
 @app.delete("/candidatos")
-def desmarcar_candidato(corridaId: str | None = None, idPrueba: str | None = None, archivo: str | None = None) -> dict:
+def desmarcar_candidato(corridaId: str, idPrueba: str) -> dict:
     with sesion() as s:
-        if archivo is not None:
-            escritura.desmarcar_de_archivo(s, archivo)
-            return {"ok": True}
-        if corridaId is None or idPrueba is None:
-            raise HTTPException(status_code=400, detail="Hace falta corridaId+idPrueba, o archivo.")
         try:
             escritura.desmarcar(s, corridaId, idPrueba)
         except ValueError as error:
@@ -243,3 +238,92 @@ def eliminar_suite(suite_id: int) -> dict:
 def dashboard() -> dict:
     with sesion() as s:
         return lectura.dashboard_resumen(s)
+
+
+@app.get("/registros")
+def listar_registros() -> list[dict]:
+    with sesion() as s:
+        return lectura.registros(s)
+
+
+@app.get("/registros/{corrida_id}")
+def obtener_registro(corrida_id: str) -> dict:
+    with sesion() as s:
+        detalle = lectura.registro_detalle(s, corrida_id)
+        if detalle is None:
+            raise HTTPException(status_code=404, detail=f"No existe la corrida {corrida_id}.")
+        return detalle
+
+
+class CeldaEditableBody(BaseModel):
+    idPrueba: str
+    cortePasante: str
+    carbonizacion1a5: str
+    notas: str
+
+
+class CompletarRegistroBody(BaseModel):
+    kwhCorridaMedido: str
+    tiempoRealCorridaS: str
+    celdas: list[CeldaEditableBody]
+
+
+@app.put("/registros/{corrida_id}")
+def completar_registro(corrida_id: str, body: CompletarRegistroBody) -> dict:
+    with sesion() as s:
+        try:
+            return escritura.completar_registro(
+                s,
+                corrida_id,
+                kwh_corrida_medido=float(body.kwhCorridaMedido) if body.kwhCorridaMedido else None,
+                tiempo_real_corrida_s=float(body.tiempoRealCorridaS) if body.tiempoRealCorridaS else None,
+                celdas=[c.model_dump() for c in body.celdas],
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.delete("/registros/{corrida_id}")
+def eliminar_registro(corrida_id: str) -> dict:
+    with sesion() as s:
+        try:
+            suites_admin.eliminar_registro_por_corrida(s, cliente_storage, corrida_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        return {"ok": True}
+
+
+@app.get("/registros/{corrida_id}/costeo")
+def obtener_costeo(corrida_id: str) -> dict:
+    with sesion() as s:
+        detalle = lectura.costeo_detalle(s, corrida_id)
+        if detalle is None:
+            raise HTTPException(status_code=404, detail=f"No existe la corrida {corrida_id}.")
+        return detalle
+
+
+@app.post("/registros/{corrida_id}/costeo")
+def calcular_costeo(corrida_id: str) -> dict:
+    with sesion() as s:
+        try:
+            return escritura.calcular_costos(s, corrida_id)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/fotos/{corrida_id}/{id_prueba}/url")
+def url_foto_celda(corrida_id: str, id_prueba: str) -> dict:
+    with sesion() as s:
+        try:
+            return {"url": storage_endpoints.url_firmada_foto_celda(s, cliente_storage, corrida_id, id_prueba)}
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/fotos-bateria/{corrida_id}/url")
+def url_foto_bateria(corrida_id: str) -> dict:
+    with sesion() as s:
+        try:
+            return {"url": storage_endpoints.url_firmada_foto_bateria(s, cliente_storage, corrida_id)}
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error

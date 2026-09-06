@@ -19,6 +19,7 @@ from laser_toolkit.db.repo_pruebas import (
     guardar_foto_medicion_key,
 )
 from laser_toolkit.storage.operaciones import (
+    BUCKET_FOTOS,
     BUCKET_GCODE,
     BUCKET_SVG,
     eliminar,
@@ -90,6 +91,20 @@ def eliminar_foto_bateria(sesion: Session, cliente: Client, corrida_id: str) -> 
         sesion.commit()
 
 
+def url_firmada_foto_celda(sesion: Session, cliente: Client, corrida_id: str, id_prueba: str) -> str:
+    medicion = _medicion_por_identidad(sesion, corrida_id, id_prueba)
+    if not medicion.foto_storage_key:
+        raise ValueError(f"No hay foto subida para la celda {id_prueba} de la corrida {corrida_id}.")
+    return url_firmada(cliente, BUCKET_FOTOS, medicion.foto_storage_key)
+
+
+def url_firmada_foto_bateria(sesion: Session, cliente: Client, corrida_id: str) -> str:
+    registro = _registro_por_corrida(sesion, corrida_id)
+    if not registro.foto_bateria_storage_key:
+        raise ValueError(f"No hay foto de batería subida para la corrida {corrida_id}.")
+    return url_firmada(cliente, BUCKET_FOTOS, registro.foto_bateria_storage_key)
+
+
 def url_firmada_gcode(sesion: Session, cliente: Client, corrida_id: str) -> str:
     registro = sesion.scalar(select(Registro).where(Registro.corrida_id == corrida_id))
     if registro is None or not registro.gcode_storage_key:
@@ -109,6 +124,8 @@ __all__ = [
     "eliminar_foto_celda",
     "subir_foto_bateria",
     "subir_foto_celda",
+    "url_firmada_foto_bateria",
+    "url_firmada_foto_celda",
     "url_firmada_gcode",
     "url_firmada_svg",
 ]

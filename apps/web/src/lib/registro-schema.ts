@@ -42,20 +42,6 @@ export const COLUMNAS_REGISTRO = [...CAMPOS_CSV, ...COLUMNAS_MANUALES];
 
 export type FilaRegistro = Record<(typeof COLUMNAS_REGISTRO)[number], string>;
 
-/** Espejo de COLUMNAS_COSTEO en io/registro.py — lo que agrega `compute-costs`. */
-export const COLUMNAS_COSTEO = [
-  "kwh_celda",
-  "costo_energia_celda",
-  "costo_material_celda",
-  "tiempo_maquina_celda_s",
-  "costo_tiempo_maquina_celda",
-  "costo_total_celda",
-] as const;
-
-export const COLUMNAS_COSTEADO = [...COLUMNAS_REGISTRO, ...COLUMNAS_COSTEO];
-
-export type FilaCosteada = Record<(typeof COLUMNAS_COSTEADO)[number], string>;
-
 const numeroPositivoOVacio = z
   .string()
   .refine((v) => v === "" || (Number.isFinite(Number(v)) && Number(v) > 0), {
@@ -83,11 +69,79 @@ export const filaEditableSchema = z.object({
 });
 
 /** Espejo de `_valor_unico_de_grupo` en registro.py: una medición de la
- * corrida completa debe ser idéntica en todas sus filas. */
+ * corrida completa debe ser idéntica en todas sus filas. Solo la usa
+ * `final-run-data.ts` (E, todavía 100% csv) -- en el modelo normalizado de
+ * Suite/Registro (C, ver más abajo) esa consistencia la da el esquema, no
+ * hace falta validarla en tiempo de lectura. */
 export function filasComparten(
   filas: { kwh_corrida_medido: string; tiempo_real_corrida_s: string }[],
 ): boolean {
   const kwh = new Set(filas.map((f) => f.kwh_corrida_medido));
   const tiempo = new Set(filas.map((f) => f.tiempo_real_corrida_s));
   return kwh.size <= 1 && tiempo.size <= 1;
+}
+
+/**
+ * Hoja de Registro sobre Supabase (C, issue #60) -- `Registro`/`Medicion`
+ * normalizados (`apps/api/lectura.py`), no un csv. Nombres de campo en
+ * camelCase (igual que el resto de los contratos de #2), a diferencia de
+ * `FilaRegistro`/`FilaCosteada` de arriba, que siguen siendo el espejo
+ * exacto de un csv real (Final Run, (E), todavía sin migrar).
+ */
+export interface CeldaRegistro {
+  idPrueba: string;
+  velocidadMmMin: string;
+  potenciaPct: string;
+  cortePasante: "" | "si" | "no";
+  carbonizacion1a5: "" | "1" | "2" | "3" | "4" | "5";
+  fotoStorageKey: string;
+  notas: string;
+}
+
+export interface RegistroDetalle {
+  corridaId: string;
+  material: string;
+  espesorMm: string;
+  operacion: "corte" | "grabado";
+  lote: string;
+  pasadas: number;
+  kwhCorridaMedido: string;
+  tiempoRealCorridaS: string;
+  fotoBateriaStorageKey: string;
+  celdas: CeldaRegistro[];
+}
+
+export const celdaEditableSchema = z.object({
+  idPrueba: z.string().min(1),
+  cortePasante: z.enum(["", "si", "no"]),
+  carbonizacion1a5: z.union([z.literal(""), z.enum(["1", "2", "3", "4", "5"])]),
+  notas: z.string(),
+});
+
+export const guardarRegistroSchema = z.object({
+  kwhCorridaMedido: numeroPositivoOVacio,
+  tiempoRealCorridaS: numeroPositivoOVacio,
+  celdas: z.array(celdaEditableSchema).min(1),
+});
+
+export type GuardarRegistroPayload = z.infer<typeof guardarRegistroSchema>;
+
+/** Costeo (C) sobre `Medicion` -- espejo de `lectura.costeo_detalle()`. */
+export interface CeldaCosteada {
+  idPrueba: string;
+  velocidadMmMin: string;
+  potenciaPct: string;
+  costoEnergiaCelda: string;
+  costoMaterialCelda: string;
+  costoTiempoMaquinaCelda: string;
+  costoTotalCelda: string;
+}
+
+export interface CosteoDetalle {
+  corridaId: string;
+  material: string;
+  espesorMm: string;
+  operacion: "corte" | "grabado";
+  lote: string;
+  celdas: CeldaCosteada[];
 }

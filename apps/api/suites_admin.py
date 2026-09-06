@@ -8,7 +8,7 @@ traduce a HTTP.
 
 from __future__ import annotations
 
-from laser_toolkit.db.models import CandidatoFinalRun, Suite
+from laser_toolkit.db.models import CandidatoFinalRun, Registro, Suite
 from laser_toolkit.storage.operaciones import eliminar as eliminar_de_storage
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -54,4 +54,24 @@ def eliminar_suite(sesion: Session, cliente_storage: Client, suite_id: int) -> N
     sesion.commit()
 
 
-__all__ = ["eliminar_suite"]
+def eliminar_registro_por_corrida(sesion: Session, cliente_storage: Client, corrida_id: str) -> None:
+    """Eliminar una corrida entera desde Hoja de Registro (C, issue #60).
+
+    En el modelo de archivos, borrar una corrida y borrar su suite/config
+    eran cosas separadas (una config podía sobrevivir a la corrida que
+    generó). En Supabase no existe todavía forma de generar una corrida
+    para una Suite ya existente sin volver a crearla (`creacion.crear`
+    persiste Suite+Registro juntos, #56) -- así que una Suite sin su
+    Registro quedaría huérfana sin ningún flujo que la reaproveche. Por eso
+    "eliminar corrida" reusa `eliminar_suite` tal cual en vez de duplicar la
+    cascada: elimina también la Suite dueña."""
+    fila = sesion.scalar(select(Registro).where(Registro.corrida_id == corrida_id))
+    if fila is None:
+        raise ValueError(f"No existe la corrida {corrida_id}.")
+    if fila.suite_id is not None:
+        eliminar_suite(sesion, cliente_storage, fila.suite_id)
+        return
+    raise ValueError(f"La corrida {corrida_id} es de Final Run -- eliminarla todavía no está soportado (E).")
+
+
+__all__ = ["eliminar_registro_por_corrida", "eliminar_suite"]
