@@ -72,6 +72,20 @@ def test_resumen_calibracion_respeta_el_minimo_de_ejecuciones_pedido(sesion):
     assert resumen_exigente.calibrado is False
 
 
+def test_resumen_calibracion_falla_claro_si_falta_medir_una_ejecucion(sesion):
+    grupo = _grupo(sesion)
+    final_run = crear_final_run(sesion, grupo, ejecucion=1, lote="L01", fecha=date(2026, 9, 4))
+    # Ejecución recién generada, todavía sin kwh/tiempo cargados -- el caso
+    # real que motivó el fix de `str(None)` en resumen_calibracion_de_grupo.
+    sesion.add(
+        Registro(corrida_id="FINAL_...ejec1", final_run_id=final_run.id, fecha=date(2026, 9, 4), lote="L01")
+    )
+    sesion.commit()
+
+    with pytest.raises(ValueError, match="falta kwh_corrida_medido o tiempo_real_corrida_s"):
+        resumen_calibracion_de_grupo(sesion, grupo)
+
+
 def test_ficha_es_1_a_1_crea_y_luego_actualiza(sesion):
     grupo = _grupo(sesion)
     ficha_1 = crear_o_actualizar_ficha(

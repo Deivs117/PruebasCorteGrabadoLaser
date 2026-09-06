@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/ui/back-link";
 import { SuiteWizard } from "@/components/suites/suite-wizard";
-import { leerSuiteEditable } from "@/lib/generar-suite";
+import { leerSuiteParaFormulario } from "@/lib/generar-suite";
 import { leerCatalogoMateriales } from "@/lib/materiales-catalog";
 import { listarSvgsConContenido } from "@/lib/svg-data";
 
@@ -15,16 +15,21 @@ export default async function NuevaSuite({
   const parametros = await searchParams;
   const duplicar = parametros.duplicar;
   const loteParam = parametros.lote;
-  const archivoOrigen = typeof duplicar === "string" ? duplicar : undefined;
+  const idOrigen =
+    typeof duplicar === "string" && Number.isInteger(Number(duplicar))
+      ? Number(duplicar)
+      : undefined;
 
   const [datosOrigen, svgsDisponibles, catalogoMateriales] = await Promise.all([
-    archivoOrigen ? leerSuiteEditable(archivoOrigen) : Promise.resolve(null),
+    idOrigen !== undefined
+      ? leerSuiteParaFormulario(idOrigen)
+      : Promise.resolve(null),
     listarSvgsConContenido(),
     leerCatalogoMateriales(),
   ]);
   const materialesDisponibles = catalogoMateriales.map((m) => m.nombre);
 
-  if (archivoOrigen && !datosOrigen) {
+  if (idOrigen !== undefined && !datosOrigen) {
     notFound();
   }
 
@@ -43,10 +48,12 @@ export default async function NuevaSuite({
       <BackLink href="/suites" label="Volver a Suites de Prueba" />
       <div>
         <h1 className="text-navy text-2xl font-semibold">
-          {archivoOrigen ? "Duplicar suite de prueba" : "Nueva suite de prueba"}
+          {idOrigen !== undefined
+            ? "Duplicar suite de prueba"
+            : "Nueva suite de prueba"}
         </h1>
         <p className="text-text-muted mt-1 text-sm">
-          {archivoOrigen
+          {idOrigen !== undefined
             ? "Mismos parámetros que la suite original, con un lote distinto — ajustá lo que necesites y generá su propio G-code."
             : "Configurá el barrido paso a paso y generá su G-code al final."}
         </p>

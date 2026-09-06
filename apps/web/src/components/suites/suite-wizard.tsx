@@ -78,8 +78,14 @@ function desdeDatosIniciales(datos: SuiteFormData): EstadoFormulario {
 type ResultadoEnvio =
   | { estado: "idle" }
   | { estado: "enviando" }
+  // Camino Supabase (crear #56 o editar B/#62): solo corridaId -- el .gcode
+  // se descarga vía Storage, ya no hay un csv de archivo aparte que ofrecer.
+  | { estado: "ok"; celdas: number; corridaId: string }
+  // Camino viejo, todavía local: crear una suite con SVG cargado (issue #3,
+  // el servicio Python no lo soporta todavía). Nunca pasa al editar: una
+  // Suite real de Supabase nunca tiene `svgPath`.
   | {
-      estado: "ok";
+      estado: "ok-local";
       celdas: number;
       gcodeFileName: string;
       csvFileName: string;
@@ -113,21 +119,22 @@ interface SvgDisponible {
 }
 
 interface SuiteWizardProps {
-  /** Si se pasa, el asistente edita esa suite en vez de crear una nueva:
-   * guarda sobre el mismo archivo y regenera su G-code. */
-  archivoExistente?: string;
+  /** Si se pasa, el asistente edita esa Suite real de Supabase (B, #62) en
+   * vez de crear una nueva: guarda sobre la misma fila y regenera su
+   * G-code. */
+  suiteIdExistente?: number;
   datosIniciales?: SuiteFormData;
   svgsDisponibles: SvgDisponible[];
   materialesDisponibles: string[];
 }
 
 export function SuiteWizard({
-  archivoExistente,
+  suiteIdExistente,
   datosIniciales,
   svgsDisponibles,
   materialesDisponibles,
 }: SuiteWizardProps) {
-  const modoEdicion = archivoExistente !== undefined;
+  const modoEdicion = suiteIdExistente !== undefined;
   const [paso, setPaso] = useState(0);
   const [form, setForm] = useState<EstadoFormulario>(
     datosIniciales ? desdeDatosIniciales(datosIniciales) : ESTADO_INICIAL,
@@ -170,9 +177,7 @@ export function SuiteWizard({
 
     try {
       const respuesta = await fetch(
-        modoEdicion
-          ? `/api/suites/${encodeURIComponent(archivoExistente)}`
-          : "/api/suites",
+        modoEdicion ? `/api/suites/${suiteIdExistente}` : "/api/suites",
         {
           method: modoEdicion ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
@@ -182,19 +187,26 @@ export function SuiteWizard({
       const cuerpo = (await respuesta.json()) as {
         ok: boolean;
         celdas?: number;
+        corridaId?: string;
         gcodeFileName?: string;
         csvFileName?: string;
         error?: string;
       };
 
-      if (
+      if (cuerpo.ok && cuerpo.celdas && cuerpo.corridaId) {
+        setResultado({
+          estado: "ok",
+          celdas: cuerpo.celdas,
+          corridaId: cuerpo.corridaId,
+        });
+      } else if (
         cuerpo.ok &&
         cuerpo.celdas &&
         cuerpo.gcodeFileName &&
         cuerpo.csvFileName
       ) {
         setResultado({
-          estado: "ok",
+          estado: "ok-local",
           celdas: cuerpo.celdas,
           gcodeFileName: cuerpo.gcodeFileName,
           csvFileName: cuerpo.csvFileName,
@@ -213,7 +225,8 @@ export function SuiteWizard({
     }
   }
 
-  if (resultado.estado === "ok") {
+  if (resultado.estado === "ok" || resultado.estado === "ok-local") {
+    const esLocal = resultado.estado === "ok-local";
     return (
       <Reveal>
         <Card accent="teal" className="flex flex-col items-start gap-4 p-6">
@@ -236,16 +249,29 @@ export function SuiteWizard({
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <DescargarBoton
-              archivo={resultado.gcodeFileName}
-              etiqueta="Descargar G-code"
-              variant="secondary"
-            />
-            <DescargarBoton
-              archivo={resultado.csvFileName}
-              etiqueta="Descargar CSV"
-              variant="outline"
-            />
+            {esLocal ? (
+              <>
+                <DescargarBoton
+                  archivo={resultado.gcodeFileName}
+                  endpointBase="/api/registros/descargar"
+                  etiqueta="Descargar G-code"
+                  variant="secondary"
+                />
+                <DescargarBoton
+                  archivo={resultado.csvFileName}
+                  endpointBase="/api/registros/descargar"
+                  etiqueta="Descargar CSV"
+                  variant="outline"
+                />
+              </>
+            ) : (
+              <DescargarBoton
+                archivo={`${resultado.corridaId}.gcode`}
+                endpointBase="/api/descargas/gcode"
+                etiqueta="Descargar G-code"
+                variant="secondary"
+              />
+            )}
           </div>
           <div className="flex gap-3">
             {modoEdicion ? (

@@ -1,9 +1,9 @@
 import { Card } from "@/components/ui/card";
 import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
-import type { FilaCosteada } from "@/lib/registro-schema";
+import type { CeldaCosteada } from "@/lib/registro-schema";
 
 interface CostoTablaProps {
-  filas: FilaCosteada[];
+  filas: CeldaCosteada[];
   moneda: string;
 }
 
@@ -60,30 +60,25 @@ export function CostoTabla({ filas, moneda }: CostoTablaProps) {
         </thead>
         <tbody className="divide-border divide-y">
           {filas.map((fila) => (
-            <tr key={fila.id_prueba}>
+            <tr key={fila.idPrueba}>
+              <td className="text-navy px-4 py-3 font-mono">{fila.idPrueba}</td>
               <td className="text-navy px-4 py-3 font-mono">
-                {fila.id_prueba}
-              </td>
-              <td className="text-navy px-4 py-3 font-mono">
-                {fila.velocidad_mm_min}
+                {fila.velocidadMmMin}
               </td>
               <td className="text-navy px-4 py-3 font-mono">
-                {fila.potencia_pct}%
+                {fila.potenciaPct}%
               </td>
               <td className="px-4 py-3">
-                <Costo valor={fila.costo_energia_celda} moneda={moneda} />
+                <Costo valor={fila.costoEnergiaCelda} moneda={moneda} />
               </td>
               <td className="px-4 py-3">
-                <Costo valor={fila.costo_material_celda} moneda={moneda} />
+                <Costo valor={fila.costoMaterialCelda} moneda={moneda} />
               </td>
               <td className="px-4 py-3">
-                <Costo
-                  valor={fila.costo_tiempo_maquina_celda}
-                  moneda={moneda}
-                />
+                <Costo valor={fila.costoTiempoMaquinaCelda} moneda={moneda} />
               </td>
               <td className="px-4 py-3 font-semibold">
-                <Costo valor={fila.costo_total_celda} moneda={moneda} />
+                <Costo valor={fila.costoTotalCelda} moneda={moneda} />
               </td>
             </tr>
           ))}

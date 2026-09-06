@@ -10,8 +10,10 @@ interface DescargarBotonProps {
   archivo: string;
   etiqueta: string;
   variant?: ButtonVariant;
-  /** Ruta base de la API de descarga — por defecto, la de data/registros/. */
-  endpointBase?: string;
+  /** Ruta base de la API de descarga -- todo lo descargable hoy vive en
+   * Supabase Storage o en `data/svgs/`, nunca en `data/registros/` (Final
+   * Run migró en E, #64), así que no hay un default razonable. */
+  endpointBase: string;
 }
 
 export function DescargarBoton({

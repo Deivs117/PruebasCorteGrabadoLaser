@@ -10,11 +10,23 @@ from datetime import date
 from laser_toolkit.config import FinalRunConfig, SuiteConfig
 
 
+def slug_material(material: str) -> str:
+    """Normaliza el nombre de un material para usarlo en nombres de archivo/
+    rutas de Storage: espacios -> guiones, sin espacios al borde. Ej.
+    "MDF Trupan" -> "MDF-Trupan". Extraido a una funcion propia (antes vivia
+    duplicado inline en `nombre_base` e `id_grupo_calibracion`) para que
+    `laser_toolkit.storage.rutas` (issue #25) use exactamente el mismo slug,
+    sin repetir la lógica de normalización."""
+    return "-".join(material.strip().split())
+
+
 def nombre_base(config: SuiteConfig) -> str:
     """Nombre base (sin extension) para los archivos .gcode/.csv de una suite."""
-    material_slug = "-".join(config.material.strip().split())
     fecha = config.fecha or date.today().isoformat()
-    return f"{material_slug}_{config.espesor_mm:g}mm_{config.operacion.value}_{fecha}_{config.lote}"
+    return (
+        f"{slug_material(config.material)}_{config.espesor_mm:g}mm_"
+        f"{config.operacion.value}_{fecha}_{config.lote}"
+    )
 
 
 def id_grupo_calibracion(config: FinalRunConfig) -> str:
@@ -22,9 +34,8 @@ def id_grupo_calibracion(config: FinalRunConfig) -> str:
     independiente de la fecha o la ejecucion -- la clave para agrupar varias
     ejecuciones independientes de la misma Final Run en `laser_toolkit.calibracion`.
     """
-    material_slug = "-".join(config.material.strip().split())
     return (
-        f"{material_slug}_{config.espesor_mm:g}mm_{config.operacion.value}_"
+        f"{slug_material(config.material)}_{config.espesor_mm:g}mm_{config.operacion.value}_"
         f"{config.velocidad_mm_min}mmmin_{config.potencia_pct}pct"
     )
 

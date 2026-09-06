@@ -13,8 +13,9 @@ const MIME: Record<string, string> = {
 
 /**
  * Sirve el G-code/csv exactamente como lo dejó el sistema en
- * data/registros/, para que el técnico pueda guardar una copia donde
- * quiera — el archivo del sistema nunca se mueve ni se borra por esto.
+ * data/registros/ -- solo sigue en pie para crear una suite con SVG cargado
+ * (issue #3, todavía local); todo lo demás descarga vía Storage
+ * (`/api/descargas/gcode`, #51).
  */
 export async function GET(_request: Request, { params }: Contexto) {
   const { archivo } = await params;
