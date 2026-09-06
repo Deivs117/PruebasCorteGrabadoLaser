@@ -4,6 +4,7 @@ import { PlaceholderPage } from "@/components/placeholder-page";
 export default function Historial() {
   return (
     <PlaceholderPage
+      ayudaSeccion="historial"
       icon={History}
       title="Historial"
       description="Explorador de todas las corridas de prueba hechas en el taller, filtrable por material, fecha, operación y estado (Generada/Registrada/Costeada/Calibrada)."

@@ -1,5 +1,6 @@
 import { FlaskConical } from "lucide-react";
 import { AlertBanner } from "@/components/ui/alert-banner";
+import { AyudaLink } from "@/components/ui/ayuda-link";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
@@ -46,6 +47,7 @@ export default async function Inicio() {
         <p className="text-text-muted mt-1 text-sm">
           Así está el taller ahora mismo.
         </p>
+        <AyudaLink seccion="inicio" />
       </div>
 
       <Reveal>
