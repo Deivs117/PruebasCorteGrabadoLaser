@@ -1,4 +1,4 @@
-.PHONY: help install test test-coverage lint format typecheck check generate-cut generate-engrave prepare-record compute-costs generate-final-run summarize-final-run svg-to-gcode clean web-install web-check
+.PHONY: help install test test-coverage lint format typecheck check generate-cut generate-engrave prepare-record compute-costs generate-final-run summarize-final-run svg-to-gcode clean web-install web-check db-migrate db-upgrade db-downgrade
 
 # Deteccion de SO
 ifeq ($(OS),Windows_NT)
@@ -47,6 +47,9 @@ help:
 	@echo "  make svg-to-gcode SVG=ruta.svg ANCHO=30 ALTO=30 VELOCIDAD=1200 POTENCIA=25 SALIDA=ruta.gcode"
 	@echo "                                              - Convertir un SVG suelto a .gcode (herramienta atomica)"
 	@echo "  make clean                                - Limpiar cache de Python y artefactos de test"
+	@echo "  make db-migrate MSG=\"mensaje\"              - Generar una migracion nueva (autogenerate, issue #22)"
+	@echo "  make db-upgrade                            - Aplicar migraciones pendientes (requiere DATABASE_URL)"
+	@echo "  make db-downgrade                          - Revertir la ultima migracion (requiere DATABASE_URL)"
 
 # ============================================
 # INSTALACION Y DEPENDENCIAS
@@ -135,6 +138,24 @@ test:
 test-coverage:
 	@echo "Ejecutando tests con cobertura..."
 	$(UV_RUN_PKG) pytest tests/ --cov=src/laser_toolkit --cov-report=html
+
+# ============================================
+# BASE DE DATOS (Supabase/Postgres, issue #1/#22)
+# ============================================
+# Requieren DATABASE_URL en el entorno -- ver packages/laser_toolkit/alembic/env.py.
+# Ninguna cadena de conexion vive en este Makefile ni en alembic.ini.
+
+db-migrate:
+	@echo "Generando migracion: $(MSG)..."
+	$(UV_RUN_PKG) alembic revision --autogenerate -m "$(MSG)"
+
+db-upgrade:
+	@echo "Aplicando migraciones pendientes..."
+	$(UV_RUN_PKG) alembic upgrade head
+
+db-downgrade:
+	@echo "Revirtiendo la ultima migracion..."
+	$(UV_RUN_PKG) alembic downgrade -1
 
 # ============================================
 # LIMPIEZA
