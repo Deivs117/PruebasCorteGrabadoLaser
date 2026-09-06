@@ -31,3 +31,9 @@ configs/tarifas.yaml
 .claude/skills/
 .agents/skills/
 skills-lock.json
+
+# Credenciales de Supabase (DATABASE_URL, tokens, etc. -- ver issue #23).
+# Solo se versiona .env.example (plantilla sin valores reales).
+.env
+.env.*
+!.env.example
