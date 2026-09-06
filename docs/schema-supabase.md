@@ -99,7 +99,7 @@ erDiagram
 - **`fichas_parametro` y `candidatos_final_run` son relaciones 1:1** (unique constraint en la FK), no 1:N — un grupo de calibración tiene a lo sumo una ficha vigente; una medición es candidata a lo sumo una vez.
 - **`velocidades_mm_min`/`potencias_pct` son `JSON`, no `ARRAY` de Postgres** — mantiene los modelos testeables contra SQLite en CI sin depender de una Supabase real; Postgres los guarda igual de bien como `jsonb`.
 - **`tarifas_historial` es de solo inserción** (nunca `UPDATE`), a pedido del propio diseño de UI ya decidido (Prompt 7: "historial de cambios tipo timeline"). El valor vigente es la fila con `vigente_desde` más reciente.
-- **Los archivos binarios (G-code, SVG, fotos) nunca están en estas tablas** — las columnas `*_storage_key` guardan la referencia a Supabase Storage (issue #25), no el contenido.
+- **Los archivos binarios (G-code, SVG, fotos) nunca están en estas tablas** — las columnas `*_storage_key` (`Registro.gcode_storage_key`, `Suite.svg_storage_key`, `Medicion.foto_storage_key`) guardan la referencia (key/ruta dentro del bucket) a Supabase Storage (issue #25), no el contenido ni una ruta de disco. Los tres buckets (`gcode`, `svg`, `fotos`, creados en #23) son **privados** — la lectura pasa siempre por una URL firmada con expiración (`laser_toolkit.storage.operaciones.url_firmada`), nunca por una URL pública directa. La organización dentro de cada bucket es por material (`<material_slug>/...`, mismo slug que ya usa `laser_toolkit.naming` para nombres de archivo) — ver `laser_toolkit.storage.rutas`.
 - **Sin tabla de "proyectos de diseño"** del editor (#3/#18) — vive en su propio sub-issue con su propio modelo, para no mezclar el schema de pruebas/costeo con el del editor.
 
 ## Estrategia de índices
