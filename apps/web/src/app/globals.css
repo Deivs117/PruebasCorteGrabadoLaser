@@ -427,3 +427,25 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* "Exportar a PDF" de una Ficha de Parámetro (issue #7): aísla el elemento
+   marcado `data-ficha-imprimible` (sidebar/topbar/botones incluidos, sin
+   importar el markup real de AppShell) en vez de generar el PDF en el
+   servidor -- ver ExportarPdfButton. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  [data-ficha-imprimible],
+  [data-ficha-imprimible] * {
+    visibility: visible;
+  }
+  [data-ficha-imprimible] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    box-shadow: none;
+    border: none;
+  }
+}

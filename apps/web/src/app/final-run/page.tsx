@@ -64,9 +64,10 @@ export default async function FinalRun() {
             return (
               <Reveal key={grupo.grupoId} delayMs={indice * 40}>
                 <Card
+                  id={grupo.grupoId}
                   data-eliminable
                   accent={grupo.operacion === "corte" ? "blue" : "purple"}
-                  className="flex flex-col gap-4 p-5"
+                  className="flex scroll-mt-4 flex-col gap-4 p-5"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>

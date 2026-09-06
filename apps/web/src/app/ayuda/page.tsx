@@ -128,8 +128,8 @@ const SECCIONES: Seccion[] = [
     slug: "fichas",
     label: "Fichas de Parámetro Estándar",
     resumen:
-      "Las 'recetas' oficiales por material, espesor y operación, respaldadas por un Final Run calibrado.",
-    construida: false,
+      "Las 'recetas' oficiales por material, espesor y operación, respaldadas por un Final Run calibrado: grid, detalle con costo y origen, editor 'Nueva Ficha' y exportación a PDF.",
+    construida: true,
   },
   {
     slug: "materiales",

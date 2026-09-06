@@ -12,6 +12,8 @@ en `lectura.py`; los de escritura sin generación de G-code (#49) en
 agregan de la misma forma sobre esta app.
 """
 
+from datetime import date
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import text
@@ -419,13 +421,28 @@ def resumen_calibracion(grupo_id: str, minimoEjecuciones: int = 3) -> dict:
 class FichaBody(BaseModel):
     estado: str
     notas: str | None = None
+    costoEstandarTotal: str | None = None
+    fechaValidacion: str | None = None
+
+
+@app.get("/fichas-parametro")
+def fichas_parametro() -> list[dict]:
+    with sesion() as s:
+        return lectura.fichas_parametro(s)
 
 
 @app.post("/grupos-calibracion/{grupo_id}/ficha")
 def actualizar_ficha(grupo_id: str, body: FichaBody) -> dict:
     with sesion() as s:
         try:
-            return final_run.actualizar_ficha(s, grupo_id, estado=body.estado, notas=body.notas)
+            return final_run.actualizar_ficha(
+                s,
+                grupo_id,
+                estado=body.estado,
+                notas=body.notas,
+                costo_estandar_total=float(body.costoEstandarTotal) if body.costoEstandarTotal else None,
+                fecha_validacion=date.fromisoformat(body.fechaValidacion) if body.fechaValidacion else None,
+            )
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
 

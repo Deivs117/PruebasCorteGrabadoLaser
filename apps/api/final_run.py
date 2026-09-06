@@ -144,20 +144,40 @@ def actualizar_ficha(
     *,
     estado: str,
     notas: str | None = None,
+    costo_estandar_total: float | None = None,
+    fecha_validacion: date | None = None,
 ) -> dict:
     """Crea o actualiza la Ficha de Parámetro (F6, issue #7) de un grupo --
     espejo de `crear_o_actualizar_ficha`. No exige que el grupo esté
     calibrado (`resumen_calibracion`) para marcarlo `oficial`: esa
     decisión es del área de calidad del taller, no una regla que este
-    servicio deba imponer."""
+    servicio deba imponer.
+
+    Un solo endpoint cubre tanto el toggle rápido de Final Run ("Marcar
+    Ficha como oficial", solo `estado`) como el editor completo de la
+    pantalla Fichas de Parámetro (#7, que además carga costo y fecha) --
+    `costo_estandar_total`/`fecha_validacion` en `None` simplemente no
+    tocan el valor ya guardado (ver `crear_o_actualizar_ficha`)."""
     grupo = _grupo_por_id(sesion, grupo_calibracion_id)
     try:
         estado_enum = EstadoFicha(estado)
     except ValueError as error:
         raise ValueError(f"Estado de ficha inválido: '{estado}'.") from error
-    ficha = crear_o_actualizar_ficha(sesion, grupo, estado=estado_enum, notas=notas)
+    ficha = crear_o_actualizar_ficha(
+        sesion,
+        grupo,
+        estado=estado_enum,
+        notas=notas,
+        costo_estandar_total=costo_estandar_total,
+        fecha_validacion=fecha_validacion,
+    )
     sesion.commit()
-    return {"estado": ficha.estado.value, "notas": ficha.notas or ""}
+    return {
+        "estado": ficha.estado.value,
+        "notas": ficha.notas or "",
+        "costoEstandarTotal": (str(ficha.costo_estandar_total) if ficha.costo_estandar_total is not None else ""),
+        "fechaValidacion": (ficha.fecha_validacion.isoformat() if ficha.fecha_validacion is not None else ""),
+    }
 
 
 def eliminar_grupo(sesion: Session, cliente_storage: Client, grupo_calibracion_id: str) -> None:
