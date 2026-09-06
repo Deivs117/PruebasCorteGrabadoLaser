@@ -1,8 +1,8 @@
 import { Card } from "@/components/ui/card";
-import type { FilaCosteada } from "@/lib/registro-schema";
+import type { CeldaCosteada } from "@/lib/registro-schema";
 
 interface CostoHeatmapProps {
-  filas: FilaCosteada[];
+  filas: CeldaCosteada[];
   moneda: string;
 }
 
@@ -10,15 +10,15 @@ interface CostoHeatmapProps {
  * naranja = más caro. Una celda sin costo total (tarifa pendiente) se
  * marca aparte, nunca se le asigna un color como si tuviera dato. */
 export function CostoHeatmap({ filas, moneda }: CostoHeatmapProps) {
-  const velocidades = [...new Set(filas.map((f) => f.velocidad_mm_min))].sort(
+  const velocidades = [...new Set(filas.map((f) => f.velocidadMmMin))].sort(
     (a, b) => Number(a) - Number(b),
   );
-  const potencias = [...new Set(filas.map((f) => f.potencia_pct))].sort(
+  const potencias = [...new Set(filas.map((f) => f.potenciaPct))].sort(
     (a, b) => Number(a) - Number(b),
   );
 
   const valores = filas
-    .map((f) => f.costo_total_celda)
+    .map((f) => f.costoTotalCelda)
     .filter((v) => v !== "")
     .map(Number);
   const minimo = valores.length > 0 ? Math.min(...valores) : 0;
@@ -26,7 +26,7 @@ export function CostoHeatmap({ filas, moneda }: CostoHeatmapProps) {
 
   function celda(velocidad: string, potencia: string) {
     return filas.find(
-      (f) => f.velocidad_mm_min === velocidad && f.potencia_pct === potencia,
+      (f) => f.velocidadMmMin === velocidad && f.potenciaPct === potencia,
     );
   }
 
@@ -71,7 +71,7 @@ export function CostoHeatmap({ filas, moneda }: CostoHeatmapProps) {
               </th>
               {velocidades.map((velocidad) => {
                 const fila = celda(velocidad, potencia);
-                const total = fila?.costo_total_celda;
+                const total = fila?.costoTotalCelda;
                 const tieneDato = total !== undefined && total !== "";
                 const porcentaje =
                   tieneDato && maximo > minimo

@@ -8,6 +8,9 @@ import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-anima
 interface ResumenCalibracionProps {
   grupoId: string;
   puedeCalcular: boolean;
+  /** Estado vigente de la Ficha de Parámetro (F6, issue #7) de este grupo,
+   * si ya tiene una -- `null` si nunca se creó. */
+  fichaEstadoInicial: "oficial" | "en_revision" | null;
 }
 
 interface Resumen {
@@ -21,17 +24,21 @@ interface Resumen {
   calibrado: boolean;
 }
 
-/** Corre `summarize-final-run` de verdad al pedirlo — no es un valor
- * guardado, es un reporte que se recalcula cada vez sobre los csv actuales. */
+/** Corre el resumen estadístico real al pedirlo (`laser_toolkit.calibracion`,
+ * vía el servicio Python) -- no es un valor guardado, se recalcula cada vez
+ * sobre las mediciones actuales. */
 export function ResumenCalibracion({
   grupoId,
   puedeCalcular,
+  fichaEstadoInicial,
 }: ResumenCalibracionProps) {
   const [estado, setEstado] = useState<
     "idle" | "calculando" | "listo" | "error"
   >("idle");
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [mensajeError, setMensajeError] = useState("");
+  const [fichaEstado, setFichaEstado] = useState(fichaEstadoInicial);
+  const [guardandoFicha, setGuardandoFicha] = useState(false);
 
   async function calcular() {
     setEstado("calculando");
@@ -54,6 +61,24 @@ export function ResumenCalibracion({
     } catch {
       setMensajeError("No se pudo conectar con el taller.");
       setEstado("error");
+    }
+  }
+
+  async function marcarFichaOficial() {
+    setGuardandoFicha(true);
+    try {
+      const respuesta = await fetch(
+        `/api/final-run/${encodeURIComponent(grupoId)}/ficha`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ estado: "oficial" }),
+        },
+      );
+      const cuerpo = (await respuesta.json()) as { ok: boolean };
+      if (cuerpo.ok) setFichaEstado("oficial");
+    } finally {
+      setGuardandoFicha(false);
     }
   }
 
@@ -92,9 +117,23 @@ export function ResumenCalibracion({
             </dd>
           </div>
         </dl>
-        <Button variant="outline" size="sm" onClick={calcular}>
-          Recalcular
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={calcular}>
+            Recalcular
+          </Button>
+          {fichaEstado === "oficial" ? (
+            <Badge tone="financiero">Ficha oficial</Badge>
+          ) : resumen.calibrado ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={marcarFichaOficial}
+              loading={guardandoFicha}
+            >
+              Marcar Ficha como oficial
+            </Button>
+          ) : null}
+        </div>
       </div>
     );
   }

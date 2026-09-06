@@ -1,10 +1,6 @@
 import "server-only";
 
-import { readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { REPO_ROOT, listarSuites } from "@/lib/fs-data";
-
-const RUTA = path.join(REPO_ROOT, "data", "materiales-catalog.json");
+import { pyGet, pyPost } from "@/lib/py-api";
 
 /** Familia del material — decide qué ícono se usa para reconocerlo de un
  * vistazo en Suites de Prueba (madera/polímero/metal tienen formas de
@@ -24,80 +20,15 @@ export interface MaterialCatalogado {
   familia: FamiliaMaterial;
 }
 
-function esFamiliaValida(valor: unknown): valor is FamiliaMaterial {
-  return (
-    typeof valor === "string" &&
-    (FAMILIAS_MATERIAL as readonly string[]).includes(valor)
-  );
-}
-
 /**
- * Materiales que el técnico agregó a mano desde el wizard (ej. antes de la
- * primera suite de un material nuevo, como "Polímero X"). Se combinan con
- * los materiales que ya aparecen en configs/*.yaml, para que el catálogo
- * siempre muestre todo lo que existe, no solo lo agregado explícitamente —
- * esos últimos, al no tener familia elegida a mano, quedan como "otro".
+ * Catálogo completo de materiales — issue #22/#24 (tabla `materiales` en
+ * Supabase), vía el servicio Python de #47/#48. Antes se armaba combinando
+ * `data/materiales-catalog.json` con lo que ya usaban las suites en
+ * `configs/*.yaml`; ahora es una sola tabla, ya no hace falta unir dos
+ * fuentes.
  */
-async function leerAgregados(): Promise<MaterialCatalogado[]> {
-  try {
-    const contenido = await readFile(RUTA, "utf-8");
-    const datos: unknown = JSON.parse(contenido);
-    if (!Array.isArray(datos)) return [];
-    return datos.filter(
-      (d): d is MaterialCatalogado =>
-        typeof d === "object" &&
-        d !== null &&
-        typeof (d as MaterialCatalogado).nombre === "string" &&
-        esFamiliaValida((d as MaterialCatalogado).familia),
-    );
-  } catch {
-    return [];
-  }
-}
-
-async function guardarAgregados(
-  materiales: MaterialCatalogado[],
-): Promise<void> {
-  await writeFile(RUTA, JSON.stringify(materiales, null, 2), "utf-8");
-}
-
-/** Une catálogos sin duplicar por nombre (sin distinguir mayúsculas/espacios),
- * dando prioridad a la familia ya elegida a mano sobre el "otro" por defecto. */
-function unirSinDuplicados(
-  ...listas: MaterialCatalogado[][]
-): MaterialCatalogado[] {
-  const vistos = new Map<string, MaterialCatalogado>();
-  for (const lista of listas) {
-    for (const item of lista) {
-      const nombre = item.nombre.trim();
-      if (nombre === "") continue;
-      const clave = nombre.toLowerCase();
-      const existente = vistos.get(clave);
-      if (
-        !existente ||
-        (existente.familia === "otro" && item.familia !== "otro")
-      ) {
-        vistos.set(clave, { nombre, familia: item.familia });
-      }
-    }
-  }
-  return [...vistos.values()].sort((a, b) =>
-    a.nombre.localeCompare(b.nombre, "es"),
-  );
-}
-
-/** Catálogo completo: lo agregado a mano (con su familia) + lo que ya usan
- * las suites configuradas hoy (con familia "otro", hasta que alguien la
- * elija explícitamente). */
 export async function leerCatalogoMateriales(): Promise<MaterialCatalogado[]> {
-  const [agregados, suites] = await Promise.all([
-    leerAgregados(),
-    listarSuites(),
-  ]);
-  return unirSinDuplicados(
-    agregados,
-    suites.map((s) => ({ nombre: s.material, familia: "otro" as const })),
-  );
+  return pyGet<MaterialCatalogado[]>("materiales");
 }
 
 export interface ResultadoAgregarMaterial {
@@ -106,34 +37,28 @@ export interface ResultadoAgregarMaterial {
   catalogo?: MaterialCatalogado[];
 }
 
-/** Agrega un material nuevo (con su familia) al catálogo persistido, si no
- * existe ya en ninguna de las dos fuentes — nunca duplica por
- * mayúsculas/espacios. */
+/**
+ * Agrega un material nuevo (con su familia) al catálogo, si no existe ya —
+ * la deduplicación por mayúsculas/espacios y la validación de familia las
+ * hace `agregar_material` del lado de Python (issue #49).
+ */
 export async function agregarMaterialCatalogo(
   nombre: string,
   familia: FamiliaMaterial,
 ): Promise<ResultadoAgregarMaterial> {
-  const limpio = nombre.trim();
-  if (limpio === "") {
-    return { ok: false, error: "El nombre del material no puede estar vacío." };
+  try {
+    const catalogo = await pyPost<MaterialCatalogado[]>("materiales", {
+      nombre,
+      familia,
+    });
+    return { ok: true, catalogo };
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Error desconocido al agregar el material.",
+    };
   }
-  if (limpio.length > 60) {
-    return { ok: false, error: "El nombre del material es demasiado largo." };
-  }
-  if (!esFamiliaValida(familia)) {
-    return { ok: false, error: "Elegí una familia de material válida." };
-  }
-
-  const actual = await leerCatalogoMateriales();
-  if (actual.some((m) => m.nombre.toLowerCase() === limpio.toLowerCase())) {
-    return { ok: true, catalogo: actual };
-  }
-
-  const agregados = await leerAgregados();
-  await guardarAgregados([...agregados, { nombre: limpio, familia }]);
-
-  return {
-    ok: true,
-    catalogo: unirSinDuplicados(actual, [{ nombre: limpio, familia }]),
-  };
 }

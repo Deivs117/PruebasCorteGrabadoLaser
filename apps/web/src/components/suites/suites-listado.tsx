@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Filter } from "lucide-react";
 import { clsx } from "clsx";
-import { Badge } from "@/components/ui/badge";
 import { Card, type CardAccent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterAnimado } from "@/components/ui/icons/filter-animado";
@@ -13,8 +12,8 @@ import { Reveal } from "@/components/ui/reveal";
 import { DuplicarSuiteButton } from "@/components/suites/duplicar-suite-button";
 import { EliminarSuiteButton } from "@/components/suites/eliminar-suite-button";
 import { MaterialIcon } from "@/components/suites/material-icon";
-import { iconButtonClasses } from "@/lib/button-styles";
 import type { SuiteConfig } from "@/lib/fs-data";
+import { iconButtonClasses } from "@/lib/button-styles";
 import type { FamiliaMaterial } from "@/lib/materiales-catalog";
 import { tiempoRelativo } from "@/lib/tiempo-relativo";
 
@@ -115,63 +114,47 @@ export function SuitesListado({ suites }: SuitesListadoProps) {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {suitesVisibles.map((suite, indice) => (
-            <Reveal key={suite.archivo} delayMs={indice * 40}>
+            <Reveal key={suite.id} delayMs={indice * 40}>
               <Card
                 data-eliminable
                 accent={suite.operacion === "corte" ? "blue" : "purple"}
                 className="flex flex-col gap-3 p-5"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <MaterialIcon
-                      material={suite.material}
-                      familia={suite.familia}
-                      color={suite.color}
-                    />
-                    <p className="text-navy text-base font-semibold capitalize">
-                      {suite.operacion} · {suite.espesorMm}mm
-                    </p>
-                  </div>
-                  <Badge tone={suite.tipo === "final_run" ? "ok" : "neutral"}>
-                    {suite.tipo === "final_run" ? "Final run" : "Barrido"}
-                  </Badge>
+                <div className="flex items-center gap-2">
+                  <MaterialIcon
+                    material={suite.material}
+                    familia={suite.familia}
+                    color={suite.color}
+                  />
+                  <p className="text-navy text-base font-semibold capitalize">
+                    {suite.operacion} · {suite.espesorMm}mm
+                  </p>
                 </div>
-                {suite.tipo === "barrido" ? (
-                  <p className="text-navy font-mono text-sm">
-                    {(suite.velocidadesMmMin?.length ?? 0) *
-                      (suite.potenciasPct?.length ?? 0)}{" "}
-                    celdas
-                  </p>
-                ) : (
-                  <p className="text-navy font-mono text-sm">
-                    {suite.velocidadMmMin} mm/min · {suite.potenciaPct}%
-                  </p>
-                )}
+                <p className="text-navy font-mono text-sm">
+                  {suite.velocidadesMmMin.length * suite.potenciasPct.length}{" "}
+                  celdas
+                </p>
                 <div className="border-border flex items-center justify-between gap-2 border-t pt-3">
                   <p className="text-text-muted text-xs">
                     Creada {tiempoRelativo(suite.creadoEn)}
                   </p>
                   <div className="flex shrink-0 items-center gap-1">
-                    {suite.tipo === "barrido" ? (
-                      <>
-                        <Link
-                          href={`/suites/${encodeURIComponent(suite.archivo)}/editar`}
-                          aria-label={`Editar suite de ${suite.material}`}
-                          className={iconButtonClasses()}
-                        >
-                          <PencilAnimado className="size-4" />
-                        </Link>
-                        <DuplicarSuiteButton
-                          archivo={suite.archivo}
-                          material={suite.material}
-                          espesorMm={suite.espesorMm}
-                          operacion={suite.operacion}
-                          loteActual={suite.lote}
-                        />
-                      </>
-                    ) : null}
+                    <Link
+                      href={`/suites/${suite.id}/editar`}
+                      aria-label={`Editar suite de ${suite.material}`}
+                      className={iconButtonClasses("neutral")}
+                    >
+                      <PencilAnimado className="size-4" />
+                    </Link>
+                    <DuplicarSuiteButton
+                      id={suite.id}
+                      material={suite.material}
+                      espesorMm={suite.espesorMm}
+                      operacion={suite.operacion}
+                      loteActual={suite.lote}
+                    />
                     <EliminarSuiteButton
-                      archivo={suite.archivo}
+                      id={suite.id}
                       material={suite.material}
                     />
                   </div>

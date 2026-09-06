@@ -47,11 +47,25 @@ def subir_svg(cliente: Client, material: str, suite_id: int, contenido: bytes) -
     return key
 
 
-def subir_foto(cliente: Client, material: str, corrida_id: str, id_prueba: str, contenido: bytes) -> str:
-    """Sube la foto de evaluación de una celda. Devuelve la key -- va en
-    `Medicion.foto_storage_key`."""
-    key = ruta_foto(material, corrida_id, id_prueba)
-    cliente.storage.from_(BUCKET_FOTOS).upload(key, contenido, file_options=_opciones("image/jpeg"))
+_CONTENT_TYPE_POR_EXTENSION = {
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+}
+
+
+def subir_foto(
+    cliente: Client, material: str, corrida_id: str, id_prueba: str, contenido: bytes, extension: str = "jpg"
+) -> str:
+    """Sube la foto de evaluación de una celda (o de `id_prueba="bateria"`
+    para la foto de toda la batería, issue #51). Devuelve la key -- va en
+    `Medicion.foto_storage_key`/`Registro.foto_bateria_storage_key`."""
+    content_type = _CONTENT_TYPE_POR_EXTENSION.get(extension)
+    if content_type is None:
+        raise ValueError(f"Formato de foto no soportado: '{extension}' (usá jpg, jpeg, png o webp).")
+    key = ruta_foto(material, corrida_id, id_prueba, extension)
+    cliente.storage.from_(BUCKET_FOTOS).upload(key, contenido, file_options=_opciones(content_type))
     return key
 
 

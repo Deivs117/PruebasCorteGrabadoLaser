@@ -4,10 +4,15 @@ import { usePathname } from "next/navigation";
 import { MorphIcon } from "morphicons/react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide";
 import { getNavLabel } from "@/lib/nav";
+import { CerrarSesionButton } from "@/components/auth/cerrar-sesion-button";
 
 interface TopbarProps {
   sidebarAbierto: boolean;
   onToggleSidebar: () => void;
+  /** Email de la sesión activa (issue #52), o `null` si por algún motivo
+   * el shell se renderiza sin sesión (no debería pasar: el middleware ya
+   * redirige a /login antes). */
+  userEmail: string | null;
 }
 
 /**
@@ -15,7 +20,11 @@ interface TopbarProps {
  * visible en cualquier ancho de pantalla (antes solo existía en viewports
  * angostos, así que en escritorio no había forma de esconder el sidebar).
  */
-export function Topbar({ sidebarAbierto, onToggleSidebar }: TopbarProps) {
+export function Topbar({
+  sidebarAbierto,
+  onToggleSidebar,
+  userEmail,
+}: TopbarProps) {
   const pathname = usePathname();
   const titulo = getNavLabel(pathname);
 
@@ -41,6 +50,13 @@ export function Topbar({ sidebarAbierto, onToggleSidebar }: TopbarProps) {
       {/* Etiqueta de la sección activa, no el <h1> de la página: cada
           página define su propio encabezado principal en su contenido. */}
       <p className="text-navy text-base font-semibold">{titulo}</p>
+
+      {userEmail ? (
+        <div className="ml-auto flex items-center gap-3">
+          <p className="text-text-muted hidden text-xs sm:block">{userEmail}</p>
+          <CerrarSesionButton />
+        </div>
+      ) : null}
     </header>
   );
 }

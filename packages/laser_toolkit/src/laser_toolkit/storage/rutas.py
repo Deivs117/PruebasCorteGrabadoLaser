@@ -29,5 +29,5 @@ def ruta_svg(material: str, suite_id: int) -> str:
     return f"{slug_material(material)}/suite-{suite_id}.svg"
 
 
-def ruta_foto(material: str, corrida_id: str, id_prueba: str) -> str:
-    return f"{slug_material(material)}/{corrida_id}/{id_prueba}.jpg"
+def ruta_foto(material: str, corrida_id: str, id_prueba: str, extension: str = "jpg") -> str:
+    return f"{slug_material(material)}/{corrida_id}/{id_prueba}.{extension}"

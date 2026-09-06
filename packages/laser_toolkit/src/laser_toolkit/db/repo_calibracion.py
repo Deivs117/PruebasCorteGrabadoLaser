@@ -106,13 +106,23 @@ def resumen_calibracion_de_grupo(
 
     Levanta `ValueError` si alguna ejecución todavía no tiene las mediciones
     de la corrida completa cargadas -- calibrar exige mediciones reales, sin
-    respaldo de estimación (igual que la versión basada en csv)."""
+    respaldo de estimación (igual que la versión basada en csv).
+
+    `resumir_calibracion` espera las mediciones como texto (viene de leer un
+    csv originalmente) y trata cualquier string no vacío como "cargado" --
+    `str(None)` es `"None"`, no vacío, así que hay que convertir a mano en
+    vez de pasar el valor crudo de la columna (`None` cuando falta), o el
+    caso "todavía sin medir" nunca se detecta como tal."""
     filas = [
         {
             "grupo_calibracion_id": grupo.grupo_calibracion_id,
             "corrida_id": registro.corrida_id,
-            "kwh_corrida_medido": registro.kwh_corrida_medido,
-            "tiempo_real_corrida_s": registro.tiempo_real_corrida_s,
+            "kwh_corrida_medido": (
+                "" if registro.kwh_corrida_medido is None else str(registro.kwh_corrida_medido)
+            ),
+            "tiempo_real_corrida_s": (
+                "" if registro.tiempo_real_corrida_s is None else str(registro.tiempo_real_corrida_s)
+            ),
         }
         for final_run in grupo.final_runs
         for registro in final_run.registros
