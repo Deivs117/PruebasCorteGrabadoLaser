@@ -1,7 +1,0 @@
-corrida_id,grupo_calibracion_id,ejecucion,id_prueba,lote,fecha,material,espesor_mm,operacion,velocidad_mm_min,potencia_pct,pasadas,x_mm,y_mm,tamano_celda_mm,area_material_mm2,tiempo_estimado_celda_s
-MDF-Trupan_3mm_grabado_2026-09-04_L03,,,G-001,L03,2026-09-04,MDF Trupan,3.0,grabado,1500,20,1,0.0,0.0,4.5,0.0,10.26
-MDF-Trupan_3mm_grabado_2026-09-04_L03,,,G-002,L03,2026-09-04,MDF Trupan,3.0,grabado,1750,20,1,7.5,0.0,4.5,0.0,8.79
-MDF-Trupan_3mm_grabado_2026-09-04_L03,,,G-003,L03,2026-09-04,MDF Trupan,3.0,grabado,2000,20,1,15.0,0.0,4.5,0.0,7.7
-MDF-Trupan_3mm_grabado_2026-09-04_L03,,,G-004,L03,2026-09-04,MDF Trupan,3.0,grabado,2000,35,1,15.0,7.5,4.5,0.0,7.7
-MDF-Trupan_3mm_grabado_2026-09-04_L03,,,G-005,L03,2026-09-04,MDF Trupan,3.0,grabado,1750,35,1,7.5,7.5,4.5,0.0,8.79
-MDF-Trupan_3mm_grabado_2026-09-04_L03,,,G-006,L03,2026-09-04,MDF Trupan,3.0,grabado,1500,35,1,0.0,7.5,4.5,0.0,10.26
