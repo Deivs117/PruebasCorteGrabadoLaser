@@ -253,6 +253,44 @@ def costeo_detalle(sesion: Session, corrida_id: str) -> dict | None:
     }
 
 
+def historial(sesion: Session, material: str | None = None) -> list[dict]:
+    """Vista agregada de solo lectura (D, issue #63) -- misma fuente que
+    `registros()` (Hoja de Registro, C), con el costo total de la corrida
+    completa ya sumado y un filtro opcional por material. Historial nunca
+    escribe nada: es la vista condensada para audiencia no solo técnica que
+    pide #12/#63 -- Hoja de Registro sigue siendo la pantalla de trabajo
+    activo (editar/completar/costear)."""
+    filas = sesion.scalars(select(Registro).order_by(Registro.fecha.desc(), Registro.created_at.desc()))
+    resultado = []
+    for registro in filas:
+        if not _solo_suite(registro):
+            continue
+        suite = registro.suite
+        if material is not None and suite.material.nombre != material:
+            continue
+        mediciones = registro.mediciones
+        evaluadas = sum(1 for m in mediciones if m.corte_pasante is not None and m.carbonizacion_1a5 is not None)
+        costos = [m.costo_total_celda for m in mediciones]
+        costeado = len(mediciones) > 0 and all(c is not None for c in costos)
+        resultado.append(
+            {
+                "corridaId": registro.corrida_id,
+                "material": suite.material.nombre,
+                "espesorMm": str(suite.espesor_mm),
+                "operacion": suite.operacion.value,
+                "lote": registro.lote,
+                "fecha": registro.fecha.isoformat(),
+                "totalCeldas": len(mediciones),
+                "celdasEvaluadas": evaluadas,
+                "evaluada": len(mediciones) > 0 and evaluadas == len(mediciones),
+                "medida": registro.kwh_corrida_medido is not None and registro.tiempo_real_corrida_s is not None,
+                "costeado": costeado,
+                "costoTotalCorrida": _costo_str(sum(c for c in costos if c is not None) if costeado else None),
+            }
+        )
+    return resultado
+
+
 def dashboard_resumen(sesion: Session) -> dict:
     """Espejo de `getDashboardSummary` en `fs-data.ts`. La distinción
     "generadas vs preparadas" no existe más -- una suite creada (#56) ya
@@ -282,6 +320,7 @@ __all__ = [
     "candidatos_final_run",
     "costeo_detalle",
     "dashboard_resumen",
+    "historial",
     "materiales_catalogo",
     "registro_detalle",
     "registros",
