@@ -12,8 +12,20 @@ from __future__ import annotations
 
 import os
 
+from dotenv import find_dotenv, load_dotenv
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+
+# Carga .env (si existe) al importar el modulo -- solo para desarrollo local:
+# en Vercel/CI las variables ya vienen inyectadas por el entorno, y
+# `load_dotenv` no pisa una variable que ya este seteada (override=False por
+# defecto), asi que esto es un no-op seguro fuera de una maquina de dev.
+#
+# `usecwd=True` busca .env subiendo desde el directorio de trabajo actual del
+# proceso (no desde la ubicacion de este archivo dentro de .venv/) -- hace
+# falta porque segun el comando de `make` que se use, el cwd puede ser la
+# raiz del repo o packages/laser_toolkit/, y el .env vive en la raiz.
+load_dotenv(find_dotenv(usecwd=True))
 
 
 class Base(DeclarativeBase):

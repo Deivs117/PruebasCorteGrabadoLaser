@@ -31,3 +31,14 @@ configs/tarifas.yaml
 .claude/skills/
 .agents/skills/
 skills-lock.json
+
+# Credenciales de Supabase (DATABASE_URL, tokens, etc. -- ver issue #23).
+# Solo se versiona .env.example (plantilla sin valores reales).
+.env
+.env.*
+!.env.example
+
+# Cache/estado local del CLI de Supabase (ej. que proyecto quedo "linkeado"
+# en esta maquina) -- no es config del proyecto, es local de quien lo corre.
+supabase/.temp
+supabase/.branches
