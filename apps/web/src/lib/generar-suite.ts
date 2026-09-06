@@ -12,6 +12,7 @@ import {
   REPO_ROOT,
 } from "@/lib/fs-data";
 import { existeArchivo, predecirCorridaId } from "@/lib/corrida-id";
+import { pyDelete, pyGet, pyPost } from "@/lib/py-api";
 import { slug } from "@/lib/slug";
 import { idPrefijo, type SuiteFormData } from "@/lib/suite-schema";
 
@@ -29,6 +30,9 @@ export interface ResultadoGeneracion {
   gcodeFileName?: string;
   csvFileName?: string;
   celdas?: number;
+  /** Solo en el camino nuevo (Supabase, ver `generarSuite`) -- identifica el
+   * `.gcode` en Storage para armar el link de descarga. */
+  corridaId?: string;
   error?: string;
 }
 
@@ -153,14 +157,47 @@ async function corridaYaRegistrada(datos: SuiteFormData): Promise<boolean> {
   return existeArchivo(path.join(REGISTROS_DIR, `${corridaId}_registro.csv`));
 }
 
+/**
+ * Crea una suite nueva -- (A)/#56, vía el servicio Python: persiste
+ * Suite+Registro+Mediciones en Supabase y genera el G-code real en la misma
+ * operación, sin pasar por un YAML local ni un subproceso (el hallazgo de
+ * #47). `camposConocidos()` ya arma el payload en snake_case, compatible
+ * 1:1 con `SuiteConfig` del lado Python.
+ *
+ * Excepción: si la suite usa un SVG cargado (`svgPath`), ese camino todavía
+ * no está soportado por el servicio Python (issue #3 -- el SVG vive en
+ * `assets/svg/` local, no en Storage) y sigue el camino viejo.
+ */
 export async function generarSuite(
   datos: SuiteFormData,
 ): Promise<ResultadoGeneracion> {
-  return escribirYGenerar(
-    nombreArchivoConfig(datos),
-    camposConocidos(datos),
-    datos.operacion,
-  );
+  if (datos.svgPath) {
+    return escribirYGenerar(
+      nombreArchivoConfig(datos),
+      camposConocidos(datos),
+      datos.operacion,
+    );
+  }
+
+  try {
+    const resultado = await pyPost<{ corridaId: string; celdas: number }>(
+      "suites",
+      camposConocidos(datos),
+    );
+    return {
+      ok: true,
+      celdas: resultado.celdas,
+      corridaId: resultado.corridaId,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Error desconocido al generar la suite.",
+    };
+  }
 }
 
 /**
@@ -260,5 +297,30 @@ export async function leerSuiteEditable(
     };
   } catch {
     return null;
+  }
+}
+
+/** Lee una suite real de Supabase en la forma que espera el asistente, para
+ * "Duplicar" (A) -- espejo de `leerSuiteEditable` de arriba, pero por `id`
+ * en vez de nombre de archivo. */
+export async function leerSuiteParaDuplicar(
+  id: number,
+): Promise<SuiteFormData | null> {
+  try {
+    return await pyGet<SuiteFormData>(`suites/${id}`);
+  } catch {
+    return null;
+  }
+}
+
+/** Elimina una suite real de Supabase en cascada (Suite→Registro→Mediciones→
+ * Candidatos, más el `.gcode`/fotos en Storage) -- (A), issue #54. Separado
+ * de `eliminarSuite` en `fs-data.ts`, que solo borra YAML de Final Run. */
+export async function eliminarSuitePorId(id: number): Promise<boolean> {
+  try {
+    await pyDelete(`suites/${id}`);
+    return true;
+  } catch {
+    return false;
   }
 }

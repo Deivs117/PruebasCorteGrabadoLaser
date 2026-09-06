@@ -6,16 +6,16 @@ import { iconButtonClasses } from "@/lib/button-styles";
 import { useEliminar } from "@/lib/use-eliminar";
 
 interface EliminarSuiteButtonProps {
-  archivo: string;
+  id: number;
   material: string;
 }
 
 export function EliminarSuiteButton({
-  archivo,
+  id,
   material,
 }: EliminarSuiteButtonProps) {
   const { botonRef, abierto, setAbierto, eliminando, eliminar } = useEliminar({
-    url: `/api/suites/${encodeURIComponent(archivo)}`,
+    url: `/api/suites/${id}`,
   });
 
   return (
@@ -32,7 +32,7 @@ export function EliminarSuiteButton({
       <ConfirmDialog
         open={abierto}
         title="Eliminar esta suite"
-        description={`Se va a borrar la configuración de "${material}". Esto no borra ningún G-code ya generado.`}
+        description={`Se va a borrar la configuración de "${material}", junto con su registro, mediciones y el G-code ya generado.`}
         onCancel={() => setAbierto(false)}
         onConfirm={eliminar}
         confirmLabel={eliminando ? "Eliminando…" : "Eliminar"}
