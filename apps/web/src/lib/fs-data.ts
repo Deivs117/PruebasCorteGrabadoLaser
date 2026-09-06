@@ -26,7 +26,6 @@ export const PY_PROJECT_ARGS = ["--project", "packages/laser_toolkit"];
 export const CONFIGS_DIR = path.join(REPO_ROOT, "configs");
 export const REGISTROS_DIR = path.join(REPO_ROOT, "data", "registros");
 export const FOTOS_DIR = path.join(REPO_ROOT, "data", "fotos");
-const MATERIALES_DIR = path.join(REPO_ROOT, "docs", "materiales");
 export const TARIFAS_PATH = path.join(CONFIGS_DIR, "tarifas.yaml");
 
 export type Operacion = "corte" | "grabado";
@@ -171,24 +170,16 @@ async function contarRegistros(): Promise<{
   return { generados, preparados };
 }
 
+/**
+ * TODO(#7, #1): las Fichas de Parámetro Estándar van a vivir en una tabla de
+ * Supabase, no como archivos — reemplazar esto por una query real cuando esa
+ * migración esté lista. Antes escaneaba docs/materiales/<material>/fichas-parametro/,
+ * pero esa carpeta se eliminó (quedó sin propósito con la decisión de ir directo
+ * a Supabase); devolver 0 explícito es más honesto que escanear una carpeta
+ * que ya sabemos que nunca va a tener nada.
+ */
 async function contarFichasOficiales(): Promise<number> {
-  try {
-    const materiales = await readdir(MATERIALES_DIR, { withFileTypes: true });
-    let total = 0;
-    for (const material of materiales) {
-      if (!material.isDirectory()) continue;
-      const fichasDir = path.join(
-        MATERIALES_DIR,
-        material.name,
-        "fichas-parametro",
-      );
-      const archivos = await listarArchivos(fichasDir);
-      total += archivos.filter((n) => n.endsWith(".md")).length;
-    }
-    return total;
-  } catch {
-    return 0;
-  }
+  return 0;
 }
 
 export async function existeArchivoTarifas(): Promise<boolean> {
