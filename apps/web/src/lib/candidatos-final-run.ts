@@ -1,10 +1,6 @@
 import "server-only";
 
-import { readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { REPO_ROOT } from "@/lib/fs-data";
-
-const RUTA = path.join(REPO_ROOT, "data", "candidatos-final-run.json");
+import { pyDelete, pyGet, pyPost } from "@/lib/py-api";
 
 export interface CandidatoFinalRun {
   /** `${corridaId}::${idPrueba}` — identifica una celda concreta de una corrida. */
@@ -23,46 +19,37 @@ export interface CandidatoFinalRun {
 
 /**
  * Combinaciones que el técnico marcó como "esta es la que quiero llevar a
- * Final Run" mientras completaba una Hoja de Registro. No es un dato del
- * motor de costeo/calibración de Python (no describe nada físico medido),
- * es pura conveniencia de la interfaz — por eso vive en su propio archivo,
- * separado del csv real que sí consume el CLI.
+ * Final Run" — tabla `candidatos_final_run` en Supabase (issue #22/#24), vía
+ * el servicio Python de #47/#48/#49. Antes vivía en su propio
+ * `data/candidatos-final-run.json`; ahora es una fila normalizada
+ * (`medicion_id`), reconstruida a esta forma plana del lado de Python.
  */
-async function leerTodos(): Promise<CandidatoFinalRun[]> {
-  try {
-    const contenido = await readFile(RUTA, "utf-8");
-    const datos: unknown = JSON.parse(contenido);
-    return Array.isArray(datos) ? (datos as CandidatoFinalRun[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-async function guardarTodos(candidatos: CandidatoFinalRun[]): Promise<void> {
-  await writeFile(RUTA, JSON.stringify(candidatos, null, 2), "utf-8");
-}
-
 export async function listarCandidatos(): Promise<CandidatoFinalRun[]> {
-  const candidatos = await leerTodos();
-  return candidatos.sort((a, b) => b.marcadoEn.localeCompare(a.marcadoEn));
+  return pyGet<CandidatoFinalRun[]>("candidatos");
 }
 
+/**
+ * Marca una celda como candidata. Solo la identidad (`corridaId`+`idPrueba`)
+ * viaja a Python -- el resto de los campos de `datos` (material, espesorMm,
+ * ...) los reconstruye Python desde la fila normalizada, así que lo que
+ * vuelve es siempre la verdad de la base, no lo que mandó el formulario.
+ */
 export async function marcarCandidato(
   datos: Omit<CandidatoFinalRun, "marcadoEn">,
 ): Promise<CandidatoFinalRun> {
-  const candidatos = await leerTodos();
-  const candidato: CandidatoFinalRun = {
-    ...datos,
-    marcadoEn: new Date().toISOString(),
-  };
-  const sinDuplicado = candidatos.filter((c) => c.id !== candidato.id);
-  await guardarTodos([...sinDuplicado, candidato]);
-  return candidato;
+  return pyPost<CandidatoFinalRun>("candidatos", {
+    corridaId: datos.corridaId,
+    idPrueba: datos.idPrueba,
+  });
 }
 
 export async function desmarcarCandidato(id: string): Promise<void> {
-  const candidatos = await leerTodos();
-  await guardarTodos(candidatos.filter((c) => c.id !== id));
+  const [corridaId, idPrueba] = id.split("::");
+  const parametros = new URLSearchParams({
+    corridaId: corridaId ?? "",
+    idPrueba: idPrueba ?? "",
+  });
+  await pyDelete(`candidatos?${parametros.toString()}`);
 }
 
 /** Al borrar una corrida entera, sus candidatos marcados quedan huérfanos —
@@ -70,6 +57,6 @@ export async function desmarcarCandidato(id: string): Promise<void> {
 export async function desmarcarCandidatosDeArchivo(
   archivo: string,
 ): Promise<void> {
-  const candidatos = await leerTodos();
-  await guardarTodos(candidatos.filter((c) => c.archivo !== archivo));
+  const parametros = new URLSearchParams({ archivo });
+  await pyDelete(`candidatos?${parametros.toString()}`);
 }
