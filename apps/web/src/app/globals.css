@@ -108,6 +108,24 @@ body {
   animation: toast-aparece var(--duration-standard) var(--ease-motion);
 }
 
+/* Shimmer de los bloques Skeleton (loading.tsx de las páginas dinámicas,
+   ver #76) — pulso de opacidad en vez de un gradiente en movimiento: más
+   barato y coherente con la personalidad "Corporate" (decisiva, sin
+   adornos). Loop infinito porque el estado de carga no tiene duración fija. */
+@keyframes skeleton-pulso {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.skeleton-pulso {
+  animation: skeleton-pulso 1.5s var(--ease-motion) infinite;
+}
+
 /* Onda que se expande desde el punto exacto del click, en botones y chips
    interactivos (ver useRipple) — feedback físico de que el click se
    registró, personalidad "Corporate": decisiva, sin rebote. */
