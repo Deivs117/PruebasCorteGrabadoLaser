@@ -14,10 +14,10 @@ interface AppShellProps {
   userEmail: string | null;
 }
 
-/** `/login` y `/auth/*` no llevan sidebar/topbar -- son las únicas páginas
- * públicas (issue #52), y muestran su propio layout centrado. */
+/** `/login` no lleva sidebar/topbar -- es la única página pública (issue
+ * #52), y muestra su propio layout centrado. */
 function esRutaPublica(pathname: string): boolean {
-  return pathname === "/login" || pathname.startsWith("/auth/");
+  return pathname === "/login";
 }
 
 const CLAVE_PREFERENCIA = "laser-toolkit:sidebar-abierto";
