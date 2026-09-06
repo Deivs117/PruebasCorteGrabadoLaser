@@ -13,9 +13,10 @@ agregan de la misma forma sobre esta app.
 """
 
 import escritura
+import generacion
 import lectura
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sesiones import sesion
 from sqlalchemy import text
 
@@ -113,3 +114,11 @@ def desmarcar_candidato(corridaId: str | None = None, idPrueba: str | None = Non
         except ValueError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         return {"ok": True}
+
+
+@app.post("/generar-suite")
+def generar_suite(payload: dict) -> dict:
+    try:
+        return generacion.generar(payload)
+    except (ValueError, ValidationError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
