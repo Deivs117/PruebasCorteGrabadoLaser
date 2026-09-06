@@ -4,6 +4,7 @@ import { PlaceholderPage } from "@/components/placeholder-page";
 export default function Reportes() {
   return (
     <PlaceholderPage
+      ayudaSeccion="reportes"
       icon={BarChart3}
       title="Reportes"
       description="Vista agregada de costos y calibración a través del tiempo, una vez que existan suficientes corridas registradas y costeadas para que un reporte diga algo real."

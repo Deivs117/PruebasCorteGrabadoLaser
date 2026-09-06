@@ -1,4 +1,5 @@
 import { FlaskConical } from "lucide-react";
+import { AyudaLink } from "@/components/ui/ayuda-link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
@@ -34,6 +35,7 @@ export default async function SuitesDePrueba() {
             Cada suite es un barrido de velocidad y potencia listo para correr
             en la máquina.
           </p>
+          <AyudaLink seccion="suites" />
         </div>
         <LinkButton href="/suites/nueva" variant="primary">
           Nueva suite de prueba

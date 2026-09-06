@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { AyudaLink } from "@/components/ui/ayuda-link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { LinkButton } from "@/components/ui/button";
@@ -10,6 +11,10 @@ interface PlaceholderPageProps {
   description: string;
   /** Qué va a poder hacer esta sección cuando esté construida. */
   planeado: string[];
+  /** Ancla de su sección en /ayuda (ver `AyudaLink`). Si no se pasa, no
+   * muestra el enlace — pensado para el caso hipotético de una sección que
+   * ni siquiera tiene definido qué va a hacer todavía. */
+  ayudaSeccion?: string;
 }
 
 /**
@@ -22,6 +27,7 @@ export function PlaceholderPage({
   title,
   description,
   planeado,
+  ayudaSeccion,
 }: PlaceholderPageProps) {
   return (
     <Reveal>
@@ -32,6 +38,7 @@ export function PlaceholderPage({
             <p className="text-text-muted mt-1 max-w-2xl text-sm">
               {description}
             </p>
+            {ayudaSeccion ? <AyudaLink seccion={ayudaSeccion} /> : null}
           </div>
           <Badge tone="neutral">En construcción</Badge>
         </div>
