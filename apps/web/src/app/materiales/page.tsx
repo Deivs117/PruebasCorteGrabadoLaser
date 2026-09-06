@@ -4,6 +4,7 @@ import { PlaceholderPage } from "@/components/placeholder-page";
 export default function Materiales() {
   return (
     <PlaceholderPage
+      ayudaSeccion="materiales"
       icon={Layers}
       title="Materiales"
       description="Librería de materiales soportados (hoy: MDF) con su ficha técnica — parámetros optomecánicos, comportamiento térmico y qué operaciones ya tienen datos."

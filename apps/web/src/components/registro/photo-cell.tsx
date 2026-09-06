@@ -16,9 +16,9 @@ interface PhotoCellProps {
   descripcion?: string;
 }
 
-/** Evidencia fotográfica de una celda: sube el archivo real a data/fotos/ al
- * elegirlo — la referencia queda en la fila recién cuando se guarda el
- * registro completo, como el resto de los campos. Un solo control visible
+/** Evidencia fotográfica de una celda: sube el archivo real a Supabase
+ * Storage al elegirlo (issue #51) -- se guarda de una, independiente del
+ * botón "Guardar cambios" de la Hoja de Registro. Un solo control visible
  * por estado, nunca un ícono decorativo al lado de un botón que hace lo mismo. */
 export function PhotoCell({
   corridaId,
@@ -30,27 +30,26 @@ export function PhotoCell({
   const inputRef = useRef<HTMLInputElement>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const ruta = `/api/fotos/${encodeURIComponent(corridaId)}/${encodeURIComponent(celdaId)}`;
 
   async function subir(archivo: File) {
     setSubiendo(true);
     setError(undefined);
     const formulario = new FormData();
     formulario.append("archivo", archivo);
-    formulario.append("corridaId", corridaId);
-    formulario.append("celdaId", celdaId);
 
     try {
-      const respuesta = await fetch("/api/fotos", {
+      const respuesta = await fetch(ruta, {
         method: "POST",
         body: formulario,
       });
       const cuerpo = (await respuesta.json()) as {
         ok: boolean;
-        nombre?: string;
+        fotoStorageKey?: string;
         error?: string;
       };
-      if (cuerpo.ok && cuerpo.nombre) {
-        onChange(cuerpo.nombre);
+      if (cuerpo.ok && cuerpo.fotoStorageKey) {
+        onChange(cuerpo.fotoStorageKey);
       } else {
         setError(cuerpo.error ?? "No se pudo subir la foto.");
       }
@@ -62,11 +61,8 @@ export function PhotoCell({
   }
 
   async function quitar() {
-    const fotoActual = foto;
     onChange("");
-    await fetch(`/api/fotos/${encodeURIComponent(fotoActual)}`, {
-      method: "DELETE",
-    });
+    await fetch(ruta, { method: "DELETE" });
   }
 
   return (
@@ -74,9 +70,9 @@ export function PhotoCell({
       <div className="flex items-center gap-2">
         {foto ? (
           <>
-            {/* eslint-disable-next-line @next/next/no-img-element -- imagen local servida por nuestra propia API, fuera de public/ */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- redirige a una URL firmada de Storage, no sirve desde public/ */}
             <img
-              src={`/api/fotos/${encodeURIComponent(foto)}`}
+              src={ruta}
               alt={`Foto de ${descripcion}`}
               className="border-border size-9 rounded-full border object-cover"
             />

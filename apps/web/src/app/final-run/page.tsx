@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Gauge } from "lucide-react";
+import { AyudaLink } from "@/components/ui/ayuda-link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -30,6 +31,7 @@ export default async function FinalRun() {
             Una combinación fija de parámetros, repetida en ejecuciones
             independientes, hasta calibrar su energía real.
           </p>
+          <AyudaLink seccion="final-run" />
         </div>
         <LinkButton href="/final-run/nueva" variant="primary">
           Nueva Final Run
@@ -109,7 +111,7 @@ export default async function FinalRun() {
                   <ul className="flex flex-col gap-1.5 text-sm">
                     {grupo.ejecuciones.map((ejecucion) => (
                       <li
-                        key={ejecucion.archivo}
+                        key={ejecucion.corridaId}
                         className="flex items-center justify-between gap-2"
                       >
                         <span className="text-text-muted">
@@ -122,7 +124,7 @@ export default async function FinalRun() {
                             {ejecucion.calibrada ? "Medida" : "Sin medir"}
                           </Badge>
                           <Link
-                            href={`/registro/${encodeURIComponent(ejecucion.archivo)}`}
+                            href={`/registro/${encodeURIComponent(ejecucion.corridaId)}`}
                             className="text-blue hover:text-blue-hover text-xs font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
                           >
                             Completar
@@ -140,6 +142,7 @@ export default async function FinalRun() {
                     <ResumenCalibracion
                       grupoId={grupo.grupoId}
                       puedeCalcular={todasCalibradas}
+                      fichaEstadoInicial={grupo.fichaEstado}
                     />
                   </div>
                 </Card>

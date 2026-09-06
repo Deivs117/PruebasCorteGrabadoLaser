@@ -6,16 +6,14 @@ import { Button } from "@/components/ui/button";
 import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
 
 interface CalcularCosteoButtonProps {
-  archivoRegistro: string;
-  archivoCosteado: string;
+  corridaId: string;
   recalcular?: boolean;
 }
 
-/** Corre `compute-costs` de verdad y navega al detalle apenas confirma el
+/** Corre el costeo de verdad y navega al detalle apenas confirma el
  * resultado real (nunca antes, nunca con datos supuestos). */
 export function CalcularCosteoButton({
-  archivoRegistro,
-  archivoCosteado,
+  corridaId,
   recalcular = false,
 }: CalcularCosteoButtonProps) {
   const router = useRouter();
@@ -25,17 +23,16 @@ export function CalcularCosteoButton({
   async function calcular() {
     setEstado("calculando");
     try {
-      const respuesta = await fetch("/api/costeo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ archivo: archivoRegistro }),
-      });
+      const respuesta = await fetch(
+        `/api/registros/${encodeURIComponent(corridaId)}/costeo`,
+        { method: "POST" },
+      );
       const cuerpo = (await respuesta.json()) as {
         ok: boolean;
         error?: string;
       };
       if (cuerpo.ok) {
-        router.push(`/costeo/${encodeURIComponent(archivoCosteado)}`);
+        router.push(`/costeo/${encodeURIComponent(corridaId)}`);
         router.refresh();
       } else {
         setEstado("error");

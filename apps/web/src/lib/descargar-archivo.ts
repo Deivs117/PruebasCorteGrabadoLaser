@@ -1,7 +1,8 @@
 /**
- * Descarga un archivo ya generado por el sistema (en data/registros/),
- * dejando que el técnico elija dónde guardarlo — nunca reemplaza la copia
- * que el sistema ya guardó, es siempre una copia adicional.
+ * Descarga un archivo ya generado por el sistema (Supabase Storage o
+ * `data/svgs/`), dejando que el técnico elija dónde guardarlo — nunca
+ * reemplaza la copia que el sistema ya guardó, es siempre una copia
+ * adicional.
  *
  * Usa el selector de carpeta nativo (File System Access API) cuando el
  * navegador lo soporta; si no, cae a la descarga estándar del navegador.
@@ -28,7 +29,7 @@ declare global {
 
 export async function descargarArchivo(
   nombre: string,
-  endpointBase = "/api/registros/descargar",
+  endpointBase: string,
 ): Promise<void> {
   const respuesta = await fetch(
     `${endpointBase}/${encodeURIComponent(nombre)}`,

@@ -96,6 +96,24 @@ class MachineConfig(BaseModel):
             "tiempo de maquina de lo necesario, topado por SOBRERECORRIDO_MAX_MM igual)."
         ),
     )
+    area_trabajo_ancho_mm: float = Field(
+        default=300.0,
+        gt=0,
+        description=(
+            "Ancho real del area de trabajo de la mesa (eje X, mm) -- 300mm en la CNC "
+            "3018 + LT-80W-F45 de este taller. Usado por el editor SVG/raster (#3) para "
+            "advertir si un diseño excede la mesa fisica antes de generar G-code."
+        ),
+    )
+    area_trabajo_alto_mm: float = Field(
+        default=180.0,
+        gt=0,
+        description=(
+            "Alto real del area de trabajo de la mesa (eje Y, mm) -- 180mm en la CNC "
+            "3018 + LT-80W-F45 de este taller. Usado por el editor SVG/raster (#3) para "
+            "advertir si un diseño excede la mesa fisica antes de generar G-code."
+        ),
+    )
 
 
 class SuiteConfig(BaseModel):

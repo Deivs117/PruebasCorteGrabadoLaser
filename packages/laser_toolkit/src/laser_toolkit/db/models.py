@@ -106,7 +106,9 @@ class Suite(Base):
     __tablename__ = "suites"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    material_id: Mapped[int] = mapped_column(ForeignKey("materiales.id"))
+    # index=True: Postgres NO indexa una FK automaticamente (a diferencia de
+    # la PK) -- sin esto, "listar suites de un material" (#10) hace full scan.
+    material_id: Mapped[int] = mapped_column(ForeignKey("materiales.id"), index=True)
     espesor_mm: Mapped[float] = mapped_column(Float)
     operacion: Mapped[Operacion] = mapped_column(Enum(Operacion, name="operacion"))
 
@@ -232,10 +234,23 @@ class Registro(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     corrida_id: Mapped[str] = mapped_column(String(150), unique=True)
-    suite_id: Mapped[int | None] = mapped_column(ForeignKey("suites.id"), default=None)
-    final_run_id: Mapped[int | None] = mapped_column(ForeignKey("final_runs.id"), default=None)
+    # index=True en ambas: sin esto, recorrer los registros de UNA suite o
+    # UNA final run (ej. `resumen_calibracion_de_grupo` en repo_calibracion.py,
+    # que hace exactamente eso por cada grupo) hace full scan de `registros`.
+    suite_id: Mapped[int | None] = mapped_column(ForeignKey("suites.id"), default=None, index=True)
+    final_run_id: Mapped[int | None] = mapped_column(ForeignKey("final_runs.id"), default=None, index=True)
     fecha: Mapped[date] = mapped_column(Date)
     lote: Mapped[str] = mapped_column(String(20))
+
+    # El .gcode que efectivamente se corrió en esta corrida (issue #25) --
+    # key en el bucket `gcode` de Supabase Storage, no una ruta de disco.
+    gcode_storage_key: Mapped[str | None] = mapped_column(Text, default=None)
+
+    # Foto de toda la batería de probetas (no una celda puntual) -- issue
+    # #51, espejo de `leerFotoBateria`/`CELDA_ID_BATERIA` en
+    # apps/web/src/lib/foto-bateria.ts. Vive acá (no en Medicion) porque es
+    # una foto por corrida, no por celda.
+    foto_bateria_storage_key: Mapped[str | None] = mapped_column(Text, default=None)
 
     # Mediciones manuales de la corrida completa (Plan Maestro, sección 4) --
     # NULL mientras no se haya completado el SOP, nunca 0 por defecto.
@@ -410,8 +425,9 @@ class ConfiguracionMaquina(Base):
     velocidad_max_mm_min: Mapped[int] = mapped_column(Integer, default=2000)
     aceleracion_mm_s2: Mapped[float] = mapped_column(Float, default=50.0)
     # Nuevos por #11/#16: validar en el editor que un diseño no exceda la mesa real.
-    area_trabajo_ancho_mm: Mapped[float | None] = mapped_column(Float, default=None)
-    area_trabajo_alto_mm: Mapped[float | None] = mapped_column(Float, default=None)
+    # 300x180mm = area real de la CNC 3018 + LT-80W-F45 de este taller (#11).
+    area_trabajo_ancho_mm: Mapped[float] = mapped_column(Float, default=300.0)
+    area_trabajo_alto_mm: Mapped[float] = mapped_column(Float, default=180.0)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

@@ -99,8 +99,16 @@ erDiagram
 - **`fichas_parametro` y `candidatos_final_run` son relaciones 1:1** (unique constraint en la FK), no 1:N — un grupo de calibración tiene a lo sumo una ficha vigente; una medición es candidata a lo sumo una vez.
 - **`velocidades_mm_min`/`potencias_pct` son `JSON`, no `ARRAY` de Postgres** — mantiene los modelos testeables contra SQLite en CI sin depender de una Supabase real; Postgres los guarda igual de bien como `jsonb`.
 - **`tarifas_historial` es de solo inserción** (nunca `UPDATE`), a pedido del propio diseño de UI ya decidido (Prompt 7: "historial de cambios tipo timeline"). El valor vigente es la fila con `vigente_desde` más reciente.
-- **Los archivos binarios (G-code, SVG, fotos) nunca están en estas tablas** — las columnas `*_storage_key` guardan la referencia a Supabase Storage (issue #25), no el contenido.
+- **Los archivos binarios (G-code, SVG, fotos) nunca están en estas tablas** — las columnas `*_storage_key` (`Registro.gcode_storage_key`, `Suite.svg_storage_key`, `Medicion.foto_storage_key`) guardan la referencia (key/ruta dentro del bucket) a Supabase Storage (issue #25), no el contenido ni una ruta de disco. Los tres buckets (`gcode`, `svg`, `fotos`, creados en #23) son **privados** — la lectura pasa siempre por una URL firmada con expiración (`laser_toolkit.storage.operaciones.url_firmada`), nunca por una URL pública directa. La organización dentro de cada bucket es por material (`<material_slug>/...`, mismo slug que ya usa `laser_toolkit.naming` para nombres de archivo) — ver `laser_toolkit.storage.rutas`.
 - **Sin tabla de "proyectos de diseño"** del editor (#3/#18) — vive en su propio sub-issue con su propio modelo, para no mezclar el schema de pruebas/costeo con el del editor.
+
+## Estrategia de índices
+
+Postgres **no indexa una columna de foreign key automáticamente** (a diferencia de la primary key) — es el gap más común al diseñar un schema, y se auditó explícitamente acá en vez de darlo por hecho:
+
+- **Ya cubierto sin índice extra**, porque un `UniqueConstraint` compuesto ya sirve como índice para su primera columna (prefijo izquierdo): `grupos_calibracion.material_id`, `final_runs.grupo_calibracion_id`, `mediciones.registro_id`, `precios_material.material_id`.
+- **Índices explícitos agregados** (`index=True`) porque no había ningún unique/constraint que los cubriera: `suites.material_id`, `registros.suite_id`, `registros.final_run_id` — este último es el más urgente de los tres, porque `repo_calibracion.resumen_calibracion_de_grupo` recorre `final_run.registros` en cada llamada; sin índice, cada resumen de calibración hacía full scan de `registros`.
+- **Deliberadamente sin indexar todavía**: columnas de fecha/estado (`registros.fecha`, `mediciones.carbonizacion_1a5`, etc.) que probablemente hagan falta para Reportes (#13) e Historial (#12) — esas pantallas todavía no tienen sus queries reales escritas. Indexar antes de tener la query concreta es especular: un índice no es gratis (hace más lento cada `INSERT`/`UPDATE` y ocupa espacio), así que se agregan cuando la query de esa pantalla exista y se pueda confirmar con `EXPLAIN ANALYZE` que realmente hace falta, no antes.
 
 ## Migraciones
 
@@ -115,3 +123,9 @@ make db-downgrade                       # revierte la última
 No todas las migraciones son de `laser_toolkit.db.models` — `versions/bcabc60606cd_restringir_signup_a_dominio_.py` (issue #23) no toca ninguna tabla de la app: crea un trigger de Postgres sobre `auth.users` (la tabla que gestiona Supabase Auth) que rechaza cualquier signup fuera del dominio `@fluxsolutionscali.com`. Se hizo así (migración versionada) en vez de un toggle en el dashboard de Supabase para que quede en el repo, no en la memoria de quien lo configuró.
 
 Los dos proyectos reales (`laser-toolkit-dev`, `laser-toolkit-prod`, ambos `sa-east-1`) ya tienen las migraciones aplicadas — ver `.env.example` para las variables que hacen falta.
+
+## Datos reales ya migrados (issue #26)
+
+`packages/laser_toolkit/scripts/migrar_datos_legacy.py` migró los datos históricos de `data/`/`configs/` a ambos proyectos (dev y producción) — idempotente, se puede volver a correr sin duplicar nada. Verificado con conteos exactos contra el origen: 2 materiales, 20 suites, 20 registros, 124 mediciones, 7 candidatos; 20 `.gcode` y 13 SVG subidos a Storage y comparados byte a byte contra el archivo original.
+
+`data/` **todavía no se borró** aunque ya no debería ser la fuente de verdad — `apps/web` sigue leyendo esos archivos directo (ver issue #40, que migra el frontend a Supabase antes de poder borrar nada sin dejar la app sin datos).

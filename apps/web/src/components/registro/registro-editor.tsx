@@ -12,40 +12,34 @@ import { PhotoCell } from "@/components/registro/photo-cell";
 import { StarRating } from "@/components/registro/star-rating";
 import { TiempoInput } from "@/components/registro/tiempo-input";
 import { CELDA_ID_BATERIA } from "@/lib/foto-bateria";
-import type { FilaRegistro } from "@/lib/registro-schema";
+import type { CeldaRegistro, RegistroDetalle } from "@/lib/registro-schema";
 
 interface RegistroEditorProps {
-  archivo: string;
-  filasIniciales: FilaRegistro[];
-  /** ids (`${corrida_id}::${id_prueba}`) ya marcados como candidatos a Final Run. */
+  detalle: RegistroDetalle;
+  /** ids (`${corridaId}::${idPrueba}`) ya marcados como candidatos a Final Run. */
   candidatosIniciales: string[];
-  /** Nombre del archivo de la foto de toda la batería, si ya se subió una. */
-  fotoBateriaInicial: string;
 }
 
-function idCandidato(fila: FilaRegistro): string {
-  return `${fila.corrida_id}::${fila.id_prueba}`;
+function idCandidato(corridaId: string, celda: CeldaRegistro): string {
+  return `${corridaId}::${celda.idPrueba}`;
 }
 
 type EstadoGuardado = "idle" | "guardando" | "ok" | "error";
 
-function filaEvaluada(fila: FilaRegistro): boolean {
-  return fila.corte_pasante !== "" && fila.carbonizacion_1a5 !== "";
+function celdaEvaluada(celda: CeldaRegistro): boolean {
+  return celda.cortePasante !== "" && celda.carbonizacion1a5 !== "";
 }
 
 export function RegistroEditor({
-  archivo,
-  filasIniciales,
+  detalle,
   candidatosIniciales,
-  fotoBateriaInicial,
 }: RegistroEditorProps) {
-  const [filas, setFilas] = useState<FilaRegistro[]>(filasIniciales);
-  const [fotoBateria, setFotoBateria] = useState(fotoBateriaInicial);
-  const [kwhCorrida, setKwhCorrida] = useState(
-    filasIniciales[0]?.kwh_corrida_medido ?? "",
-  );
+  const { corridaId } = detalle;
+  const [celdas, setCeldas] = useState<CeldaRegistro[]>(detalle.celdas);
+  const [fotoBateria, setFotoBateria] = useState(detalle.fotoBateriaStorageKey);
+  const [kwhCorrida, setKwhCorrida] = useState(detalle.kwhCorridaMedido);
   const [tiempoCorrida, setTiempoCorrida] = useState(
-    filasIniciales[0]?.tiempo_real_corrida_s ?? "",
+    detalle.tiempoRealCorridaS,
   );
   const [estadoGuardado, setEstadoGuardado] = useState<EstadoGuardado>("idle");
   const [mensajeError, setMensajeError] = useState("");
@@ -54,7 +48,10 @@ export function RegistroEditor({
   );
   const [toasts, setToasts] = useState<ToastData[]>([]);
 
-  const evaluadas = useMemo(() => filas.filter(filaEvaluada).length, [filas]);
+  const evaluadas = useMemo(
+    () => celdas.filter(celdaEvaluada).length,
+    [celdas],
+  );
 
   function mostrarToast(mensaje: string, tono: ToastData["tono"] = "info") {
     setToasts((anteriores) => [
@@ -67,8 +64,8 @@ export function RegistroEditor({
     setToasts((anteriores) => anteriores.filter((t) => t.id !== id));
   }
 
-  async function marcarCandidata(fila: FilaRegistro) {
-    const id = idCandidato(fila);
+  async function marcarCandidata(celda: CeldaRegistro) {
+    const id = idCandidato(corridaId, celda);
     setCandidatos((anteriores) => new Set(anteriores).add(id));
     try {
       const respuesta = await fetch("/api/candidatos-final-run", {
@@ -76,20 +73,20 @@ export function RegistroEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id,
-          corridaId: fila.corrida_id,
-          idPrueba: fila.id_prueba,
-          archivo,
-          material: fila.material,
-          espesorMm: fila.espesor_mm,
-          operacion: fila.operacion,
-          velocidadMmMin: fila.velocidad_mm_min,
-          potenciaPct: fila.potencia_pct,
+          corridaId,
+          idPrueba: celda.idPrueba,
+          archivo: `${corridaId}_registro.csv`,
+          material: detalle.material,
+          espesorMm: detalle.espesorMm,
+          operacion: detalle.operacion,
+          velocidadMmMin: celda.velocidadMmMin,
+          potenciaPct: celda.potenciaPct,
         }),
       });
       const cuerpo = (await respuesta.json()) as { ok: boolean };
       if (cuerpo.ok) {
         mostrarToast(
-          `${fila.id_prueba} quedó marcada como candidata a Final Run.`,
+          `${celda.idPrueba} quedó marcada como candidata a Final Run.`,
           "exito",
         );
       } else {
@@ -105,8 +102,8 @@ export function RegistroEditor({
     }
   }
 
-  async function desmarcarCandidata(fila: FilaRegistro) {
-    const id = idCandidato(fila);
+  async function desmarcarCandidata(celda: CeldaRegistro) {
+    const id = idCandidato(corridaId, celda);
     setCandidatos((anteriores) => {
       const copia = new Set(anteriores);
       copia.delete(id);
@@ -119,7 +116,7 @@ export function RegistroEditor({
       );
       const cuerpo = (await respuesta.json()) as { ok: boolean };
       if (cuerpo.ok) {
-        mostrarToast(`${fila.id_prueba} ya no es candidata a Final Run.`);
+        mostrarToast(`${celda.idPrueba} ya no es candidata a Final Run.`);
       } else {
         throw new Error("respuesta no ok");
       }
@@ -129,30 +126,33 @@ export function RegistroEditor({
     }
   }
 
-  function actualizarFila(indice: number, cambios: Partial<FilaRegistro>) {
+  function actualizarCelda(indice: number, cambios: Partial<CeldaRegistro>) {
     setEstadoGuardado("idle");
-    setFilas((anteriores) =>
-      anteriores.map((fila, i) =>
-        i === indice ? { ...fila, ...cambios } : fila,
+    setCeldas((anteriores) =>
+      anteriores.map((celda, i) =>
+        i === indice ? { ...celda, ...cambios } : celda,
       ),
     );
   }
 
   async function guardar() {
     setEstadoGuardado("guardando");
-    const filasConMedicion = filas.map((fila) => ({
-      ...fila,
-      kwh_corrida_medido: kwhCorrida,
-      tiempo_real_corrida_s: tiempoCorrida,
-    }));
-
     try {
       const respuesta = await fetch(
-        `/api/registros/${encodeURIComponent(archivo)}`,
+        `/api/registros/${encodeURIComponent(corridaId)}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filas: filasConMedicion }),
+          body: JSON.stringify({
+            kwhCorridaMedido: kwhCorrida,
+            tiempoRealCorridaS: tiempoCorrida,
+            celdas: celdas.map((celda) => ({
+              idPrueba: celda.idPrueba,
+              cortePasante: celda.cortePasante,
+              carbonizacion1a5: celda.carbonizacion1a5,
+              notas: celda.notas,
+            })),
+          }),
         },
       );
       const cuerpo = (await respuesta.json()) as {
@@ -160,7 +160,6 @@ export function RegistroEditor({
         error?: string;
       };
       if (cuerpo.ok) {
-        setFilas(filasConMedicion);
         setEstadoGuardado("ok");
       } else {
         setEstadoGuardado("error");
@@ -178,13 +177,13 @@ export function RegistroEditor({
         <ProgressBar
           label="Celdas evaluadas"
           value={evaluadas}
-          total={filas.length}
+          total={celdas.length}
         />
         <div className="flex flex-wrap items-center gap-6">
           <div className="flex flex-col gap-1">
             <span className="text-navy text-sm font-medium">Pasadas</span>
             <span className="text-navy font-mono text-lg leading-none">
-              {filas[0]?.pasadas ?? "—"}
+              {detalle.pasadas}
             </span>
           </div>
           <div className="flex flex-col gap-1">
@@ -192,7 +191,7 @@ export function RegistroEditor({
               Foto de toda la batería
             </span>
             <PhotoCell
-              corridaId={filas[0]?.corrida_id ?? ""}
+              corridaId={corridaId}
               celdaId={CELDA_ID_BATERIA}
               foto={fotoBateria}
               onChange={setFotoBateria}
@@ -224,16 +223,16 @@ export function RegistroEditor({
             </tr>
           </thead>
           <tbody className="divide-border divide-y">
-            {filas.map((fila, indice) => (
-              <tr key={fila.id_prueba}>
+            {celdas.map((celda, indice) => (
+              <tr key={celda.idPrueba}>
                 <td className="p-2">
                   <CandidatoCell
-                    idPrueba={fila.id_prueba}
-                    velocidadMmMin={fila.velocidad_mm_min}
-                    potenciaPct={fila.potencia_pct}
-                    marcado={candidatos.has(idCandidato(fila))}
-                    onMarcar={() => marcarCandidata(fila)}
-                    onDesmarcar={() => desmarcarCandidata(fila)}
+                    idPrueba={celda.idPrueba}
+                    velocidadMmMin={celda.velocidadMmMin}
+                    potenciaPct={celda.potenciaPct}
+                    marcado={candidatos.has(idCandidato(corridaId, celda))}
+                    onMarcar={() => marcarCandidata(celda)}
+                    onDesmarcar={() => desmarcarCandidata(celda)}
                   />
                 </td>
                 <td className="px-4 py-3">
@@ -242,13 +241,13 @@ export function RegistroEditor({
                       <button
                         key={opcion}
                         type="button"
-                        aria-pressed={fila.corte_pasante === opcion}
+                        aria-pressed={celda.cortePasante === opcion}
                         onClick={() =>
-                          actualizarFila(indice, { corte_pasante: opcion })
+                          actualizarCelda(indice, { cortePasante: opcion })
                         }
                         className={clsx(
                           "px-3 py-1.5 text-xs font-medium capitalize transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
-                          fila.corte_pasante === opcion
+                          celda.cortePasante === opcion
                             ? "bg-blue text-white"
                             : "bg-surface text-navy hover:bg-navy-soft",
                         )}
@@ -260,32 +259,32 @@ export function RegistroEditor({
                 </td>
                 <td className="px-4 py-3">
                   <StarRating
-                    label={`Carbonización, celda ${fila.id_prueba}`}
-                    value={
-                      fila.carbonizacion_1a5 as "" | "1" | "2" | "3" | "4" | "5"
-                    }
+                    label={`Carbonización, celda ${celda.idPrueba}`}
+                    value={celda.carbonizacion1a5}
                     onChange={(v) =>
-                      actualizarFila(indice, { carbonizacion_1a5: v })
+                      actualizarCelda(indice, { carbonizacion1a5: v })
                     }
                   />
                 </td>
                 <td className="px-4 py-3">
                   <PhotoCell
-                    corridaId={fila.corrida_id}
-                    celdaId={fila.id_prueba}
-                    foto={fila.foto}
-                    onChange={(foto) => actualizarFila(indice, { foto })}
+                    corridaId={corridaId}
+                    celdaId={celda.idPrueba}
+                    foto={celda.fotoStorageKey}
+                    onChange={(foto) =>
+                      actualizarCelda(indice, { fotoStorageKey: foto })
+                    }
                   />
                 </td>
                 <td className="px-4 py-3">
                   <input
                     type="text"
-                    value={fila.notas}
+                    value={celda.notas}
                     onChange={(e) =>
-                      actualizarFila(indice, { notas: e.target.value })
+                      actualizarCelda(indice, { notas: e.target.value })
                     }
                     className={clsx(INPUT_CLASSES, "w-40")}
-                    aria-label={`Notas de la celda ${fila.id_prueba}`}
+                    aria-label={`Notas de la celda ${celda.idPrueba}`}
                   />
                 </td>
               </tr>
