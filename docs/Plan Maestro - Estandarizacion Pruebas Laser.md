@@ -233,10 +233,10 @@ El kWh/unidad y tiempo/unidad calibrados de una Final Run **son** el dato de ene
 | **F1** | Script generador de G-code (grillas de corte y grabado) + csv hermano | — | Listo — paquete `laser_toolkit` (ver `README.md`) |
 | **F2** | Hoja de Registro + motor de costeo | F1 (columnas del csv) | Listo — `laser-toolkit prepare-record` / `compute-costs`, separados en `io/registro.py` y `costos.py`. Se implementó como extensión del toolkit (no como planilla aparte) para mantener un único pipeline con tests y tipado |
 | **F3** | SOP de una página para el taller | F1 + F2 | Listo — `docs/sop/SOP-corrida-de-prueba.md` |
-| **F4** | Primera corrida piloto en MDF 3mm (validación end-to-end del flujo completo) | F1, F2, F3 | Pendiente |
-| **F5** | Calibración del factor de energía mediante Final Run (sección 8) | F4 | Listo — `generate-final-run`/`summarize-final-run`. Pendiente: correrla en la máquina real |
-| **F6** | Ficha de Parámetro Estándar v1 para MDF (todos los espesores) | F4, F5, repetido por espesor | Pendiente |
-| **F7** | Extender a un segundo material (validar que el sistema es agnóstico) | F6 | Pendiente |
+| **F4** | Primera corrida piloto en MDF 3mm (validación end-to-end del flujo completo) | F1, F2, F3 | **Listo** — 23 corridas reales de barrido (corte y grabado, MDF Comercial y Trupan), la mayoría con `kwh_corrida_medido` y evaluación completa. El fix `overscan real + límite de velocidad + punto focal` salió justamente de este ciclo real |
+| **F5** | Calibración del factor de energía mediante Final Run (sección 8) | F4 | Barrido listo — `generate-final-run`/`summarize-final-run`. Pendiente real: hay 7 candidatos marcados desde la Hoja de Registro, pero ninguna Final Run generada/ejecutada todavía |
+| **F6** | Ficha de Parámetro Estándar v1 para MDF (todos los espesores) | F4, F5, repetido por espesor | Pendiente. Persistencia decidida: datos estructurados (JSON/YAML), no Markdown a mano — la UI de "Fichas" (Prompt 12) los renderiza directo |
+| **F7** | Extender a un segundo material (validar que el sistema es agnóstico) | F6 | Pendiente. Material elegido: carcasas de teléfono en TPU/silicona (familia polímero) — primera vez que se prueba un material no-madera; confirmar ficha de seguridad antes de la primera corrida (fume/ventilación distintos al MDF) |
 
 ---
 
@@ -255,9 +255,7 @@ Mientras un campo quede en `null`, `laser-toolkit compute-costs` deja esa column
 costo vacía en el csv de salida en vez de asumir un valor — nunca hay que "avisar" para
 que el sistema funcione con datos parciales.
 
-Sigue pendiente de definir (fuera del alcance del costeo, es un criterio operativo):
-
-- Umbral de aceptación de carbonización para considerar una prueba "aprobada" (Fase F6/F7).
+**Umbral de aceptación de carbonización** (Fase F6/F7), ya definido: `carbonizacion_1a5 ≤ 3`, tanto en corte como en grabado. En grabado este umbral tiene una lectura distinta a la de corte: no busca *ausencia* de carbonización (el grabado la produce por diseño), sino distinguir un grabado controlado de una quema indiscriminada del material.
 
 ---
 

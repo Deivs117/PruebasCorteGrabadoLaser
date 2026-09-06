@@ -23,3 +23,22 @@ configs/tarifas.yaml
 # Salidas de prueba locales que no deben versionarse por defecto
 # (las fotos y csv de resultados sí se versionan salvo que pesen mucho;
 #  ajustar aquí si el repo empieza a crecer demasiado)
+
+# Skills de agentes (Claude Code, etc.): no son código del proyecto, son
+# herramientas opcionales de quien las use. Cada dev instala las que necesite
+# a nivel de usuario (~/.claude/skills) en vez de versionarlas acá -- ver
+# CLAUDE.md, sección "Skills de diseño/frontend (opcionales)".
+.claude/skills/
+.agents/skills/
+skills-lock.json
+
+# Credenciales de Supabase (DATABASE_URL, tokens, etc. -- ver issue #23).
+# Solo se versiona .env.example (plantilla sin valores reales).
+.env
+.env.*
+!.env.example
+
+# Cache/estado local del CLI de Supabase (ej. que proyecto quedo "linkeado"
+# en esta maquina) -- no es config del proyecto, es local de quien lo corre.
+supabase/.temp
+supabase/.branches

@@ -33,7 +33,7 @@ export interface NavSection {
 /**
  * Estructura de navegación de la app, según docs/ui-design/prompts-stitch.md
  * (Prompt 0). Cada ruta existe como página real, aunque varias todavía sean
- * placeholders mientras se construyen (ver docs/ui-design/reglas-frontend-basics.md:
+ * placeholders mientras se construyen (ver apps/web/docs/reglas-frontend-basics.md:
  * nunca un <a> o <button> que no lleve a algo real).
  *
  * Los íconos son las versiones animadas propias (ver components/ui/icons/ y
