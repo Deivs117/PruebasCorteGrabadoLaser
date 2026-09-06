@@ -234,6 +234,12 @@ def eliminar_suite(suite_id: int) -> dict:
         return {"ok": True}
 
 
+@app.get("/historial")
+def historial(material: str | None = None) -> list[dict]:
+    with sesion() as s:
+        return lectura.historial(s, material)
+
+
 @app.get("/dashboard")
 def dashboard() -> dict:
     with sesion() as s:
