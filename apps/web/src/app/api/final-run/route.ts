@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { generarFinalRun } from "@/lib/final-run-data";
+import { crearEjecucion } from "@/lib/final-run-data";
 import { finalRunSchema } from "@/lib/final-run-schema";
 
 export async function POST(request: Request) {
@@ -16,6 +16,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const resultado = await generarFinalRun(analisis.data, 1);
+  const resultado = await crearEjecucion(analisis.data);
   return NextResponse.json(resultado, { status: resultado.ok ? 200 : 422 });
 }

@@ -18,11 +18,13 @@ consume el resultado de `generar()` en vez de reimplementar la generación.
 
 from __future__ import annotations
 
-from laser_toolkit.config import Operacion, SuiteConfig
+from laser_toolkit.config import FinalRunConfig, Operacion, SuiteConfig
 from laser_toolkit.naming import nombre_base
 from laser_toolkit.storage.operaciones import subir_gcode
 from laser_toolkit.suites.cut import generar_suite_corte
 from laser_toolkit.suites.engrave import generar_suite_grabado
+from laser_toolkit.suites.final_run import generar_final_run as _generar_final_run
+
 from storage_cliente import cliente as _cliente_storage
 
 
@@ -55,4 +57,25 @@ def generar(payload: dict) -> dict:
     }
 
 
-__all__ = ["generar"]
+def generar_final_run(payload: dict) -> dict:
+    """Espejo de `generar()` de arriba, pero para una ejecución de Final Run
+    (E, issue #64) -- `laser_toolkit.suites.final_run.generar_final_run` en
+    vez de `suites.cut`/`.engrave`. `payload` ya trae `ejecucion` (a
+    diferencia de `SuiteConfig`, `FinalRunConfig` sí modela ese campo)."""
+    config = FinalRunConfig(**payload)
+    gcode, filas = _generar_final_run(config)
+
+    corrida_id = filas[0]["corrida_id"]
+    contenido = ("\n".join(gcode) + "\n").encode("utf-8")
+    gcode_storage_key = subir_gcode(_cliente_storage, config.material, corrida_id, contenido)
+
+    return {
+        "ok": True,
+        "corridaId": corrida_id,
+        "gcodeStorageKey": gcode_storage_key,
+        "celdas": len(filas),
+        "filas": filas,
+    }
+
+
+__all__ = ["generar", "generar_final_run"]

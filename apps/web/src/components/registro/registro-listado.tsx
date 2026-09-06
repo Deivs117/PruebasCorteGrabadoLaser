@@ -144,7 +144,9 @@ export function RegistroListado({ registros }: RegistroListadoProps) {
                   etiqueta="G-code"
                   endpointBase="/api/descargas/gcode"
                 />
-                <EliminarCorridaButton corridaId={corrida.corridaId} />
+                {corrida.origen === "suite" ? (
+                  <EliminarCorridaButton corridaId={corrida.corridaId} />
+                ) : null}
               </div>
             </Card>
           ))}

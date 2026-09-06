@@ -18,6 +18,7 @@ from sqlalchemy import text
 
 import creacion
 import escritura
+import final_run
 import generacion
 import lectura
 import storage_endpoints
@@ -345,3 +346,60 @@ def url_foto_bateria(corrida_id: str) -> dict:
             return {"url": storage_endpoints.url_firmada_foto_bateria(s, cliente_storage, corrida_id)}
         except ValueError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/grupos-calibracion")
+def listar_grupos_calibracion() -> list[dict]:
+    with sesion() as s:
+        return lectura.grupos_calibracion(s)
+
+
+@app.post("/grupos-calibracion")
+def crear_ejecucion_final_run(payload: dict) -> dict:
+    with sesion() as s:
+        try:
+            return final_run.crear_ejecucion(s, payload)
+        except (ValueError, ValidationError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/grupos-calibracion/{grupo_id}/ejecucion")
+def generar_siguiente_ejecucion(grupo_id: str) -> dict:
+    with sesion() as s:
+        try:
+            return final_run.generar_siguiente_ejecucion(s, grupo_id)
+        except (ValueError, ValidationError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/grupos-calibracion/{grupo_id}/resumen")
+def resumen_calibracion(grupo_id: str, minimoEjecuciones: int = 3) -> dict:
+    with sesion() as s:
+        try:
+            return lectura.resumen_calibracion(s, grupo_id, minimo_ejecuciones=minimoEjecuciones)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+class FichaBody(BaseModel):
+    estado: str
+    notas: str | None = None
+
+
+@app.post("/grupos-calibracion/{grupo_id}/ficha")
+def actualizar_ficha(grupo_id: str, body: FichaBody) -> dict:
+    with sesion() as s:
+        try:
+            return final_run.actualizar_ficha(s, grupo_id, estado=body.estado, notas=body.notas)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.delete("/grupos-calibracion/{grupo_id}")
+def eliminar_grupo_calibracion(grupo_id: str) -> dict:
+    with sesion() as s:
+        try:
+            final_run.eliminar_grupo(s, cliente_storage, grupo_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        return {"ok": True}

@@ -29,6 +29,9 @@ from laser_toolkit.db.repo_pruebas import (
     desmarcar_candidato,
     marcar_candidato,
 )
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from lectura import (
     candidato_a_dict,
     costeo_detalle,
@@ -36,8 +39,6 @@ from lectura import (
     registro_detalle,
     tarifas_vigentes,
 )
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 
 def agregar_material(sesion: Session, nombre: str, familia: str) -> list[dict]:

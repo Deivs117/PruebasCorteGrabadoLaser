@@ -215,8 +215,7 @@ export async function leerSuiteParaFormulario(
 }
 
 /** Elimina una suite real de Supabase en cascada (Suite→Registro→Mediciones→
- * Candidatos, más el `.gcode`/fotos en Storage) -- (A), issue #54. Separado
- * de `eliminarSuite` en `fs-data.ts`, que solo borra YAML de Final Run. */
+ * Candidatos, más el `.gcode`/fotos en Storage) -- (A), issue #54. */
 export async function eliminarSuitePorId(id: number): Promise<boolean> {
   try {
     await pyDelete(`suites/${id}`);

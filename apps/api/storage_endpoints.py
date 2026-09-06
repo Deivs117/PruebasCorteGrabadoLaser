@@ -5,11 +5,9 @@ Sin dependencia de FastAPI a propósito (mismo patrón que `lectura.py`/
 `escritura.py`): funciones que levantan `ValueError` en errores de negocio,
 `main.py` las traduce a HTTP.
 
-⚠️ Solo cubre registros ligados a una `Suite` (no a un `FinalRun`) -- es el
-único caso real hoy, y necesita `Registro.suite.material` para armar la ruta
-de Storage (`<material_slug>/...`). Una foto/descarga de un registro de
-Final Run se puede agregar después si hace falta.
-"""
+Cubre registros de Suite (barrido) y de FinalRun (E, #64) por igual --
+`_material_de` resuelve el material para armar la ruta de Storage
+(`<material_slug>/...`) sin importar el origen."""
 
 from __future__ import annotations
 
@@ -37,9 +35,15 @@ def _registro_por_corrida(sesion: Session, corrida_id: str) -> Registro:
     registro = sesion.scalar(select(Registro).where(Registro.corrida_id == corrida_id))
     if registro is None:
         raise ValueError(f"No existe la corrida {corrida_id}.")
-    if registro.suite is None:
-        raise ValueError(f"La corrida {corrida_id} no está ligada a una Suite -- no soportado todavía.")
     return registro
+
+
+def _material_de(registro: Registro) -> str:
+    if registro.suite is not None:
+        return registro.suite.material.nombre
+    if registro.final_run is not None:
+        return registro.final_run.grupo_calibracion.material.nombre
+    raise ValueError(f"La corrida {registro.corrida_id} no tiene Suite ni FinalRun asociado.")
 
 
 def _medicion_por_identidad(sesion: Session, corrida_id: str, id_prueba: str) -> Medicion:
@@ -57,9 +61,7 @@ def subir_foto_celda(
     sesion: Session, cliente: Client, corrida_id: str, id_prueba: str, contenido: bytes, extension: str
 ) -> dict:
     medicion = _medicion_por_identidad(sesion, corrida_id, id_prueba)
-    material = medicion.registro.suite.material.nombre if medicion.registro.suite else None
-    if material is None:
-        raise ValueError(f"La corrida {corrida_id} no está ligada a una Suite -- no soportado todavía.")
+    material = _material_de(medicion.registro)
     key = subir_foto(cliente, material, corrida_id, id_prueba, contenido, extension)
     guardar_foto_medicion_key(sesion, medicion, key)
     sesion.commit()
@@ -68,7 +70,7 @@ def subir_foto_celda(
 
 def subir_foto_bateria(sesion: Session, cliente: Client, corrida_id: str, contenido: bytes, extension: str) -> dict:
     registro = _registro_por_corrida(sesion, corrida_id)
-    material = registro.suite.material.nombre  # type: ignore[union-attr]  # _registro_por_corrida ya validó suite
+    material = _material_de(registro)
     key = subir_foto(cliente, material, corrida_id, ID_CELDA_BATERIA, contenido, extension)
     guardar_foto_bateria_key(sesion, registro, key)
     sesion.commit()
