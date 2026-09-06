@@ -39,11 +39,23 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from laser_toolkit.config import Operacion
 from laser_toolkit.db.base import Base
+from laser_toolkit.svg.modo import ModoGrabadoSvg
 
 # ============================================================
-# Enums (espejo de laser_toolkit.config y laser_toolkit.materiales)
+# Enums
 # ============================================================
+#
+# `Operacion` y `ModoGrabadoSvg` se REUSAN de `laser_toolkit.config`/
+# `laser_toolkit.svg.modo` -- no se redefinen acá. Redefinirlos (como se hizo
+# en una version anterior de este archivo) crea dos clases de enum distintas
+# con el mismo nombre y los mismos valores de string: pyright las trata como
+# tipos incompatibles entre si (`config.Operacion.CORTE` no es asignable a
+# `db.models.Operacion`), lo cual rompe justo el codigo que intenta pasar un
+# valor de un modulo al otro. `FamiliaMaterial` si es propio de este modulo:
+# no existe un equivalente en el backend Python (solo en el catalogo del
+# frontend), asi que acá SI es la fuente de la verdad para Python.
 
 
 class FamiliaMaterial(str, enum.Enum):
@@ -53,21 +65,6 @@ class FamiliaMaterial(str, enum.Enum):
     POLIMERO = "polimero"
     METAL = "metal"
     OTRO = "otro"
-
-
-class Operacion(str, enum.Enum):
-    """Espejo de `laser_toolkit.config.Operacion`."""
-
-    CORTE = "corte"
-    GRABADO = "grabado"
-
-
-class ModoGrabadoSvg(str, enum.Enum):
-    """Espejo de `laser_toolkit.svg.modo.ModoGrabadoSvg`."""
-
-    CONTORNO = "contorno"
-    RELLENO = "relleno"
-    CONTORNO_Y_RELLENO = "contorno_y_relleno"
 
 
 class EstadoFicha(str, enum.Enum):
@@ -109,7 +106,9 @@ class Suite(Base):
     __tablename__ = "suites"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    material_id: Mapped[int] = mapped_column(ForeignKey("materiales.id"))
+    # index=True: Postgres NO indexa una FK automaticamente (a diferencia de
+    # la PK) -- sin esto, "listar suites de un material" (#10) hace full scan.
+    material_id: Mapped[int] = mapped_column(ForeignKey("materiales.id"), index=True)
     espesor_mm: Mapped[float] = mapped_column(Float)
     operacion: Mapped[Operacion] = mapped_column(Enum(Operacion, name="operacion"))
 
@@ -235,8 +234,11 @@ class Registro(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     corrida_id: Mapped[str] = mapped_column(String(150), unique=True)
-    suite_id: Mapped[int | None] = mapped_column(ForeignKey("suites.id"), default=None)
-    final_run_id: Mapped[int | None] = mapped_column(ForeignKey("final_runs.id"), default=None)
+    # index=True en ambas: sin esto, recorrer los registros de UNA suite o
+    # UNA final run (ej. `resumen_calibracion_de_grupo` en repo_calibracion.py,
+    # que hace exactamente eso por cada grupo) hace full scan de `registros`.
+    suite_id: Mapped[int | None] = mapped_column(ForeignKey("suites.id"), default=None, index=True)
+    final_run_id: Mapped[int | None] = mapped_column(ForeignKey("final_runs.id"), default=None, index=True)
     fecha: Mapped[date] = mapped_column(Date)
     lote: Mapped[str] = mapped_column(String(20))
 

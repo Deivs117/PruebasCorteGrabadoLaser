@@ -57,3 +57,11 @@ master                              ← producción, deploy automático (Vercel)
 - `.agents/skills/` + `skills-lock.json`: gestionadas por un instalador con lockfile aparte (convención portable entre agentes, análoga a `AGENTS.md`) — hoy solo tiene `motion-design` (`LottieFiles/motion-design-skill` en GitHub). Reinstalar con la herramienta que gestiona ese lockfile si hace falta.
 
 No las reintroduzcas a git sin avisar — si alguna termina siendo realmente necesaria para todo el equipo (no solo quien toca frontend), es una decisión a discutir, no un commit de rutina.
+
+## Credenciales de Supabase (issue #1/#23)
+
+Nunca hardcodeadas, nunca committeadas. `.env.example` en la raíz documenta qué variables hacen falta; cada quien copia eso a su propio `.env` local (gitignored) con los valores reales del proyecto Supabase de **dev/preview** (nunca los de producción, para desarrollo local).
+
+Dos proyectos Supabase separados (decisión de #1): uno de dev/preview, otro de producción — región `sa-east-1` (São Paulo, la más cercana a Colombia). Las credenciales de producción viven solo como variables de entorno de Vercel (#2), nunca en un `.env` de ningún dev.
+
+`laser_toolkit.db.base.crear_engine()` lee `DATABASE_URL` del entorno y falla ruidosamente si no está seteada — nunca conecta a una base por defecto/adivinada.
