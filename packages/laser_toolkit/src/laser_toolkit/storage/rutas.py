@@ -31,3 +31,16 @@ def ruta_svg(material: str, suite_id: int) -> str:
 
 def ruta_foto(material: str, corrida_id: str, id_prueba: str, extension: str = "jpg") -> str:
     return f"{slug_material(material)}/{corrida_id}/{id_prueba}.{extension}"
+
+
+# Prefijo fijo separado de `<material_slug>/` a propósito: un SVG de la
+# biblioteca de "Grabado Vectorial" (issue #3) no está asociado a ninguna
+# Suite/material todavía -- es una copia de trabajo suelta que se sube,
+# convierte y eventualmente se descarta, no la geometría oficial de una
+# suite (`ruta_svg`). Reemplaza `data/svgs/` (filesystem local, no
+# sobrevive en la función serverless de Vercel).
+PREFIJO_BIBLIOTECA_SVG = "biblioteca"
+
+
+def ruta_svg_biblioteca(nombre: str) -> str:
+    return f"{PREFIJO_BIBLIOTECA_SVG}/{nombre}"

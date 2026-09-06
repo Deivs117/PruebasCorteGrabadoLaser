@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from laser_toolkit.svg.document import parsear_svg
+from laser_toolkit.svg.document import parsear_svg, parsear_svg_texto
 
 RAIZ_REPO = Path(__file__).resolve().parent.parent
 LOGO_EMPRESA = RAIZ_REPO / "assets" / "svg" / "logo-empresa.svg"
@@ -65,3 +65,22 @@ def test_logo_empresa_real_parsea_sin_errores():
     assert viewbox == (0.0, 0.0, 800.0, 800.0)
     assert len(subpaths) == 3
     assert all(len(sp.puntos) >= 3 for sp in subpaths)
+
+
+# --- parsear_svg_texto (issue #3/#16: SVG subido desde el navegador, sin disco) ---
+
+
+def test_parsear_svg_texto_da_lo_mismo_que_desde_archivo(tmp_path: Path):
+    svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50">
+        <path d="M0,0 L100,0 L100,50 L0,50 Z"/>
+    </svg>"""
+    subpaths_texto, viewbox_texto = parsear_svg_texto(svg)
+    subpaths_archivo, viewbox_archivo = parsear_svg(_escribir_svg(tmp_path, svg))
+    assert viewbox_texto == viewbox_archivo
+    assert subpaths_texto == subpaths_archivo
+
+
+def test_parsear_svg_texto_sin_formas_soportadas_levanta_error():
+    svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"></svg>'
+    with pytest.raises(ValueError, match="no se encontraron"):
+        parsear_svg_texto(svg)
