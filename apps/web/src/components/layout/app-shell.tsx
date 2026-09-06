@@ -8,6 +8,16 @@ import { Topbar } from "@/components/layout/topbar";
 
 interface AppShellProps {
   children: React.ReactNode;
+  /** Email de la sesión activa, o `null` sin sesión (issue #52) -- resuelto
+   * server-side en `layout.tsx`, nunca acá (evita un round-trip extra al
+   * cliente solo para mostrarlo en el Topbar). */
+  userEmail: string | null;
+}
+
+/** `/login` y `/auth/*` no llevan sidebar/topbar -- son las únicas páginas
+ * públicas (issue #52), y muestran su propio layout centrado. */
+function esRutaPublica(pathname: string): boolean {
+  return pathname === "/login" || pathname.startsWith("/auth/");
 }
 
 const CLAVE_PREFERENCIA = "laser-toolkit:sidebar-abierto";
@@ -26,9 +36,10 @@ function esViewportAngosto(): boolean {
  * En viewports angostos, además, actúa como panel deslizante con fondo
  * oscurecido (transform + fade, nunca un display:none/block instantáneo).
  */
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, userEmail }: AppShellProps) {
   const [sidebarAbierto, setSidebarAbierto] = useState(true);
   const pathname = usePathname();
+  const rutaPublica = esRutaPublica(pathname);
 
   // Antes del primer paint: aplicar la preferencia guardada, para no
   // mostrar el sidebar abierto un instante y recién después cerrarlo.
@@ -69,6 +80,14 @@ export function AppShell({ children }: AppShellProps) {
     if (esViewportAngosto()) setSidebarAbierto(false);
   }
 
+  // Recién acá, después de llamar todos los hooks siempre en el mismo
+  // orden (regla de los Hooks) -- "cerrar sesión" navega de una página con
+  // shell a /login sin desmontar este componente, así que el temprano
+  // return no puede saltearse hooks condicionalmente.
+  if (rutaPublica) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="flex min-h-screen">
       <Sidebar open={sidebarAbierto} onNavigate={cerrarSiEsAngosto} />
@@ -92,6 +111,7 @@ export function AppShell({ children }: AppShellProps) {
         <Topbar
           sidebarAbierto={sidebarAbierto}
           onToggleSidebar={() => setSidebarAbierto((v) => !v)}
+          userEmail={userEmail}
         />
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
