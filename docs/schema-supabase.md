@@ -111,3 +111,7 @@ make db-migrate MSG="agregar tabla X"   # genera una migración nueva (autogener
 make db-upgrade                         # aplica migraciones pendientes
 make db-downgrade                       # revierte la última
 ```
+
+No todas las migraciones son de `laser_toolkit.db.models` — `versions/bcabc60606cd_restringir_signup_a_dominio_.py` (issue #23) no toca ninguna tabla de la app: crea un trigger de Postgres sobre `auth.users` (la tabla que gestiona Supabase Auth) que rechaza cualquier signup fuera del dominio `@fluxsolutionscali.com`. Se hizo así (migración versionada) en vez de un toggle en el dashboard de Supabase para que quede en el repo, no en la memoria de quien lo configuró.
+
+Los dos proyectos reales (`laser-toolkit-dev`, `laser-toolkit-prod`, ambos `sa-east-1`) ya tienen las migraciones aplicadas — ver `.env.example` para las variables que hacen falta.
