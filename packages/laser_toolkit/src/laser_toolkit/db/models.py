@@ -39,11 +39,23 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from laser_toolkit.config import Operacion
 from laser_toolkit.db.base import Base
+from laser_toolkit.svg.modo import ModoGrabadoSvg
 
 # ============================================================
-# Enums (espejo de laser_toolkit.config y laser_toolkit.materiales)
+# Enums
 # ============================================================
+#
+# `Operacion` y `ModoGrabadoSvg` se REUSAN de `laser_toolkit.config`/
+# `laser_toolkit.svg.modo` -- no se redefinen acá. Redefinirlos (como se hizo
+# en una version anterior de este archivo) crea dos clases de enum distintas
+# con el mismo nombre y los mismos valores de string: pyright las trata como
+# tipos incompatibles entre si (`config.Operacion.CORTE` no es asignable a
+# `db.models.Operacion`), lo cual rompe justo el codigo que intenta pasar un
+# valor de un modulo al otro. `FamiliaMaterial` si es propio de este modulo:
+# no existe un equivalente en el backend Python (solo en el catalogo del
+# frontend), asi que acá SI es la fuente de la verdad para Python.
 
 
 class FamiliaMaterial(str, enum.Enum):
@@ -53,21 +65,6 @@ class FamiliaMaterial(str, enum.Enum):
     POLIMERO = "polimero"
     METAL = "metal"
     OTRO = "otro"
-
-
-class Operacion(str, enum.Enum):
-    """Espejo de `laser_toolkit.config.Operacion`."""
-
-    CORTE = "corte"
-    GRABADO = "grabado"
-
-
-class ModoGrabadoSvg(str, enum.Enum):
-    """Espejo de `laser_toolkit.svg.modo.ModoGrabadoSvg`."""
-
-    CONTORNO = "contorno"
-    RELLENO = "relleno"
-    CONTORNO_Y_RELLENO = "contorno_y_relleno"
 
 
 class EstadoFicha(str, enum.Enum):
