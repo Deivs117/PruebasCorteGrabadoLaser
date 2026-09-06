@@ -10,16 +10,15 @@ export const dynamic = "force-dynamic";
 
 export default async function DetalleCosteo({
   params,
-}: PageProps<"/costeo/[archivo]">) {
-  const { archivo: archivoParam } = await params;
-  const archivo = decodeURIComponent(archivoParam);
-  const [filas, tarifas] = await Promise.all([
-    leerCosteo(archivo),
+}: PageProps<"/costeo/[corridaId]">) {
+  const { corridaId: corridaIdParam } = await params;
+  const corridaId = decodeURIComponent(corridaIdParam);
+  const [detalle, tarifas] = await Promise.all([
+    leerCosteo(corridaId),
     leerTarifas(),
   ]);
-  const primera = filas?.[0];
 
-  if (!filas || !primera) {
+  if (!detalle) {
     notFound();
   }
 
@@ -32,20 +31,24 @@ export default async function DetalleCosteo({
         <div>
           <h1 className="text-navy text-2xl font-semibold">Costeo</h1>
           <p className="text-text-muted mt-1 text-sm capitalize">
-            {primera.material} · {primera.espesor_mm}mm · {primera.operacion} ·
-            lote {primera.lote}
+            {detalle.material} · {detalle.espesorMm}mm · {detalle.operacion} ·
+            lote {detalle.lote}
           </p>
         </div>
-        <DescargarBoton archivo={archivo} etiqueta="Descargar costeo" />
+        <DescargarBoton
+          archivo={`${corridaId}.gcode`}
+          etiqueta="Descargar G-code"
+          endpointBase="/api/descargas/gcode"
+        />
       </div>
 
-      <CostoTabla filas={filas} moneda={moneda} />
+      <CostoTabla filas={detalle.celdas} moneda={moneda} />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-navy text-base font-semibold">
           Costo por combinación
         </h2>
-        <CostoHeatmap filas={filas} moneda={moneda} />
+        <CostoHeatmap filas={detalle.celdas} moneda={moneda} />
       </section>
     </div>
   );

@@ -15,9 +15,27 @@ from __future__ import annotations
 
 from laser_toolkit.db.models import FamiliaMaterial, Material, Medicion, Registro
 from laser_toolkit.db.repo_materiales import obtener_o_crear_material
-from laser_toolkit.db.repo_negocio import fijar_precio_material, registrar_tarifas
-from laser_toolkit.db.repo_pruebas import desmarcar_candidato, marcar_candidato
-from lectura import candidato_a_dict, materiales_catalogo, tarifas_vigentes
+from laser_toolkit.db.repo_negocio import (
+    construir_machine_config,
+    construir_tarifas_config,
+    fijar_precio_material,
+    obtener_tarifas_vigentes,
+    registrar_tarifas,
+)
+from laser_toolkit.db.repo_pruebas import (
+    calcular_y_guardar_costos_registro,
+    completar_evaluacion,
+    completar_medicion_corrida,
+    desmarcar_candidato,
+    marcar_candidato,
+)
+from lectura import (
+    candidato_a_dict,
+    costeo_detalle,
+    materiales_catalogo,
+    registro_detalle,
+    tarifas_vigentes,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -87,6 +105,78 @@ def _medicion_por_identidad(sesion: Session, corrida_id: str, id_prueba: str) ->
     return medicion
 
 
+def _registro_por_corrida(sesion: Session, corrida_id: str) -> Registro:
+    registro = sesion.scalar(select(Registro).where(Registro.corrida_id == corrida_id))
+    if registro is None:
+        raise ValueError(f"No existe la corrida {corrida_id}.")
+    return registro
+
+
+def completar_registro(
+    sesion: Session,
+    corrida_id: str,
+    *,
+    kwh_corrida_medido: float | None,
+    tiempo_real_corrida_s: float | None,
+    celdas: list[dict],
+) -> dict:
+    """Hoja de Registro (C, issue #60): guarda en una sola transacción la
+    medición de la corrida completa (si se cargó) y la evaluación de cada
+    celda -- un solo botón "Guardar cambios" en el frontend, igual que en el
+    csv plano, aunque acá viajen a dos tablas distintas (`Registro` vs
+    `Medicion`).
+
+    A diferencia del csv, `kwh_corrida_medido`/`tiempo_real_corrida_s` no se
+    validan "iguales entre filas" (`filasComparten` en el TS viejo): viven
+    UNA sola vez en `Registro`, el modelo de datos ya lo garantiza."""
+    registro = _registro_por_corrida(sesion, corrida_id)
+    if kwh_corrida_medido is not None and tiempo_real_corrida_s is not None:
+        completar_medicion_corrida(
+            sesion,
+            registro,
+            kwh_corrida_medido=kwh_corrida_medido,
+            tiempo_real_corrida_s=tiempo_real_corrida_s,
+        )
+
+    mediciones_por_id = {m.id_prueba: m for m in registro.mediciones}
+    for celda in celdas:
+        medicion = mediciones_por_id.get(celda["idPrueba"])
+        if medicion is None:
+            raise ValueError(f"La celda {celda['idPrueba']} no pertenece a la corrida {corrida_id}.")
+        corte_pasante = celda.get("cortePasante")
+        carbonizacion = celda.get("carbonizacion1a5")
+        completar_evaluacion(
+            sesion,
+            medicion,
+            corte_pasante=None if corte_pasante in (None, "") else corte_pasante == "si",
+            carbonizacion_1a5=None if carbonizacion in (None, "") else int(carbonizacion),
+            notas=celda.get("notas") or "",
+        )
+
+    sesion.commit()
+    detalle = registro_detalle(sesion, corrida_id)
+    if detalle is None:
+        raise ValueError("El registro se guardó pero no se pudo reconstruir para la respuesta.")
+    return detalle
+
+
+def calcular_costos(sesion: Session, corrida_id: str) -> dict:
+    """Espejo de `calcularCosteo` en `costeo-data.ts`, pero operando sobre la
+    base -- reusa `calcular_y_guardar_costos_registro` (mismo motor de
+    `laser_toolkit.costos` de siempre) en vez de correr el CLI."""
+    if obtener_tarifas_vigentes(sesion) is None:
+        raise ValueError("Todavía no se cargaron las tarifas del taller.")
+    registro = _registro_por_corrida(sesion, corrida_id)
+    tarifas = construir_tarifas_config(sesion)
+    machine = construir_machine_config(sesion)
+    calcular_y_guardar_costos_registro(sesion, registro, tarifas, machine)
+    sesion.commit()
+    detalle = costeo_detalle(sesion, corrida_id)
+    if detalle is None:
+        raise ValueError("El costeo se calculó pero no se pudo reconstruir para la respuesta.")
+    return detalle
+
+
 def marcar(sesion: Session, corrida_id: str, id_prueba: str) -> dict:
     """Espejo de `marcarCandidato` en `candidatos-final-run.ts` -- recibe solo
     la identidad (corridaId + idPrueba); el resto de los campos que el TS
@@ -107,23 +197,11 @@ def desmarcar(sesion: Session, corrida_id: str, id_prueba: str) -> None:
     sesion.commit()
 
 
-def desmarcar_de_archivo(sesion: Session, archivo: str) -> None:
-    """Espejo de `desmarcarCandidatosDeArchivo`: al borrar una Hoja de
-    Registro entera, sus candidatos marcados quedan huérfanos."""
-    corrida_id = archivo.removesuffix("_registro.csv")
-    registro = sesion.scalar(select(Registro).where(Registro.corrida_id == corrida_id))
-    if registro is None:
-        return
-    for medicion in registro.mediciones:
-        if medicion.candidato is not None:
-            desmarcar_candidato(sesion, medicion)
-    sesion.commit()
-
-
 __all__ = [
     "agregar_material",
+    "calcular_costos",
+    "completar_registro",
     "desmarcar",
-    "desmarcar_de_archivo",
     "guardar_tarifas",
     "marcar",
 ]
