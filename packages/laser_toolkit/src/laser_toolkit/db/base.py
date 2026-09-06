@@ -44,7 +44,21 @@ def crear_engine(database_url: str | None = None) -> Engine:
             "produccion, ver issue #23) debe inyectarla por su cuenta -- nunca "
             "hardcodear una cadena de conexion en el codigo."
         )
-    return create_engine(url, pool_pre_ping=True)
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        # `DATABASE_URL` apunta al pooler de Supabase en modo TRANSACCION
+        # (puerto 6543, ver #23) -- ahi la conexion fisica de Postgres que te
+        # toca puede haber sido reciclada de otra sesion. psycopg3 por defecto
+        # usa "prepared statements" del lado del servidor con nombres
+        # autogenerados (`_pg3_0`, `_pg3_1`...); si te toca una conexion que
+        # ya tiene preparado ese mismo nombre (de otra sesion), Postgres tira
+        # `DuplicatePreparedStatement`. `prepare_threshold=None` desactiva esa
+        # cache -- exactamente lo que Supabase/PgBouncer recomienda para el
+        # pooler de transacciones. Encontrado corriendo la migracion de #26
+        # dos veces seguidas contra produccion real, no es un caso hipotetico.
+        connect_args={"prepare_threshold": None},
+    )
 
 
 def crear_fabrica_sesiones(engine: Engine) -> sessionmaker[Session]:

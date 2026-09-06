@@ -123,3 +123,9 @@ make db-downgrade                       # revierte la última
 No todas las migraciones son de `laser_toolkit.db.models` — `versions/bcabc60606cd_restringir_signup_a_dominio_.py` (issue #23) no toca ninguna tabla de la app: crea un trigger de Postgres sobre `auth.users` (la tabla que gestiona Supabase Auth) que rechaza cualquier signup fuera del dominio `@fluxsolutionscali.com`. Se hizo así (migración versionada) en vez de un toggle en el dashboard de Supabase para que quede en el repo, no en la memoria de quien lo configuró.
 
 Los dos proyectos reales (`laser-toolkit-dev`, `laser-toolkit-prod`, ambos `sa-east-1`) ya tienen las migraciones aplicadas — ver `.env.example` para las variables que hacen falta.
+
+## Datos reales ya migrados (issue #26)
+
+`packages/laser_toolkit/scripts/migrar_datos_legacy.py` migró los datos históricos de `data/`/`configs/` a ambos proyectos (dev y producción) — idempotente, se puede volver a correr sin duplicar nada. Verificado con conteos exactos contra el origen: 2 materiales, 20 suites, 20 registros, 124 mediciones, 7 candidatos; 20 `.gcode` y 13 SVG subidos a Storage y comparados byte a byte contra el archivo original.
+
+`data/` **todavía no se borró** aunque ya no debería ser la fuente de verdad — `apps/web` sigue leyendo esos archivos directo (ver issue #40, que migra el frontend a Supabase antes de poder borrar nada sin dejar la app sin datos).
