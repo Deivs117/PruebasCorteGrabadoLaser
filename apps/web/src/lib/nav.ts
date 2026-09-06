@@ -11,6 +11,7 @@ import { HomeAnimado } from "@/components/ui/icons/home-animado";
 import { LayersAnimado } from "@/components/ui/icons/layers-animado";
 import { Settings2Animado } from "@/components/ui/icons/settings2-animado";
 import { ShapesAnimado } from "@/components/ui/icons/shapes-animado";
+import { SquareAnimado } from "@/components/ui/icons/square-animado";
 
 export interface IconProps {
   className?: string;
@@ -65,6 +66,15 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Final Run (Calibración)",
         icon: GaugeAnimado,
       },
+    ],
+  },
+  {
+    // Producción consume Fichas ya aprobadas, nunca alimenta el pipeline de
+    // pruebas de arriba (#3) -- por eso vive en su propia sección, no
+    // adentro de "Pruebas".
+    titulo: "Producción",
+    items: [
+      { href: "/editor", label: "Editor de Diseño", icon: SquareAnimado },
     ],
   },
   {
