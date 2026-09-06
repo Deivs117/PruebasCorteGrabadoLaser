@@ -104,6 +104,13 @@ const SECCIONES: Seccion[] = [
     construida: true,
   },
   {
+    slug: "editor",
+    label: "Editor de Diseño",
+    resumen:
+      "Lienzo de producción (#3): subí varios SVGs y/o imágenes, arrastralos/rotalos sobre el área de trabajo real de la máquina y generá el toolpath de cada uno por separado. A diferencia de Suites/Grabado Vectorial, esto no alimenta Hoja de Registro/Historial/Costeo — consume Fichas ya aprobadas, no genera datos de prueba. El export a un solo G-code combinado todavía no está disponible.",
+    construida: true,
+  },
+  {
     slug: "registro",
     label: "Hoja de Registro",
     resumen:
