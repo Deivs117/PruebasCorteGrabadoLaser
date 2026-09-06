@@ -20,12 +20,10 @@ from __future__ import annotations
 
 from laser_toolkit.config import Operacion, SuiteConfig
 from laser_toolkit.naming import nombre_base
-from laser_toolkit.storage.client import crear_cliente_storage
 from laser_toolkit.storage.operaciones import subir_gcode
 from laser_toolkit.suites.cut import generar_suite_corte
 from laser_toolkit.suites.engrave import generar_suite_grabado
-
-_cliente_storage = crear_cliente_storage()
+from storage_cliente import cliente as _cliente_storage
 
 
 def generar(payload: dict) -> dict:

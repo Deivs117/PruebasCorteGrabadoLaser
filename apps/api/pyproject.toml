@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.117.1",
     "laser-toolkit",
+    "python-multipart>=0.0.20",
 ]
 
 [tool.uv.sources]
