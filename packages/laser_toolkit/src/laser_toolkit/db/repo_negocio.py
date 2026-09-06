@@ -100,6 +100,8 @@ def obtener_configuracion_maquina(sesion: Session) -> ConfiguracionMaquina:
         punto_focal_mm=defaults.punto_focal_mm,
         velocidad_max_mm_min=defaults.velocidad_max_mm_min,
         aceleracion_mm_s2=defaults.aceleracion_mm_s2,
+        area_trabajo_ancho_mm=defaults.area_trabajo_ancho_mm,
+        area_trabajo_alto_mm=defaults.area_trabajo_alto_mm,
     )
     sesion.add(fila)
     sesion.flush()
@@ -118,4 +120,37 @@ def construir_machine_config(sesion: Session) -> MachineConfig:
         punto_focal_mm=fila.punto_focal_mm,
         velocidad_max_mm_min=fila.velocidad_max_mm_min,
         aceleracion_mm_s2=fila.aceleracion_mm_s2,
+        area_trabajo_ancho_mm=fila.area_trabajo_ancho_mm,
+        area_trabajo_alto_mm=fila.area_trabajo_alto_mm,
     )
+
+
+def actualizar_configuracion_maquina(
+    sesion: Session,
+    *,
+    laser_max_s: int,
+    travel_feed_mm_min: int,
+    potencia_modulo_w: float,
+    factor_utilizacion_laser: float,
+    punto_focal_mm: float,
+    velocidad_max_mm_min: int,
+    aceleracion_mm_s2: float,
+    area_trabajo_ancho_mm: float,
+    area_trabajo_alto_mm: float,
+) -> ConfiguracionMaquina:
+    """Sobreescribe la fila única de `configuracion_maquina` -- pasa a ser el
+    default global real que usa todo el toolkit (no un pre-llenado del
+    wizard), así que esto es un UPDATE-in-place, no un historial versionado
+    como `tarifas_historial`."""
+    fila = obtener_configuracion_maquina(sesion)
+    fila.laser_max_s = laser_max_s
+    fila.travel_feed_mm_min = travel_feed_mm_min
+    fila.potencia_modulo_w = potencia_modulo_w
+    fila.factor_utilizacion_laser = factor_utilizacion_laser
+    fila.punto_focal_mm = punto_focal_mm
+    fila.velocidad_max_mm_min = velocidad_max_mm_min
+    fila.aceleracion_mm_s2 = aceleracion_mm_s2
+    fila.area_trabajo_ancho_mm = area_trabajo_ancho_mm
+    fila.area_trabajo_alto_mm = area_trabajo_alto_mm
+    sesion.flush()
+    return fila

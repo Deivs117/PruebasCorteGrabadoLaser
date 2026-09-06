@@ -142,8 +142,8 @@ const SECCIONES: Seccion[] = [
     slug: "maquina",
     label: "Máquina",
     resumen:
-      "Parámetros del perfil de máquina (CNC 3018 + Laser Tree LT-80W-F45): límite de láser, velocidad de desplazamiento, potencia del módulo y factor de utilización.",
-    construida: false,
+      "Parámetros del perfil de máquina (CNC 3018 + Laser Tree LT-80W-F45): límite de láser, velocidad, aceleración, potencia del módulo, punto focal y área de trabajo real de la mesa.",
+    construida: true,
   },
   {
     slug: "historial",

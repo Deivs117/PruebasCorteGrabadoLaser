@@ -26,7 +26,7 @@ from laser_toolkit.db.repo_calibracion import (
     resumen_calibracion_de_grupo,
 )
 from laser_toolkit.db.repo_materiales import listar_materiales
-from laser_toolkit.db.repo_negocio import obtener_tarifas_vigentes
+from laser_toolkit.db.repo_negocio import obtener_configuracion_maquina, obtener_tarifas_vigentes
 from laser_toolkit.db.repo_pruebas import listar_candidatos
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -67,6 +67,25 @@ def tarifas_vigentes(sesion: Session) -> dict:
             }
             for nombre, espesor, precio in precios
         ],
+    }
+
+
+def configuracion_maquina(sesion: Session) -> dict:
+    """Espejo de `leerMaquina` en `maquina-data.ts`. A diferencia de tarifas,
+    `obtener_configuracion_maquina` nunca devuelve `None` -- crea la fila con
+    los defaults de `MachineConfig` (issue #11) la primera vez, así que acá
+    siempre hay algo que mostrar."""
+    fila = obtener_configuracion_maquina(sesion)
+    return {
+        "laserMaxS": fila.laser_max_s,
+        "travelFeedMmMin": fila.travel_feed_mm_min,
+        "potenciaModuloW": fila.potencia_modulo_w,
+        "factorUtilizacionLaser": fila.factor_utilizacion_laser,
+        "puntoFocalMm": fila.punto_focal_mm,
+        "velocidadMaxMmMin": fila.velocidad_max_mm_min,
+        "aceleracionMmS2": fila.aceleracion_mm_s2,
+        "areaTrabajoAnchoMm": fila.area_trabajo_ancho_mm,
+        "areaTrabajoAltoMm": fila.area_trabajo_alto_mm,
     }
 
 
@@ -401,6 +420,7 @@ def dashboard_resumen(sesion: Session) -> dict:
 
 __all__ = [
     "candidatos_final_run",
+    "configuracion_maquina",
     "costeo_detalle",
     "dashboard_resumen",
     "grupos_calibracion",
