@@ -12,6 +12,7 @@ en `lectura.py`; los de escritura sin generación de G-code (#49) en
 agregan de la misma forma sobre esta app.
 """
 
+import creacion
 import escritura
 import generacion
 import lectura
@@ -127,6 +128,15 @@ def generar_suite(payload: dict) -> dict:
         return generacion.generar(payload)
     except (ValueError, ValidationError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/suites")
+def crear_suite(payload: dict) -> dict:
+    with sesion() as s:
+        try:
+            return creacion.crear(s, payload)
+        except (ValueError, ValidationError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 def _extension_de(archivo: UploadFile) -> str:
