@@ -17,6 +17,7 @@ import escritura
 import generacion
 import lectura
 import storage_endpoints
+import suites_admin
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, ValidationError
 from sesiones import sesion
@@ -211,3 +212,34 @@ def descargar_svg(suite_id: int) -> dict:
             return {"url": storage_endpoints.url_firmada_svg(s, cliente_storage, suite_id)}
         except ValueError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/suites")
+def listar_suites() -> list[dict]:
+    with sesion() as s:
+        return lectura.suites(s)
+
+
+@app.get("/suites/{suite_id}")
+def obtener_suite(suite_id: int) -> dict:
+    with sesion() as s:
+        detalle = lectura.suite_detalle(s, suite_id)
+        if detalle is None:
+            raise HTTPException(status_code=404, detail=f"No existe la suite {suite_id}.")
+        return detalle
+
+
+@app.delete("/suites/{suite_id}")
+def eliminar_suite(suite_id: int) -> dict:
+    with sesion() as s:
+        try:
+            suites_admin.eliminar_suite(s, cliente_storage, suite_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        return {"ok": True}
+
+
+@app.get("/dashboard")
+def dashboard() -> dict:
+    with sesion() as s:
+        return lectura.dashboard_resumen(s)

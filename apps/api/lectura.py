@@ -1,21 +1,28 @@
-"""Endpoints de LECTURA (#48): materiales, tarifas, candidatos de Final Run.
+"""Endpoints de LECTURA: materiales/tarifas/candidatos (#48), suites y
+dashboard (A, issue #54).
 
 Cada función arma directamente el JSON que espera el `lib/*.ts` equivalente
 de `apps/web` (mismos nombres de campo en camelCase que ya usan los
 componentes), para no tener que tocar las páginas que los consumen -- solo
 cambia de dónde sale el dato (Supabase en vez de `data/`/`configs/`).
 
-"listar suites y registros" (Hoja de Registro/Historial) quedó fuera de este
-módulo -- se partió a su propio sub-issue por tamaño, ver #54.
+Hoja de Registro/Historial/Final Run quedaron fuera -- son (C)/(D)/(E) del
+plan reordenado de #2.
 """
 
 from __future__ import annotations
 
-from laser_toolkit.db.models import CandidatoFinalRun, Material, PrecioMaterial
+from laser_toolkit.db.models import (
+    CandidatoFinalRun,
+    Material,
+    PrecioMaterial,
+    Registro,
+    Suite,
+)
 from laser_toolkit.db.repo_materiales import listar_materiales
 from laser_toolkit.db.repo_negocio import obtener_tarifas_vigentes
 from laser_toolkit.db.repo_pruebas import listar_candidatos
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 
@@ -88,4 +95,82 @@ def candidatos_final_run(sesion: Session) -> list[dict]:
     return [c for c in candidatos if c is not None]
 
 
-__all__ = ["candidatos_final_run", "materiales_catalogo", "tarifas_vigentes"]
+def suites(sesion: Session) -> list[dict]:
+    """Espejo de `listarSuites` en `fs-data.ts`. La tabla `suites` (issue #22)
+    solo describe barridos -- Final Run es otra tabla (`final_runs`, (E) del
+    plan de #2), así que no hace falta filtrar por "tipo" como en el YAML."""
+    filas = sesion.scalars(select(Suite).order_by(Suite.created_at.desc()))
+    resultado = []
+    for suite in filas:
+        registro = suite.registros[0] if suite.registros else None
+        resultado.append(
+            {
+                "id": suite.id,
+                "material": suite.material.nombre,
+                "espesorMm": suite.espesor_mm,
+                "operacion": suite.operacion.value,
+                "velocidadesMmMin": suite.velocidades_mm_min,
+                "potenciasPct": suite.potencias_pct,
+                "lote": suite.lote,
+                "creadoEn": suite.created_at.isoformat(),
+                "corridaId": registro.corrida_id if registro else None,
+                "gcodeStorageKey": registro.gcode_storage_key if registro else None,
+            }
+        )
+    return resultado
+
+
+def suite_detalle(sesion: Session, suite_id: int) -> dict | None:
+    """Forma que espera el wizard (`SuiteFormData`) para prefillear "Editar"
+    (B) o "Duplicar" (A) -- espejo de `leerSuiteEditable` en `generar-suite.ts`.
+    `svgPath`/`modoGrabadoSvg`/`svgResolucionRellenoMm` quedan pendientes de
+    cuando el editor SVG (#3) suba a Storage en vez de a `assets/svg/`."""
+    suite = sesion.get(Suite, suite_id)
+    if suite is None:
+        return None
+    return {
+        "operacion": suite.operacion.value,
+        "material": suite.material.nombre,
+        "espesorMm": suite.espesor_mm,
+        "lote": suite.lote,
+        "velocidadesMmMin": suite.velocidades_mm_min,
+        "potenciasPct": suite.potencias_pct,
+        "pasadas": suite.pasadas,
+        "tamanoCeldaMm": suite.tamano_celda_mm,
+        "espaciadoMm": suite.espaciado_mm,
+    }
+
+
+def dashboard_resumen(sesion: Session) -> dict:
+    """Espejo de `getDashboardSummary` en `fs-data.ts`. La distinción
+    "generadas vs preparadas" no existe más -- una suite creada (#56) ya
+    persiste su Registro completo desde el principio (ver el hallazgo del
+    plan reordenado de #2), así que se cuenta cuántas ya tienen la medición
+    de corrida completa en vez de eso."""
+    total_suites = sesion.scalar(select(func.count()).select_from(Suite)) or 0
+    total_registros = sesion.scalar(select(func.count()).select_from(Registro)) or 0
+    registros_completados = (
+        sesion.scalar(
+            select(func.count()).select_from(Registro).where(Registro.kwh_corrida_medido.is_not(None))
+        )
+        or 0
+    )
+    return {
+        "suitesBarrido": total_suites,
+        # Final Run vive en otra tabla, todavía no wireada -- (E) del plan.
+        "suitesFinalRun": 0,
+        "registros": total_registros,
+        "registrosCompletados": registros_completados,
+        "fichasOficiales": 0,
+        "tarifasConfiguradas": obtener_tarifas_vigentes(sesion) is not None,
+    }
+
+
+__all__ = [
+    "candidatos_final_run",
+    "dashboard_resumen",
+    "materiales_catalogo",
+    "suite_detalle",
+    "suites",
+    "tarifas_vigentes",
+]

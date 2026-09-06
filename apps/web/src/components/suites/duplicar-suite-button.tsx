@@ -9,7 +9,7 @@ import { iconButtonClasses } from "@/lib/button-styles";
 import { loteSiguiente } from "@/lib/lote-siguiente";
 
 interface DuplicarSuiteButtonProps {
-  archivo: string;
+  id: number;
   material: string;
   espesorMm: number;
   operacion: "corte" | "grabado";
@@ -29,7 +29,7 @@ interface DuplicarSuiteButtonProps {
  * primer lote realmente libre para esta identidad.
  */
 export function DuplicarSuiteButton({
-  archivo,
+  id,
   material,
   espesorMm,
   operacion,
@@ -74,7 +74,7 @@ export function DuplicarSuiteButton({
     if (!loteLimpio || loteLimpio === loteActual) return;
     setAbierto(false);
     router.push(
-      `/suites/nueva?duplicar=${encodeURIComponent(archivo)}&lote=${encodeURIComponent(loteLimpio)}`,
+      `/suites/nueva?duplicar=${id}&lote=${encodeURIComponent(loteLimpio)}`,
     );
   }
 
