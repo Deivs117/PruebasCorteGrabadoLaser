@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Calculator } from "lucide-react";
+import { AyudaLink } from "@/components/ui/ayuda-link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -27,6 +28,7 @@ export default async function Costeo() {
             Costo real por celda (energía, material, tiempo de máquina), a
             partir de una Hoja de Registro completada.
           </p>
+          <AyudaLink seccion="costeo" />
         </div>
         <Reveal>
           <EmptyState
@@ -54,6 +56,7 @@ export default async function Costeo() {
           Costo real por celda (energía, material, tiempo de máquina), a partir
           de una Hoja de Registro completada.
         </p>
+        <AyudaLink seccion="costeo" />
       </div>
 
       {costeables.length === 0 ? (

@@ -4,6 +4,7 @@ import { PlaceholderPage } from "@/components/placeholder-page";
 export default function FichasDeParametro() {
   return (
     <PlaceholderPage
+      ayudaSeccion="fichas"
       icon={FileBadge}
       title="Fichas de Parámetro Estándar"
       description="Las 'recetas' oficiales por material, espesor y operación, respaldadas por un Final Run calibrado — hoy todavía no hay ninguna publicada."

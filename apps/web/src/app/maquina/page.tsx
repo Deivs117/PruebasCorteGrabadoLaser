@@ -4,6 +4,7 @@ import { PlaceholderPage } from "@/components/placeholder-page";
 export default function Maquina() {
   return (
     <PlaceholderPage
+      ayudaSeccion="maquina"
       icon={Settings2}
       title="Máquina"
       description="Parámetros del perfil de máquina (CNC 3018 + Laser Tree LT-80W-F45): límite de láser, velocidad de desplazamiento, potencia del módulo y factor de utilización."

@@ -1,3 +1,4 @@
+import { AyudaLink } from "@/components/ui/ayuda-link";
 import { TarifasForm } from "@/components/tarifas/tarifas-form";
 import { leerTarifas } from "@/lib/tarifas-data";
 
@@ -17,6 +18,7 @@ export default async function Tarifas() {
           hora-máquina y precio de material. Mientras un campo quede vacío,
           Costeo lo muestra como pendiente — nunca asume un número.
         </p>
+        <AyudaLink seccion="tarifas" />
       </div>
       <TarifasForm inicial={tarifas} />
     </div>

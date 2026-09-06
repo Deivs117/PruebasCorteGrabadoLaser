@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Gauge } from "lucide-react";
+import { AyudaLink } from "@/components/ui/ayuda-link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -30,6 +31,7 @@ export default async function FinalRun() {
             Una combinación fija de parámetros, repetida en ejecuciones
             independientes, hasta calibrar su energía real.
           </p>
+          <AyudaLink seccion="final-run" />
         </div>
         <LinkButton href="/final-run/nueva" variant="primary">
           Nueva Final Run
