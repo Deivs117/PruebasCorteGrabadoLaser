@@ -60,8 +60,8 @@ class MachineConfig(BaseModel):
         gt=0,
         description=(
             "Diametro del punto focal (spot) del modulo, en mm -- 0.08mm en el LT-80W-F45 "
-            "(lente de haz comprimido, ver docs/materiales/MDF/Analisis Tecnico MDF - "
-            "LT-80W-F45.md). Define el paso de linea (mm entre pasadas de barrido) que usa "
+            "(lente de haz comprimido, dato del manual del fabricante). Define el paso de "
+            "linea (mm entre pasadas de barrido) que usa "
             "el relleno tipo trama del grabado generico de una suite: un paso mas ancho que "
             "el spot deja franjas sin quemar entre lineas; uno mas angosto que el spot solo "
             "duplica el tiempo de maquina sin grabar mas oscuro. Ver "

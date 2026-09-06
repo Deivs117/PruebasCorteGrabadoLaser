@@ -40,10 +40,7 @@ Monorepo: `apps/` para lo desplegable, `packages/` para el código compartido. `
 ├── docs/
 │   ├── Plan Maestro - Estandarizacion Pruebas Laser.md    ← arquitectura completa del sistema
 │   ├── sop/                                                 ← protocolos de una página para el taller
-│   └── materiales/
-│       └── MDF/
-│           ├── Analisis Tecnico MDF - LT-80W-F45.md        ← análisis técnico base (parámetros teóricos)
-│           └── fichas-parametro/                            ← "recetas" oficiales validadas con datos reales
+│   └── ui-design/                                            ← paleta, prompts de Stitch, propuestas de diseño visual
 ├── data/
 │   ├── registros/                                           ← G-code + csv generados, hojas de registro por corrida
 │   └── fotos/                                                ← fotos de cupones de prueba evaluados
@@ -169,4 +166,4 @@ El estado del trabajo en curso — qué falta, en qué orden, quién lo está tr
 
 ## Material de referencia
 
-- [Análisis Técnico MDF](docs/materiales/MDF/Analisis%20Tecnico%20MDF%20-%20LT-80W-F45.md): parámetros optomecánicos del módulo LT-80W-F45, comportamiento térmico del MDF, matriz de decisión comercial por línea de producto.
+Los parámetros óptimos por material/espesor ya no viven en un documento teórico — son las **Fichas de Parámetro Estándar**, derivadas de datos reales medidos en la máquina (ver Plan Maestro, sección 7).
