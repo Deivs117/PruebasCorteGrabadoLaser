@@ -1,11 +1,12 @@
-"""Acceso a datos (Supabase/Postgres, via SQLAlchemy) -- ver issue #1 y #22.
+"""Acceso a datos (Supabase/Postgres, via SQLAlchemy) -- ver issues #1, #22, #24.
 
-Este subpaquete define el schema (`models.py`) y la base declarativa/engine
-(`base.py`). NO expone sesiones crudas de SQLAlchemy hacia afuera de
-`laser_toolkit`: la capa de funciones de alto nivel que sí se usa desde las
-funciones serverless del frontend vive en el issue #24 (todavia no
-implementado). Este modulo es deliberadamente solo el schema -- diseñarlo
-bien primero, antes de escribir una sola query, es el alcance de #22.
+- `base.py`: base declarativa + factory de engine/sesion (lee `DATABASE_URL`).
+- `models.py`: el schema (11 tablas).
+- `repo_materiales.py`, `repo_pruebas.py`, `repo_calibracion.py`,
+  `repo_negocio.py`: funciones de alto nivel (issue #24) -- la UNICA forma en
+  que el resto del sistema (funciones serverless de #2, futuros comandos del
+  CLI) toca la base. Nunca se espera que quien llama escriba una query de
+  SQLAlchemy por su cuenta.
 """
 
 from __future__ import annotations
