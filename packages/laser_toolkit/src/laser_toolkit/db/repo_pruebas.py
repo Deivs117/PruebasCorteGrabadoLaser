@@ -86,6 +86,17 @@ def crear_registro_de_suite(
     return registro
 
 
+def guardar_gcode_key(sesion: Session, registro: Registro, gcode_storage_key: str) -> Registro:
+    """Asocia el `.gcode` ya subido a Supabase Storage (issue #25,
+    `laser_toolkit.storage.operaciones.subir_gcode`) con su registro. Deja
+    la subida en sí fuera de este módulo a propósito: `repo_pruebas.py` no
+    depende de `laser_toolkit.storage` ni de red -- quien orquesta ambos
+    pasos (subir, después guardar la key) es el llamador."""
+    registro.gcode_storage_key = gcode_storage_key
+    sesion.flush()
+    return registro
+
+
 def registrar_mediciones_generadas(sesion: Session, registro: Registro, filas: list[dict]) -> list[Medicion]:
     """Vuelca las filas ya generadas por una suite (espejo de `CAMPOS_CSV` de
     `laser_toolkit.io.csv_export`) como `Medicion` -- ninguna requiere
