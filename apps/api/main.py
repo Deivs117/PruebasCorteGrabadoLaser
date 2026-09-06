@@ -13,18 +13,22 @@ agregan de la misma forma sobre esta app.
 """
 
 from datetime import date
+from typing import Literal
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import text
 
 import creacion
+import editor
 import escritura
 import final_run
 import generacion
 import lectura
 import storage_endpoints
 import suites_admin
+import svgs
+from laser_toolkit.db.repo_negocio import construir_machine_config
 from sesiones import sesion
 from storage_cliente import cliente as cliente_storage
 
@@ -455,3 +459,95 @@ def eliminar_grupo_calibracion(grupo_id: str) -> dict:
         except ValueError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         return {"ok": True}
+
+
+class ParametrosOperacionBody(BaseModel):
+    velocidadMmMin: int
+    potenciaPct: int
+
+
+class ObjetoExportarBody(BaseModel):
+    tipo: Literal["svg", "raster"]
+    xMm: float
+    yMm: float
+    anchoMm: float
+    altoMm: float
+    rotacionDeg: float = 0.0
+    operaciones: list[Literal["corte", "grabado"]]
+    parametros: dict[str, ParametrosOperacionBody]
+    # Solo para tipo="svg":
+    contenidoSvg: str | None = None
+    resolucionRellenoMm: float | None = None
+    # Solo para tipo="raster":
+    dataUri: str | None = None
+
+
+class ExportarGcodeBody(BaseModel):
+    objetos: list[ObjetoExportarBody]
+
+
+@app.post("/editor/exportar")
+def exportar_gcode_editor(body: ExportarGcodeBody) -> dict:
+    with sesion() as s:
+        try:
+            objetos = [o.model_dump() for o in body.objetos]
+            return editor.exportar_gcode_combinado(s, cliente_storage, objetos)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/svgs")
+def listar_svgs() -> list[dict]:
+    return svgs.listar(cliente_storage)
+
+
+class SubirSvgBody(BaseModel):
+    nombre: str
+    contenido: str
+
+
+@app.post("/svgs")
+def subir_svg_biblioteca(body: SubirSvgBody) -> dict:
+    try:
+        return svgs.subir(cliente_storage, body.nombre, body.contenido)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.delete("/svgs/{nombre}")
+def eliminar_svg_biblioteca(nombre: str) -> dict:
+    try:
+        svgs.eliminar_svg(cliente_storage, nombre)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return {"ok": True}
+
+
+class ConvertirSvgBody(BaseModel):
+    anchoMm: float
+    altoMm: float
+    velocidadMmMin: int
+    potenciaPct: int
+    modo: str
+    resolucionRellenoMm: float
+
+
+@app.post("/svgs/{nombre}/convertir")
+def convertir_svg_biblioteca(nombre: str, body: ConvertirSvgBody) -> dict:
+    with sesion() as s:
+        machine = construir_machine_config(s)
+    try:
+        gcode = svgs.convertir(
+            cliente_storage,
+            nombre,
+            ancho_mm=body.anchoMm,
+            alto_mm=body.altoMm,
+            velocidad_mm_min=body.velocidadMmMin,
+            potencia_pct=body.potenciaPct,
+            modo=body.modo,
+            resolucion_relleno_mm=body.resolucionRellenoMm,
+            machine=machine,
+        )
+        return {"ok": True, "gcode": "\n".join(gcode)}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error

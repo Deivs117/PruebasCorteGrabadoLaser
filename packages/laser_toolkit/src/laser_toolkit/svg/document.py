@@ -120,6 +120,15 @@ def _parsear_viewbox(raiz: ET.Element) -> tuple[float, float, float, float]:
     return 0.0, 0.0, ancho, alto
 
 
+def _procesar_raiz(raiz: ET.Element, origen: str) -> tuple[list[Subpath], tuple[float, float, float, float]]:
+    viewbox = _parsear_viewbox(raiz)
+    subpaths: list[Subpath] = []
+    _recolectar_subpaths(raiz, subpaths)
+    if not subpaths:
+        raise ValueError(f"no se encontraron formas soportadas en {origen}")
+    return subpaths, viewbox
+
+
 def parsear_svg(ruta: str | Path) -> tuple[list[Subpath], tuple[float, float, float, float]]:
     """Parsea un archivo SVG completo.
 
@@ -128,9 +137,14 @@ def parsear_svg(ruta: str | Path) -> tuple[list[Subpath], tuple[float, float, fl
     todavia -- eso lo hace `laser_toolkit.svg.transform`).
     """
     raiz = ET.parse(Path(ruta)).getroot()
-    viewbox = _parsear_viewbox(raiz)
-    subpaths: list[Subpath] = []
-    _recolectar_subpaths(raiz, subpaths)
-    if not subpaths:
-        raise ValueError(f"no se encontraron formas soportadas en {ruta}")
-    return subpaths, viewbox
+    return _procesar_raiz(raiz, str(ruta))
+
+
+def parsear_svg_texto(contenido: str) -> tuple[list[Subpath], tuple[float, float, float, float]]:
+    """Igual que `parsear_svg`, pero a partir del contenido ya en memoria
+    (issue #3, editor de diseño: el SVG llega como texto subido en el
+    navegador, nunca toca un filesystem persistente en la función serverless
+    de Vercel, #2) -- misma logica de recoleccion de subpaths, sin pasar por
+    disco."""
+    raiz = ET.fromstring(contenido)  # noqa: S314 -- SVG propio del usuario, no XML de terceros no confiable
+    return _procesar_raiz(raiz, "<contenido SVG en memoria>")

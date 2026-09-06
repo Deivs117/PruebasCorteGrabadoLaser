@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
 import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
-import { DescargarBoton } from "@/components/registro/descargar-boton";
+import { DescargarGcodeBoton } from "@/components/grabado-svg/descargar-gcode-boton";
 import { SvgOriginalPreview } from "@/components/grabado-svg/svg-original-preview";
 import { ToolpathPreview } from "@/components/grabado-svg/toolpath-preview";
 import {
@@ -47,7 +47,7 @@ const OPCIONES_MODO: { valor: ModoGrabadoSvg; etiqueta: string }[] = [
 type Resultado =
   | { estado: "idle" }
   | { estado: "generando" }
-  | { estado: "ok"; gcode: string; archivoGcode: string }
+  | { estado: "ok"; gcode: string }
   | { estado: "error"; mensaje: string };
 
 export function SvgWorkspace({ nombre, contenidoSvg }: SvgWorkspaceProps) {
@@ -82,15 +82,10 @@ export function SvgWorkspace({ nombre, contenidoSvg }: SvgWorkspaceProps) {
       const cuerpo = (await respuesta.json()) as {
         ok: boolean;
         gcode?: string;
-        archivoGcode?: string;
         error?: string;
       };
-      if (cuerpo.ok && cuerpo.gcode && cuerpo.archivoGcode) {
-        setResultado({
-          estado: "ok",
-          gcode: cuerpo.gcode,
-          archivoGcode: cuerpo.archivoGcode,
-        });
+      if (cuerpo.ok && cuerpo.gcode) {
+        setResultado({ estado: "ok", gcode: cuerpo.gcode });
       } else {
         setResultado({
           estado: "error",
@@ -260,10 +255,9 @@ export function SvgWorkspace({ nombre, contenidoSvg }: SvgWorkspaceProps) {
             : "Generar vista previa"}
         </Button>
         {resultado.estado === "ok" ? (
-          <DescargarBoton
-            archivo={resultado.archivoGcode}
-            etiqueta="Descargar G-code"
-            endpointBase="/api/svgs/descargar"
+          <DescargarGcodeBoton
+            gcode={resultado.gcode}
+            nombreArchivo={nombre.replace(/\.svg$/i, ".gcode")}
           />
         ) : null}
       </div>

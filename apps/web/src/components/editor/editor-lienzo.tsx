@@ -12,12 +12,36 @@ import { ObjetoLienzoKonva } from "@/components/editor/objeto-lienzo-konva";
 import { PanelObjeto } from "@/components/editor/panel-objeto";
 import { SubirObjetoDropzone } from "@/components/editor/subir-objeto-dropzone";
 import { objetoExcedeArea } from "@/lib/editor-area";
+import type { ObjetoExportar } from "@/lib/editor-export-schema";
 import { conversionSvgSchema, type ModoGrabadoSvg } from "@/lib/svg-schema";
 import type {
   EstadoToolpath,
   ObjetoLienzo,
   Operacion,
 } from "@/lib/editor-tipos";
+
+/** Recorta un `ObjetoLienzo` (estado del cliente, con `id`/`nombre`/
+ * `toolpath` y demás campos de UI) a la forma que espera `/api/editor/
+ * exportar` -- espejo de `ObjetoExportarBody` en `apps/api/main.py`. */
+function aObjetoExportar(objeto: ObjetoLienzo): ObjetoExportar {
+  const comunes = {
+    xMm: objeto.xMm,
+    yMm: objeto.yMm,
+    anchoMm: objeto.anchoMm,
+    altoMm: objeto.altoMm,
+    rotacionDeg: objeto.rotacionDeg,
+    operaciones: objeto.operaciones,
+    parametros: objeto.parametros,
+  };
+  return objeto.tipo === "svg"
+    ? {
+        tipo: "svg",
+        ...comunes,
+        contenidoSvg: objeto.contenidoSvg,
+        resolucionRellenoMm: objeto.resolucionRellenoMm,
+      }
+    : { tipo: "raster", ...comunes, dataUri: objeto.dataUri };
+}
 
 interface EditorLienzoProps {
   areaTrabajoAnchoMm: number;
@@ -36,13 +60,10 @@ const ESPACIADO_CASCADA_MM = 15;
 /**
  * Lienzo interactivo de "Editor de Diseño" (#3/#16): subir, arrastrar,
  * posicionar y rotar varios objetos (SVG y/o imágenes raster) sobre el área
- * de trabajo real de la máquina, con preview de toolpath por objeto.
- *
- * Deliberadamente NO incluye el export combinado a un solo G-code todavía
- * — el motor de conversión no soporta rotación real de coordenadas hasta
- * que se sincronice con la rama de backend de #15/#16 (ver el botón
- * deshabilitado al final). Ver la nota técnica sobre rotación en los
- * comentarios de #15 y #16 en GitHub.
+ * de trabajo real de la máquina, con preview de toolpath por objeto y
+ * exportación final a un G-code combinado (`/api/editor/exportar`, cierre
+ * de #15/#16 -- la conversión real corre en `apps/api`, reusando el motor
+ * de rotación de `laser_toolkit.svg.transform`/`laser_toolkit.raster`).
  */
 export function EditorLienzo({
   areaTrabajoAnchoMm,
@@ -54,6 +75,8 @@ export function EditorLienzo({
   const [vistaToolpath, setVistaToolpath] = useState(false);
   const contenedorRef = useRef<HTMLDivElement>(null);
   const [anchoPx, setAnchoPx] = useState(600);
+  const [exportando, setExportando] = useState(false);
+  const [errorExportar, setErrorExportar] = useState<string | null>(null);
 
   // Konva dibuja sobre un <canvas> real -- montarlo durante el render de
   // servidor rompería el SSR (no hay canvas ahí). No se puede derivar de un
@@ -190,6 +213,39 @@ export function EditorLienzo({
       });
     }
   }
+
+  async function exportarGcode() {
+    setExportando(true);
+    setErrorExportar(null);
+    try {
+      const respuesta = await fetch("/api/editor/exportar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ objetos: objetos.map(aObjetoExportar) }),
+      });
+      const cuerpo = (await respuesta.json()) as {
+        ok: boolean;
+        url?: string;
+        error?: string;
+      };
+      if (cuerpo.ok && cuerpo.url) {
+        window.open(cuerpo.url, "_blank");
+      } else {
+        setErrorExportar(cuerpo.error ?? "No se pudo exportar el G-code.");
+      }
+    } catch {
+      setErrorExportar("No se pudo conectar con el taller.");
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  const noSeExportaPor =
+    objetos.length === 0
+      ? "Agregá al menos un objeto al lienzo antes de exportar."
+      : objetosFueraDeArea.length > 0
+        ? "Movés o achicá los objetos que no caben en el área de trabajo antes de exportar."
+        : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -328,16 +384,26 @@ export function EditorLienzo({
           <Card className="flex flex-col gap-1.5 p-4">
             <Button
               variant="primary"
-              disabled
-              title="Pendiente de sincronizar con feature/backend (#15/#16)"
+              onClick={exportarGcode}
+              disabled={exportando || noSeExportaPor !== null}
+              loading={exportando}
+              title={noSeExportaPor ?? undefined}
             >
-              Exportar G-code combinado
+              {exportando ? "Exportando…" : "Exportar G-code combinado"}
             </Button>
-            <p className="text-text-muted text-xs">
-              Todavía no disponible: el motor de conversión no soporta rotación
-              real de coordenadas — este botón se activa cuando la rama de
-              backend de rotación (#15/#16) se mergee.
-            </p>
+            {noSeExportaPor ? (
+              <p className="text-text-muted text-xs">{noSeExportaPor}</p>
+            ) : (
+              <p className="text-text-muted text-xs">
+                Genera un solo G-code con todos los objetos del lienzo, en su
+                posición y rotación actuales, y abre el link de descarga.
+              </p>
+            )}
+            {errorExportar ? (
+              <p role="alert" className="text-danger text-xs font-medium">
+                {errorExportar}
+              </p>
+            ) : null}
           </Card>
         </div>
 
