@@ -1,18 +1,12 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import {
-  CONFIGS_DIR,
-  PY_PROJECT_ARGS,
-  REGISTROS_DIR,
-  REPO_ROOT,
-} from "@/lib/fs-data";
-import { existeArchivo, predecirCorridaId } from "@/lib/corrida-id";
-import { pyDelete, pyGet, pyPost } from "@/lib/py-api";
+import { stringify as stringifyYaml } from "yaml";
+import { CONFIGS_DIR, PY_PROJECT_ARGS, REPO_ROOT } from "@/lib/fs-data";
+import { pyDelete, pyGet, pyPost, pyPut } from "@/lib/py-api";
 import { slug } from "@/lib/slug";
 import { idPrefijo, type SuiteFormData } from "@/lib/suite-schema";
 
@@ -36,27 +30,16 @@ export interface ResultadoGeneracion {
   error?: string;
 }
 
-/** Mismo criterio que `esYamlDeSuite` en fs-data.ts: nunca tocar
- * tarifas.yaml ni nada fuera de configs/. */
-function nombreDeSuiteValido(nombre: string): boolean {
-  return (
-    nombre.endsWith(".yaml") &&
-    !nombre.includes("tarifas") &&
-    !nombre.includes("example") &&
-    !nombre.includes("/") &&
-    !nombre.includes("..")
-  );
-}
-
 function nombreArchivoConfig(datos: SuiteFormData): string {
   const marca = Date.now().toString(36);
   return `web-${slug(datos.material)}-${datos.espesorMm}mm-${datos.operacion}-${marca}.yaml`;
 }
 
-/** Solo los campos que administra el asistente — nunca todo el YAML: al
- * editar, esto se fusiona sobre el archivo original en vez de reemplazarlo
- * entero, para no borrar configuración que el formulario no muestra (ej. un
- * `machine` con valores no default). Ver `actualizarSuite`. */
+/** Solo los campos que administra el asistente. Compartido por los tres
+ * caminos de escritura: crear/editar una suite real (Supabase, camelCase ->
+ * snake_case, ya compatible 1:1 con `SuiteConfig`) y crear una suite con SVG
+ * (todavía local, issue #3 -- editar una ya creada con SVG no es un caso
+ * real: una suite real de Supabase nunca tiene `svgPath`, ver B/#62). */
 function camposConocidos(datos: SuiteFormData): Record<string, unknown> {
   const campos: Record<string, unknown> = {
     material: datos.material,
@@ -141,23 +124,6 @@ async function escribirYGenerar(
 }
 
 /**
- * Evita el incidente real que motivó esto: editar una suite que ya tiene su
- * Hoja de Registro preparada (`_registro.csv`) regenera el `.csv` hermano
- * bajo el MISMO nombre (mismo material+espesor+operación+fecha+lote) y, si
- * después se corre "Preparar registro" de nuevo, pisa en silencio las
- * mediciones y notas ya guardadas. En vez de bloquear todas las ediciones
- * (el `.csv` se regenera solo en cada guardado, incluso recién creada la
- * suite, así que bloquear por su sola existencia rompería la edición normal
- * antes de correr nada), esto solo bloquea cuando ya existe un
- * `_registro.csv` real para esa identidad — ahí sí hay datos del técnico en
- * juego.
- */
-async function corridaYaRegistrada(datos: SuiteFormData): Promise<boolean> {
-  const corridaId = predecirCorridaId(datos);
-  return existeArchivo(path.join(REGISTROS_DIR, `${corridaId}_registro.csv`));
-}
-
-/**
  * Crea una suite nueva -- (A)/#56, vía el servicio Python: persiste
  * Suite+Registro+Mediciones en Supabase y genera el G-code real en la misma
  * operación, sin pasar por un YAML local ni un subproceso (el hallazgo de
@@ -201,109 +167,44 @@ export async function generarSuite(
 }
 
 /**
- * Guarda los cambios sobre el mismo archivo de configuración (no crea uno
- * nuevo) y regenera su G-code — editar una suite implica que la máquina
- * corra la versión actualizada, no solo cambiar un número en un formulario.
- *
- * Fusiona los campos del formulario sobre el YAML original en vez de
- * reemplazarlo entero: el asistente no conoce todos los campos posibles de
- * `SuiteConfig` (ej. `machine` con valores no default) y sobreescribir el
- * archivo completo borraría esos campos en silencio.
+ * Guarda los cambios sobre la misma Suite/Registro (B, issue #62) y
+ * regenera su G-code -- editar una suite implica que la máquina corra la
+ * versión actualizada, no solo cambiar un número en un formulario. El
+ * servicio Python (`creacion.actualizar`) rechaza la edición si el Registro
+ * ya tiene evaluación, medición de corrida o costeo cargado (mismo
+ * incidente real que motivaba `actualizarSuite`/`corridaYaRegistrada` en el
+ * sistema de archivos viejo) -- ese error ya viaja en `resultado.error`
+ * tal cual lo devuelve Python, no se reinterpreta acá.
  */
-export async function actualizarSuite(
-  archivoExistente: string,
+export async function actualizarSuitePorId(
+  id: number,
   datos: SuiteFormData,
 ): Promise<ResultadoGeneracion> {
-  if (!nombreDeSuiteValido(archivoExistente)) {
-    return { ok: false, error: "Archivo inválido." };
-  }
-
-  if (await corridaYaRegistrada(datos)) {
+  try {
+    const resultado = await pyPut<{ corridaId: string; celdas: number }>(
+      `suites/${id}`,
+      camposConocidos(datos),
+    );
+    return {
+      ok: true,
+      celdas: resultado.celdas,
+      corridaId: resultado.corridaId,
+    };
+  } catch (error) {
     return {
       ok: false,
       error:
-        'Ya existe una Hoja de Registro preparada para este material, espesor, operación y lote de hoy. Guardar esta edición pisaría esas mediciones en silencio — usá "Duplicar" con un lote distinto en vez de editar esta suite.',
+        error instanceof Error
+          ? error.message
+          : "Error desconocido al actualizar la suite.",
     };
-  }
-
-  let original: Record<string, unknown> = {};
-  try {
-    original =
-      (parseYaml(
-        await readFile(path.join(CONFIGS_DIR, archivoExistente), "utf-8"),
-      ) as Record<string, unknown> | null) ?? {};
-  } catch {
-    // No existía o no se pudo leer: se escribe desde cero con lo que sabe el asistente.
-  }
-
-  const fusionado = { ...original, ...camposConocidos(datos) };
-  // El spread de arriba no borra una clave que `camposConocidos` omite: si
-  // el técnico quitó el SVG en el formulario, hay que sacarlo a mano.
-  if (!datos.svgPath) {
-    delete fusionado.svg_path;
-    delete fusionado.modo_grabado_svg;
-    delete fusionado.svg_resolucion_relleno_mm;
-  }
-
-  return escribirYGenerar(archivoExistente, fusionado, datos.operacion);
-}
-
-/** Lee una suite ya existente en la forma que espera el formulario del
- * asistente, para poder editarla — separado de `leerSuite` en fs-data.ts,
- * que devuelve la forma pensada para mostrarla en las listas. */
-export async function leerSuiteEditable(
-  archivo: string,
-): Promise<SuiteFormData | null> {
-  if (!nombreDeSuiteValido(archivo)) return null;
-  try {
-    const contenido = await readFile(path.join(CONFIGS_DIR, archivo), "utf-8");
-    const datos = parseYaml(contenido) as Record<string, unknown>;
-
-    if (
-      typeof datos.material !== "string" ||
-      typeof datos.espesor_mm !== "number" ||
-      typeof datos.velocidad_mm_min === "number" // Final Run: no la edita este asistente.
-    ) {
-      return null;
-    }
-
-    return {
-      operacion: datos.operacion === "grabado" ? "grabado" : "corte",
-      material: datos.material,
-      espesorMm: datos.espesor_mm,
-      lote: typeof datos.lote === "string" ? datos.lote : "L01",
-      velocidadesMmMin: Array.isArray(datos.velocidades_mm_min)
-        ? (datos.velocidades_mm_min as number[])
-        : [],
-      potenciasPct: Array.isArray(datos.potencias_pct)
-        ? (datos.potencias_pct as number[])
-        : [],
-      pasadas: typeof datos.pasadas === "number" ? datos.pasadas : 1,
-      tamanoCeldaMm:
-        typeof datos.tamano_celda_mm === "number" ? datos.tamano_celda_mm : 15,
-      espaciadoMm:
-        typeof datos.espaciado_mm === "number" ? datos.espaciado_mm : 5,
-      svgPath: typeof datos.svg_path === "string" ? datos.svg_path : undefined,
-      modoGrabadoSvg:
-        datos.modo_grabado_svg === "contorno" ||
-        datos.modo_grabado_svg === "relleno" ||
-        datos.modo_grabado_svg === "contorno_y_relleno"
-          ? datos.modo_grabado_svg
-          : undefined,
-      svgResolucionRellenoMm:
-        typeof datos.svg_resolucion_relleno_mm === "number"
-          ? datos.svg_resolucion_relleno_mm
-          : undefined,
-    };
-  } catch {
-    return null;
   }
 }
 
-/** Lee una suite real de Supabase en la forma que espera el asistente, para
- * "Duplicar" (A) -- espejo de `leerSuiteEditable` de arriba, pero por `id`
- * en vez de nombre de archivo. */
-export async function leerSuiteParaDuplicar(
+/** Lee una suite real de Supabase en la forma que espera el asistente --
+ * compartida por "Duplicar" (A) y "Editar" (B), ver el docstring de
+ * `suite_detalle` en `apps/api/lectura.py`. */
+export async function leerSuiteParaFormulario(
   id: number,
 ): Promise<SuiteFormData | null> {
   try {

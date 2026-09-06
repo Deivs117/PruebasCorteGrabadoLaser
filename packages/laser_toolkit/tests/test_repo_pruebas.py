@@ -10,6 +10,8 @@ from laser_toolkit.config import Operacion
 from laser_toolkit.db.base import Base
 from laser_toolkit.db.models import FamiliaMaterial
 from laser_toolkit.db.repo_pruebas import (
+    actualizar_registro,
+    actualizar_suite,
     calcular_y_guardar_costos_registro,
     completar_evaluacion,
     completar_medicion_corrida,
@@ -19,7 +21,9 @@ from laser_toolkit.db.repo_pruebas import (
     guardar_gcode_key,
     listar_candidatos,
     marcar_candidato,
+    reemplazar_mediciones,
     registrar_mediciones_generadas,
+    tiene_datos_cargados,
 )
 from laser_toolkit.tarifas import TarifasConfig
 
@@ -136,6 +140,87 @@ def test_guardar_gcode_key_asocia_la_key_de_storage(sesion):
     assert registro.gcode_storage_key is None
     guardar_gcode_key(sesion, registro, "MDF-Trupan/MDF-Trupan_3mm_corte_2026-09-03_L07.gcode")
     assert registro.gcode_storage_key == "MDF-Trupan/MDF-Trupan_3mm_corte_2026-09-03_L07.gcode"
+
+
+def test_tiene_datos_cargados_falso_recien_generado(sesion):
+    registro = _armar_registro_con_mediciones(sesion)
+    assert tiene_datos_cargados(registro) is False
+
+
+def test_tiene_datos_cargados_por_medicion_de_corrida(sesion):
+    registro = _armar_registro_con_mediciones(sesion)
+    completar_medicion_corrida(sesion, registro, kwh_corrida_medido=0.05, tiempo_real_corrida_s=100.0)
+    assert tiene_datos_cargados(registro) is True
+
+
+def test_tiene_datos_cargados_por_evaluacion_de_una_sola_celda(sesion):
+    registro = _armar_registro_con_mediciones(sesion)
+    completar_evaluacion(sesion, registro.mediciones[0], corte_pasante=True)
+    assert tiene_datos_cargados(registro) is True
+
+
+def test_actualizar_suite_muta_la_fila_sin_crear_una_nueva(sesion):
+    registro = _armar_registro_con_mediciones(sesion)
+    assert registro.suite is not None
+    suite = registro.suite
+    suite_id = suite.id
+
+    actualizar_suite(
+        sesion,
+        suite,
+        material="MDF Trupan",
+        familia=FamiliaMaterial.MADERA,
+        espesor_mm=5.0,
+        operacion=Operacion.CORTE,
+        velocidades_mm_min=[500],
+        potencias_pct=[80],
+        lote="L08",
+        fecha=date(2026, 9, 6),
+    )
+    sesion.commit()
+
+    assert suite.id == suite_id
+    assert suite.espesor_mm == 5.0
+    assert suite.velocidades_mm_min == [500]
+    assert suite.lote == "L08"
+
+
+def test_actualizar_registro_cambia_corrida_id_sin_perder_el_registro(sesion):
+    registro = _armar_registro_con_mediciones(sesion)
+    registro_id = registro.id
+
+    actualizar_registro(
+        sesion, registro, corrida_id="MDF-Trupan_5mm_corte_2026-09-06_L08", fecha=date(2026, 9, 6), lote="L08"
+    )
+    sesion.commit()
+
+    assert registro.id == registro_id
+    assert registro.corrida_id == "MDF-Trupan_5mm_corte_2026-09-06_L08"
+    assert registro.lote == "L08"
+
+
+def test_reemplazar_mediciones_descarta_las_anteriores(sesion):
+    registro = _armar_registro_con_mediciones(sesion)
+    assert {m.id_prueba for m in registro.mediciones} == {"C-001", "C-002"}
+
+    filas_nuevas = [
+        {
+            "id_prueba": "C-001",
+            "velocidad_mm_min": 500,
+            "potencia_pct": 80,
+            "pasadas": 1,
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "tamano_celda_mm": 30.0,
+            "area_material_mm2": 900.0,
+            "tiempo_estimado_celda_s": 30.0,
+        }
+    ]
+    reemplazar_mediciones(sesion, registro, filas_nuevas)
+    sesion.commit()
+
+    assert {m.id_prueba for m in registro.mediciones} == {"C-001"}
+    assert registro.mediciones[0].velocidad_mm_min == 500
 
 
 def test_marcar_y_desmarcar_candidato_es_idempotente(sesion):

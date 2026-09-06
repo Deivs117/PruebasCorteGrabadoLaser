@@ -1,13 +1,26 @@
 import { NextResponse } from "next/server";
-import { actualizarSuite, eliminarSuitePorId } from "@/lib/generar-suite";
+import { actualizarSuitePorId, eliminarSuitePorId } from "@/lib/generar-suite";
 import { suiteSchema } from "@/lib/suite-schema";
 
 interface Contexto {
-  params: Promise<{ archivo: string }>;
+  params: Promise<{ id: string }>;
+}
+
+function idValido(id: string): number | null {
+  const numero = Number(id);
+  return Number.isInteger(numero) ? numero : null;
 }
 
 export async function PUT(request: Request, { params }: Contexto) {
-  const { archivo } = await params;
+  const { id: idParam } = await params;
+  const id = idValido(idParam);
+  if (id === null) {
+    return NextResponse.json(
+      { ok: false, error: "Id de suite inválido." },
+      { status: 400 },
+    );
+  }
+
   const cuerpo: unknown = await request.json().catch(() => null);
   const analisis = suiteSchema.safeParse(cuerpo);
 
@@ -21,25 +34,20 @@ export async function PUT(request: Request, { params }: Contexto) {
     );
   }
 
-  const resultado = await actualizarSuite(
-    decodeURIComponent(archivo),
-    analisis.data,
-  );
+  const resultado = await actualizarSuitePorId(id, analisis.data);
   return NextResponse.json(resultado, { status: resultado.ok ? 200 : 422 });
 }
 
-/** Pese al nombre del segmento de ruta (`[archivo]`, heredado de cuando las
- * suites vivían como YAML — B/#62 lo va a renombrar), acá siempre llega el
- * `id` numérico real de la fila `Suite` en Supabase. */
 export async function DELETE(_request: Request, { params }: Contexto) {
-  const { archivo } = await params;
-  const id = Number(archivo);
-  if (!Number.isInteger(id)) {
+  const { id: idParam } = await params;
+  const id = idValido(idParam);
+  if (id === null) {
     return NextResponse.json(
       { ok: false, error: "Id de suite inválido." },
       { status: 400 },
     );
   }
+
   const eliminado = await eliminarSuitePorId(id);
   if (!eliminado) {
     return NextResponse.json(

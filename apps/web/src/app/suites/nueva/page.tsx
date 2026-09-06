@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/ui/back-link";
 import { SuiteWizard } from "@/components/suites/suite-wizard";
-import { leerSuiteParaDuplicar } from "@/lib/generar-suite";
+import { leerSuiteParaFormulario } from "@/lib/generar-suite";
 import { leerCatalogoMateriales } from "@/lib/materiales-catalog";
 import { listarSvgsConContenido } from "@/lib/svg-data";
 
@@ -22,7 +22,7 @@ export default async function NuevaSuite({
 
   const [datosOrigen, svgsDisponibles, catalogoMateriales] = await Promise.all([
     idOrigen !== undefined
-      ? leerSuiteParaDuplicar(idOrigen)
+      ? leerSuiteParaFormulario(idOrigen)
       : Promise.resolve(null),
     listarSvgsConContenido(),
     leerCatalogoMateriales(),

@@ -12,16 +12,17 @@ en `lectura.py`; los de escritura sin generación de G-code (#49) en
 agregan de la misma forma sobre esta app.
 """
 
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from pydantic import BaseModel, ValidationError
+from sqlalchemy import text
+
 import creacion
 import escritura
 import generacion
 import lectura
 import storage_endpoints
 import suites_admin
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from pydantic import BaseModel, ValidationError
 from sesiones import sesion
-from sqlalchemy import text
 from storage_cliente import cliente as cliente_storage
 
 app = FastAPI(title="laser-toolkit-api")
@@ -222,6 +223,17 @@ def obtener_suite(suite_id: int) -> dict:
         if detalle is None:
             raise HTTPException(status_code=404, detail=f"No existe la suite {suite_id}.")
         return detalle
+
+
+@app.put("/suites/{suite_id}")
+def actualizar_suite(suite_id: int, payload: dict) -> dict:
+    with sesion() as s:
+        if lectura.suite_detalle(s, suite_id) is None:
+            raise HTTPException(status_code=404, detail=f"No existe la suite {suite_id}.")
+        try:
+            return creacion.actualizar(s, cliente_storage, suite_id, payload)
+        except (ValueError, ValidationError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @app.delete("/suites/{suite_id}")

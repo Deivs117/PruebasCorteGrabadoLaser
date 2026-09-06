@@ -78,10 +78,12 @@ function desdeDatosIniciales(datos: SuiteFormData): EstadoFormulario {
 type ResultadoEnvio =
   | { estado: "idle" }
   | { estado: "enviando" }
-  // Camino nuevo (crear, Supabase): solo corridaId -- el .gcode se descarga
-  // vía Storage, ya no hay un csv de archivo aparte que ofrecer.
+  // Camino Supabase (crear #56 o editar B/#62): solo corridaId -- el .gcode
+  // se descarga vía Storage, ya no hay un csv de archivo aparte que ofrecer.
   | { estado: "ok"; celdas: number; corridaId: string }
-  // Camino viejo (editar, todavía local -- ver B/#62): gcode/csv de disco.
+  // Camino viejo, todavía local: crear una suite con SVG cargado (issue #3,
+  // el servicio Python no lo soporta todavía). Nunca pasa al editar: una
+  // Suite real de Supabase nunca tiene `svgPath`.
   | {
       estado: "ok-local";
       celdas: number;
@@ -117,21 +119,22 @@ interface SvgDisponible {
 }
 
 interface SuiteWizardProps {
-  /** Si se pasa, el asistente edita esa suite en vez de crear una nueva:
-   * guarda sobre el mismo archivo y regenera su G-code. */
-  archivoExistente?: string;
+  /** Si se pasa, el asistente edita esa Suite real de Supabase (B, #62) en
+   * vez de crear una nueva: guarda sobre la misma fila y regenera su
+   * G-code. */
+  suiteIdExistente?: number;
   datosIniciales?: SuiteFormData;
   svgsDisponibles: SvgDisponible[];
   materialesDisponibles: string[];
 }
 
 export function SuiteWizard({
-  archivoExistente,
+  suiteIdExistente,
   datosIniciales,
   svgsDisponibles,
   materialesDisponibles,
 }: SuiteWizardProps) {
-  const modoEdicion = archivoExistente !== undefined;
+  const modoEdicion = suiteIdExistente !== undefined;
   const [paso, setPaso] = useState(0);
   const [form, setForm] = useState<EstadoFormulario>(
     datosIniciales ? desdeDatosIniciales(datosIniciales) : ESTADO_INICIAL,
@@ -174,9 +177,7 @@ export function SuiteWizard({
 
     try {
       const respuesta = await fetch(
-        modoEdicion
-          ? `/api/suites/${encodeURIComponent(archivoExistente)}`
-          : "/api/suites",
+        modoEdicion ? `/api/suites/${suiteIdExistente}` : "/api/suites",
         {
           method: modoEdicion ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
