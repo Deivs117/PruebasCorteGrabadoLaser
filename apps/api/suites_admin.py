@@ -71,7 +71,10 @@ def eliminar_registro_por_corrida(sesion: Session, cliente_storage: Client, corr
     if fila.suite_id is not None:
         eliminar_suite(sesion, cliente_storage, fila.suite_id)
         return
-    raise ValueError(f"La corrida {corrida_id} es de Final Run -- eliminarla todavía no está soportado (E).")
+    raise ValueError(
+        f"La corrida {corrida_id} es una ejecución de Final Run -- no se puede eliminar suelta, "
+        "eliminá el grupo de calibración completo desde Final Run."
+    )
 
 
 __all__ = ["eliminar_registro_por_corrida", "eliminar_suite"]

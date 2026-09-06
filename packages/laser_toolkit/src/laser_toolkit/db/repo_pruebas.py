@@ -20,7 +20,7 @@ from laser_toolkit.costos import (
     kwh_estimado_celda,
     prorratear_por_tiempo,
 )
-from laser_toolkit.db.models import CandidatoFinalRun, FamiliaMaterial, Medicion, Registro, Suite
+from laser_toolkit.db.models import CandidatoFinalRun, FamiliaMaterial, FinalRun, Medicion, Registro, Suite
 from laser_toolkit.db.repo_materiales import obtener_o_crear_material
 from laser_toolkit.svg.modo import ModoGrabadoSvg
 from laser_toolkit.tarifas import TarifasConfig
@@ -81,6 +81,18 @@ def crear_registro_de_suite(
     """Una corrida física que ejecuta esa suite -- ver `CheckConstraint` de
     origen único en `Registro` (exactamente suite XOR final_run)."""
     registro = Registro(corrida_id=corrida_id, suite_id=suite.id, fecha=fecha, lote=lote)
+    sesion.add(registro)
+    sesion.flush()
+    return registro
+
+
+def crear_registro_de_final_run(
+    sesion: Session, final_run: FinalRun, *, corrida_id: str, fecha: date, lote: str
+) -> Registro:
+    """Una ejecución independiente de Final Run (E, issue #64) -- espejo de
+    `crear_registro_de_suite`, pero por el otro lado del XOR de origen (ver
+    `CheckConstraint` en `Registro`)."""
+    registro = Registro(corrida_id=corrida_id, final_run_id=final_run.id, fecha=fecha, lote=lote)
     sesion.add(registro)
     sesion.flush()
     return registro

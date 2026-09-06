@@ -1,48 +1,39 @@
 import "server-only";
 
-import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { parse as parseCsv } from "csv-parse/sync";
 import { REGISTROS_DIR } from "@/lib/fs-data";
 import { pyDelete, pyGet, pyPut } from "@/lib/py-api";
 import type {
   CeldaRegistro,
-  FilaRegistro,
   GuardarRegistroPayload,
   RegistroDetalle,
 } from "@/lib/registro-schema";
 
-/** Nombre de archivo tal como lo entrega Final Run (E, todavía 100% csv) —
- * nunca una ruta con segmentos (`/`, `..`), para que no pueda escaparse de
- * data/registros. */
+/** Nombre de archivo tal como lo entrega crear una suite CON SVG cargado
+ * (issue #3, todavía local -- ver `escribirYGenerar` en `generar-suite.ts`)
+ * -- nunca una ruta con segmentos (`/`, `..`), para que no pueda escaparse
+ * de data/registros. */
 function nombreDescargableValido(nombre: string): boolean {
   return (
     /^[A-Za-z0-9._-]+\.(csv|gcode)$/.test(nombre) && !nombre.includes("..")
   );
 }
 
-/** Ruta absoluta de un archivo descargable de Final Run si (y solo si) es
- * válido y vive dentro de data/registros/ -- Hoja de Registro/Costeo (C) ya
- * no generan estos archivos, descargan G-code vía Storage
- * (`/api/descargas/gcode`, #51). */
+/** Ruta absoluta de un archivo descargable si (y solo si) es válido y vive
+ * dentro de data/registros/. Todo lo demás (Suites/Registros/Final Run
+ * reales) descarga vía Storage (`/api/descargas/gcode`, #51) -- esto solo
+ * sigue en pie para el camino local de crear una suite con SVG. */
 export function rutaDescarga(archivo: string): string | null {
   if (!nombreDescargableValido(archivo)) return null;
   return path.join(REGISTROS_DIR, archivo);
 }
 
-/** Lee cualquier csv con encabezado como lista de filas de texto -- sigue
- * siendo el mecanismo real de Final Run (E, `final-run-data.ts`), que todavía
- * no migró a Supabase. Hoja de Registro/Costeo (C) ya no la usan: sus
- * corridas viven en `registros`/`mediciones`, vía el servicio Python. */
-export async function leerFilasCsv<T = FilaRegistro>(
-  rutaAbsoluta: string,
-): Promise<T[]> {
-  const contenido = await readFile(rutaAbsoluta, "utf-8");
-  return parseCsv(contenido, { columns: true, skip_empty_lines: true });
-}
-
 export interface ResumenRegistro {
   corridaId: string;
+  /** "suite" (barrido) o "finalRun" (E, #64) -- Hoja de Registro usa esto
+   * para no ofrecer "Eliminar corrida" en una ejecución de Final Run (se
+   * elimina en grupo completo, desde Final Run). */
+  origen: "suite" | "finalRun";
   material: string;
   espesorMm: string;
   operacion: string;

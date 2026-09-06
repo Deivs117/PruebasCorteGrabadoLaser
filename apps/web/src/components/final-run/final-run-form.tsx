@@ -49,7 +49,7 @@ const ESTADO_INICIAL: EstadoFormulario = {
 type Resultado =
   | { estado: "idle" }
   | { estado: "enviando" }
-  | { estado: "ok"; celdas: number; gcodeFileName: string; csvFileName: string }
+  | { estado: "ok"; celdas: number; corridaId: string }
   | { estado: "error"; mensaje: string };
 
 function puedeEnviar(form: EstadoFormulario): boolean {
@@ -110,21 +110,14 @@ export function FinalRunForm({ candidatos }: FinalRunFormProps) {
       const cuerpo = (await respuesta.json()) as {
         ok: boolean;
         celdas?: number;
-        gcodeFileName?: string;
-        csvFileName?: string;
+        corridaId?: string;
         error?: string;
       };
-      if (
-        cuerpo.ok &&
-        cuerpo.celdas &&
-        cuerpo.gcodeFileName &&
-        cuerpo.csvFileName
-      ) {
+      if (cuerpo.ok && cuerpo.celdas && cuerpo.corridaId) {
         setResultado({
           estado: "ok",
           celdas: cuerpo.celdas,
-          gcodeFileName: cuerpo.gcodeFileName,
-          csvFileName: cuerpo.csvFileName,
+          corridaId: cuerpo.corridaId,
         });
       } else {
         setResultado({
@@ -161,14 +154,10 @@ export function FinalRunForm({ candidatos }: FinalRunFormProps) {
         </div>
         <div className="flex flex-wrap gap-3">
           <DescargarBoton
-            archivo={resultado.gcodeFileName}
+            archivo={`${resultado.corridaId}.gcode`}
+            endpointBase="/api/descargas/gcode"
             etiqueta="Descargar G-code"
             variant="secondary"
-          />
-          <DescargarBoton
-            archivo={resultado.csvFileName}
-            etiqueta="Descargar CSV"
-            variant="outline"
           />
         </div>
         <div className="flex gap-3">

@@ -1,6 +1,5 @@
 import "server-only";
 
-import { access, unlink } from "node:fs/promises";
 import path from "node:path";
 import { pyGet } from "@/lib/py-api";
 
@@ -25,8 +24,6 @@ export const REPO_ROOT = path.resolve(process.cwd(), "..", "..");
 export const PY_PROJECT_ARGS = ["--project", "packages/laser_toolkit"];
 export const CONFIGS_DIR = path.join(REPO_ROOT, "configs");
 export const REGISTROS_DIR = path.join(REPO_ROOT, "data", "registros");
-export const FOTOS_DIR = path.join(REPO_ROOT, "data", "fotos");
-export const TARIFAS_PATH = path.join(CONFIGS_DIR, "tarifas.yaml");
 
 export type Operacion = "corte" | "grabado";
 
@@ -61,55 +58,10 @@ export interface DashboardSummary {
   tarifasConfiguradas: boolean;
 }
 
-function esYamlDeSuite(nombre: string): boolean {
-  return (
-    nombre.endsWith(".yaml") &&
-    !nombre.includes("tarifas") &&
-    !nombre.includes("example") &&
-    // "ejemplo-dev_*" son las suites de ejemplo que documentan README.md,
-    // el docstring de cli.py y el Plan Maestro (make generate-cut CONFIG=...) —
-    // configs reales que hay que conservar, no ruido: solo se ocultan de este
-    // panel para no mezclarse con las suites reales del taller.
-    !nombre.startsWith("ejemplo-dev")
-  );
-}
-
 /** Suites de prueba configuradas hoy — usado por el Dashboard y por la
  * sección Suites, vía el servicio Python de #47/(A). */
 export async function listarSuites(): Promise<SuiteConfig[]> {
   return pyGet<SuiteConfig[]>("suites");
-}
-
-/** Solo borra un YAML de Final Run (`final-run-data.ts`, ver (E) del plan de
- * #2) -- nunca una `Suite` real, esas viven en Supabase y se borran vía
- * `eliminarSuitePorId` en `generar-suite.ts`. Solo borra un archivo que ya
- * pasó `esYamlDeSuite` (nunca tarifas.yaml, nunca nada fuera de configs/). */
-export async function eliminarSuite(archivo: string): Promise<boolean> {
-  if (
-    !esYamlDeSuite(archivo) ||
-    archivo.includes("/") ||
-    archivo.includes("..")
-  ) {
-    return false;
-  }
-  try {
-    await unlink(path.join(CONFIGS_DIR, archivo));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Usado solo por `costeo-data.ts` (aún no migrado, ver (C) del plan de #2)
- * -- las tarifas en sí ya viven en Supabase desde #49, este chequeo de
- * archivo local queda obsoleto cuando (C) migre el costeo. */
-export async function existeArchivoTarifas(): Promise<boolean> {
-  try {
-    await access(TARIFAS_PATH);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {

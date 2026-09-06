@@ -1,24 +1,29 @@
 """Endpoints de LECTURA: materiales/tarifas/candidatos (#48), suites y
-dashboard (A, issue #54).
+dashboard (A, issue #54), Hoja de Registro/Costeo (C, #60), Historial (D,
+#63) y Final Run/Calibración (E, #64).
 
 Cada función arma directamente el JSON que espera el `lib/*.ts` equivalente
 de `apps/web` (mismos nombres de campo en camelCase que ya usan los
 componentes), para no tener que tocar las páginas que los consumen -- solo
 cambia de dónde sale el dato (Supabase en vez de `data/`/`configs/`).
-
-Hoja de Registro (C, issue #60) se agregó acá también -- Historial/Final Run
-siguen fuera, son (D)/(E) del plan reordenado de #2.
 """
 
 from __future__ import annotations
 
 from laser_toolkit.db.models import (
     CandidatoFinalRun,
+    EstadoFicha,
+    FichaParametro,
+    GrupoCalibracion,
     Material,
     Medicion,
     PrecioMaterial,
     Registro,
     Suite,
+)
+from laser_toolkit.db.repo_calibracion import (
+    obtener_ficha_vigente,
+    resumen_calibracion_de_grupo,
 )
 from laser_toolkit.db.repo_materiales import listar_materiales
 from laser_toolkit.db.repo_negocio import obtener_tarifas_vigentes
@@ -142,11 +147,17 @@ def suite_detalle(sesion: Session, suite_id: int) -> dict | None:
     }
 
 
-def _solo_suite(registro: Registro) -> bool:
-    """Hoja de Registro/Costeo (C) solo cubre corridas de Suite (barrido) --
-    Final Run (E) sigue siendo 100% archivos, no tiene fila en `registros`
-    todavía."""
-    return registro.suite_id is not None
+def _contexto_registro(registro: Registro) -> tuple[str, float, str]:
+    """(material, espesor_mm, operación) sin importar el origen del
+    Registro -- Suite (barrido) o FinalRun (E, #64) comparten la misma
+    Hoja de Registro/Costeo (C) y el mismo Historial (D)."""
+    if registro.suite is not None:
+        suite = registro.suite
+        return suite.material.nombre, suite.espesor_mm, suite.operacion.value
+    if registro.final_run is not None:
+        grupo = registro.final_run.grupo_calibracion
+        return grupo.material.nombre, grupo.espesor_mm, grupo.operacion.value
+    raise ValueError(f"El registro {registro.corrida_id} no tiene Suite ni FinalRun asociado.")
 
 
 def _celda_editable(medicion: Medicion) -> dict:
@@ -169,22 +180,26 @@ def registros(sesion: Session) -> list[dict]:
     """Espejo de `listarCorridas` en `registro-data.ts`, pero sin la
     distinción "generadas vs preparadas": una suite creada (#56) ya nace con
     su Registro y sus Mediciones completas (ver el hallazgo del plan
-    reordenado de #2), así que solo hay un tipo de fila acá."""
+    reordenado de #2), así que solo hay un tipo de fila acá. Incluye
+    corridas de Suite y de FinalRun (E) por igual -- Hoja de Registro nunca
+    distinguió el origen en el sistema de archivos viejo."""
     filas = sesion.scalars(select(Registro).order_by(Registro.created_at.desc()))
     resultado = []
     for registro in filas:
-        if not _solo_suite(registro):
-            continue
-        suite = registro.suite
+        material, espesor_mm, operacion = _contexto_registro(registro)
         mediciones = registro.mediciones
         evaluadas = sum(1 for m in mediciones if m.corte_pasante is not None and m.carbonizacion_1a5 is not None)
         costeadas = sum(1 for m in mediciones if m.costo_total_celda is not None)
         resultado.append(
             {
                 "corridaId": registro.corrida_id,
-                "material": suite.material.nombre,
-                "espesorMm": str(suite.espesor_mm),
-                "operacion": suite.operacion.value,
+                # "suite" | "finalRun" -- Hoja de Registro usa esto para no
+                # ofrecer "Eliminar corrida" en una ejecución de Final Run
+                # (se elimina en grupo completo, desde Final Run).
+                "origen": "suite" if registro.suite_id is not None else "finalRun",
+                "material": material,
+                "espesorMm": str(espesor_mm),
+                "operacion": operacion,
                 "lote": registro.lote,
                 "totalCeldas": len(mediciones),
                 "celdasEvaluadas": evaluadas,
@@ -199,16 +214,16 @@ def registro_detalle(sesion: Session, corrida_id: str) -> dict | None:
     """Forma que espera `RegistroEditor` (Hoja de Registro, C) -- el
     equivalente normalizado de un `_registro.csv`."""
     registro = sesion.scalar(select(Registro).where(Registro.corrida_id == corrida_id))
-    if registro is None or not _solo_suite(registro):
+    if registro is None:
         return None
-    suite = registro.suite
+    material, espesor_mm, operacion = _contexto_registro(registro)
     return {
         "corridaId": registro.corrida_id,
-        "material": suite.material.nombre,
-        "espesorMm": str(suite.espesor_mm),
-        "operacion": suite.operacion.value,
+        "material": material,
+        "espesorMm": str(espesor_mm),
+        "operacion": operacion,
         "lote": registro.lote,
-        "pasadas": suite.pasadas,
+        "pasadas": registro.suite.pasadas if registro.suite else registro.final_run.pasadas,
         "kwhCorridaMedido": (
             "" if registro.kwh_corrida_medido is None else str(registro.kwh_corrida_medido)
         ),
@@ -229,14 +244,14 @@ def costeo_detalle(sesion: Session, corrida_id: str) -> dict | None:
     `calcular_y_guardar_costos_registro`. `None` si el registro no existe o
     todavía no se calculó ningún costo."""
     registro = sesion.scalar(select(Registro).where(Registro.corrida_id == corrida_id))
-    if registro is None or not _solo_suite(registro):
+    if registro is None:
         return None
-    suite = registro.suite
+    material, espesor_mm, operacion = _contexto_registro(registro)
     return {
         "corridaId": registro.corrida_id,
-        "material": suite.material.nombre,
-        "espesorMm": str(suite.espesor_mm),
-        "operacion": suite.operacion.value,
+        "material": material,
+        "espesorMm": str(espesor_mm),
+        "operacion": operacion,
         "lote": registro.lote,
         "celdas": [
             {
@@ -263,10 +278,8 @@ def historial(sesion: Session, material: str | None = None) -> list[dict]:
     filas = sesion.scalars(select(Registro).order_by(Registro.fecha.desc(), Registro.created_at.desc()))
     resultado = []
     for registro in filas:
-        if not _solo_suite(registro):
-            continue
-        suite = registro.suite
-        if material is not None and suite.material.nombre != material:
+        material_registro, espesor_mm, operacion = _contexto_registro(registro)
+        if material is not None and material_registro != material:
             continue
         mediciones = registro.mediciones
         evaluadas = sum(1 for m in mediciones if m.corte_pasante is not None and m.carbonizacion_1a5 is not None)
@@ -275,9 +288,9 @@ def historial(sesion: Session, material: str | None = None) -> list[dict]:
         resultado.append(
             {
                 "corridaId": registro.corrida_id,
-                "material": suite.material.nombre,
-                "espesorMm": str(suite.espesor_mm),
-                "operacion": suite.operacion.value,
+                "material": material_registro,
+                "espesorMm": str(espesor_mm),
+                "operacion": operacion,
                 "lote": registro.lote,
                 "fecha": registro.fecha.isoformat(),
                 "totalCeldas": len(mediciones),
@@ -291,6 +304,68 @@ def historial(sesion: Session, material: str | None = None) -> list[dict]:
     return resultado
 
 
+def grupos_calibracion(sesion: Session) -> list[dict]:
+    """Espejo de `listarGruposCalibracion` en `final-run-data.ts` (E, #64):
+    cada grupo con sus ejecuciones (una por `FinalRun`, ordenadas), y si ya
+    tiene una Ficha de Parámetro vigente."""
+    grupos = sesion.scalars(select(GrupoCalibracion).order_by(GrupoCalibracion.id))
+    resultado = []
+    for grupo in grupos:
+        ejecuciones = []
+        repeticiones = 5
+        for final_run in sorted(grupo.final_runs, key=lambda f: f.ejecucion):
+            registro = final_run.registros[0] if final_run.registros else None
+            if registro is None:
+                continue
+            repeticiones = final_run.repeticiones
+            ejecuciones.append(
+                {
+                    "ejecucion": final_run.ejecucion,
+                    "corridaId": registro.corrida_id,
+                    "calibrada": (
+                        registro.kwh_corrida_medido is not None and registro.tiempo_real_corrida_s is not None
+                    ),
+                }
+            )
+        ficha = obtener_ficha_vigente(sesion, grupo)
+        resultado.append(
+            {
+                "grupoId": grupo.grupo_calibracion_id,
+                "material": grupo.material.nombre,
+                "espesorMm": str(grupo.espesor_mm),
+                "operacion": grupo.operacion.value,
+                "velocidadMmMin": str(grupo.velocidad_mm_min),
+                "potenciaPct": str(grupo.potencia_pct),
+                "repeticiones": repeticiones,
+                "ejecuciones": ejecuciones,
+                "fichaEstado": ficha.estado.value if ficha is not None else None,
+            }
+        )
+    return resultado
+
+
+def resumen_calibracion(sesion: Session, grupo_calibracion_id: str, minimo_ejecuciones: int = 3) -> dict:
+    """Espejo de `resumirCalibracion` en `final-run-data.ts` -- reusa
+    `resumen_calibracion_de_grupo` (mismo motor estadístico de siempre,
+    `laser_toolkit.calibracion`) en vez de correr `summarize-final-run`
+    como subproceso. Levanta `ValueError` (grupo inexistente o alguna
+    ejecución sin medir) -- `main.py` lo traduce a HTTP."""
+    grupo = sesion.scalar(select(GrupoCalibracion).where(GrupoCalibracion.grupo_calibracion_id == grupo_calibracion_id))
+    if grupo is None:
+        raise ValueError(f"No existe el grupo de calibración {grupo_calibracion_id}.")
+    resumen = resumen_calibracion_de_grupo(sesion, grupo, minimo_ejecuciones=minimo_ejecuciones)
+    return {
+        "nEjecuciones": resumen.n_ejecuciones,
+        "kwhPorUnidadMedio": resumen.kwh_por_unidad_medio,
+        "kwhPorUnidadDesvStd": resumen.kwh_por_unidad_desv_std,
+        "kwhPorUnidadCvPct": resumen.kwh_por_unidad_cv_pct,
+        "tiempoPorUnidadMedio": resumen.tiempo_por_unidad_s_medio,
+        "tiempoPorUnidadDesvStd": resumen.tiempo_por_unidad_s_desv_std,
+        "tiempoPorUnidadCvPct": resumen.tiempo_por_unidad_s_cv_pct,
+        "calibrado": resumen.calibrado,
+    }
+
+
 def dashboard_resumen(sesion: Session) -> dict:
     """Espejo de `getDashboardSummary` en `fs-data.ts`. La distinción
     "generadas vs preparadas" no existe más -- una suite creada (#56) ya
@@ -298,6 +373,7 @@ def dashboard_resumen(sesion: Session) -> dict:
     plan reordenado de #2), así que se cuenta cuántas ya tienen la medición
     de corrida completa en vez de eso."""
     total_suites = sesion.scalar(select(func.count()).select_from(Suite)) or 0
+    total_grupos = sesion.scalar(select(func.count()).select_from(GrupoCalibracion)) or 0
     total_registros = sesion.scalar(select(func.count()).select_from(Registro)) or 0
     registros_completados = (
         sesion.scalar(
@@ -305,13 +381,20 @@ def dashboard_resumen(sesion: Session) -> dict:
         )
         or 0
     )
+    fichas_oficiales = (
+        sesion.scalar(
+            select(func.count())
+            .select_from(FichaParametro)
+            .where(FichaParametro.estado == EstadoFicha.OFICIAL)
+        )
+        or 0
+    )
     return {
         "suitesBarrido": total_suites,
-        # Final Run vive en otra tabla, todavía no wireada -- (E) del plan.
-        "suitesFinalRun": 0,
+        "suitesFinalRun": total_grupos,
         "registros": total_registros,
         "registrosCompletados": registros_completados,
-        "fichasOficiales": 0,
+        "fichasOficiales": fichas_oficiales,
         "tarifasConfiguradas": obtener_tarifas_vigentes(sesion) is not None,
     }
 
@@ -320,10 +403,12 @@ __all__ = [
     "candidatos_final_run",
     "costeo_detalle",
     "dashboard_resumen",
+    "grupos_calibracion",
     "historial",
     "materiales_catalogo",
     "registro_detalle",
     "registros",
+    "resumen_calibracion",
     "suite_detalle",
     "suites",
     "tarifas_vigentes",

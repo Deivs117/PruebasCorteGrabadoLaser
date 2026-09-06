@@ -9,12 +9,14 @@ from sqlalchemy.orm import Session
 from laser_toolkit.config import Operacion
 from laser_toolkit.db.base import Base
 from laser_toolkit.db.models import FamiliaMaterial
+from laser_toolkit.db.repo_calibracion import crear_final_run, obtener_o_crear_grupo_calibracion
 from laser_toolkit.db.repo_pruebas import (
     actualizar_registro,
     actualizar_suite,
     calcular_y_guardar_costos_registro,
     completar_evaluacion,
     completar_medicion_corrida,
+    crear_registro_de_final_run,
     crear_registro_de_suite,
     crear_suite,
     desmarcar_candidato,
@@ -221,6 +223,24 @@ def test_reemplazar_mediciones_descarta_las_anteriores(sesion):
 
     assert {m.id_prueba for m in registro.mediciones} == {"C-001"}
     assert registro.mediciones[0].velocidad_mm_min == 500
+
+
+def test_crear_registro_de_final_run_usa_el_lado_final_run_del_xor(sesion):
+    grupo = obtener_o_crear_grupo_calibracion(
+        sesion,
+        material="MDF Trupan",
+        familia=FamiliaMaterial.MADERA,
+        espesor_mm=3.0,
+        operacion=Operacion.CORTE,
+        velocidad_mm_min=350,
+        potencia_pct=100,
+    )
+    final_run = crear_final_run(sesion, grupo, ejecucion=1, lote="L01", fecha=date(2026, 9, 6))
+    registro = crear_registro_de_final_run(
+        sesion, final_run, corrida_id="grupo_ejec1", fecha=date(2026, 9, 6), lote="L01"
+    )
+    assert registro.final_run_id == final_run.id
+    assert registro.suite_id is None
 
 
 def test_marcar_y_desmarcar_candidato_es_idempotente(sesion):

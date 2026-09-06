@@ -253,11 +253,13 @@ export function SuiteWizard({
               <>
                 <DescargarBoton
                   archivo={resultado.gcodeFileName}
+                  endpointBase="/api/registros/descargar"
                   etiqueta="Descargar G-code"
                   variant="secondary"
                 />
                 <DescargarBoton
                   archivo={resultado.csvFileName}
+                  endpointBase="/api/registros/descargar"
                   etiqueta="Descargar CSV"
                   variant="outline"
                 />
