@@ -48,3 +48,12 @@ master                              ← producción, deploy automático (Vercel)
 ## CI/CD
 
 `.github/workflows/ci.yml` corre en cada push/PR a `master`/`develop`/`feature/**`: un job de backend (`ruff` + `pyright` + `pytest` sobre `packages/laser_toolkit`) y un job de frontend (`lint` + `typecheck` + `format:check` + `build` sobre `apps/web`). El deploy en sí no vive en GitHub Actions — lo maneja la integración nativa de Vercel con el repo (preview por rama, producción en push a `master`).
+
+## Skills de diseño/frontend (opcionales, no versionadas)
+
+`.claude/skills/` y `.agents/skills/` existen en disco pero están en `.gitignore` — no son código del proyecto (nada de esto es específico de un toolkit de corte/grabado láser), son herramientas de agentes que solo hacen falta si estás trabajando en tareas de UI/diseño del frontend.
+
+- `.claude/skills/` (banner-design, brand, design, design-system, slides, ui-styling, ui-ux-pro-max): skills del marketplace de Claude Code. Instalar bajo demanda vía `/plugin` en Claude Code cuando haga falta alguna, en vez de asumir que ya están.
+- `.agents/skills/` + `skills-lock.json`: gestionadas por un instalador con lockfile aparte (convención portable entre agentes, análoga a `AGENTS.md`) — hoy solo tiene `motion-design` (`LottieFiles/motion-design-skill` en GitHub). Reinstalar con la herramienta que gestiona ese lockfile si hace falta.
+
+No las reintroduzcas a git sin avisar — si alguna termina siendo realmente necesaria para todo el equipo (no solo quien toca frontend), es una decisión a discutir, no un commit de rutina.
