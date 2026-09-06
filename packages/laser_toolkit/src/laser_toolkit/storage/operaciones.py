@@ -17,7 +17,13 @@ from typing import cast
 from storage3.types import FileOptions
 from supabase import Client
 
-from laser_toolkit.storage.rutas import ruta_foto, ruta_gcode, ruta_svg
+from laser_toolkit.storage.rutas import (
+    PREFIJO_BIBLIOTECA_SVG,
+    ruta_foto,
+    ruta_gcode,
+    ruta_svg,
+    ruta_svg_biblioteca,
+)
 
 BUCKET_GCODE = "gcode"
 BUCKET_SVG = "svg"
@@ -45,6 +51,21 @@ def subir_svg(cliente: Client, material: str, suite_id: int, contenido: bytes) -
     key = ruta_svg(material, suite_id)
     cliente.storage.from_(BUCKET_SVG).upload(key, contenido, file_options=_opciones("image/svg+xml"))
     return key
+
+
+def subir_svg_biblioteca(cliente: Client, nombre: str, contenido: bytes) -> str:
+    """Sube un SVG de la biblioteca de 'Grabado Vectorial' (issue #3) --
+    reemplaza `data/svgs/`, ver `ruta_svg_biblioteca`."""
+    key = ruta_svg_biblioteca(nombre)
+    cliente.storage.from_(BUCKET_SVG).upload(key, contenido, file_options=_opciones("image/svg+xml"))
+    return key
+
+
+def listar_svgs_biblioteca(cliente: Client) -> list[dict]:
+    """Metadata cruda de `storage3` (nombre, fechas, tamaño) de cada archivo
+    bajo el prefijo de biblioteca -- el contenido se pide aparte con
+    `descargar()`, solo para los que hagan falta (issue #3)."""
+    return cliente.storage.from_(BUCKET_SVG).list(PREFIJO_BIBLIOTECA_SVG)
 
 
 _CONTENT_TYPE_POR_EXTENSION = {
