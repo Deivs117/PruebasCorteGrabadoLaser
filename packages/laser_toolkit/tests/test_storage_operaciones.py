@@ -62,3 +62,19 @@ def test_url_firmada_extrae_signedurl_de_la_respuesta():
     url = ops.url_firmada(cliente, ops.BUCKET_GCODE, "k", expiracion_s=120)
     bucket.create_signed_url.assert_called_once_with("k", 120)
     assert url == "https://ejemplo/firmada"
+
+
+def test_subir_svg_biblioteca_usa_bucket_y_prefijo_correctos():
+    cliente, bucket = _cliente_falso()
+    key = ops.subir_svg_biblioteca(cliente, "logo-flux-mtqd4ks6.svg", b"<svg/>")
+    cliente.storage.from_.assert_called_once_with(ops.BUCKET_SVG)
+    assert key == "biblioteca/logo-flux-mtqd4ks6.svg"
+
+
+def test_listar_svgs_biblioteca_lista_el_prefijo_correcto():
+    cliente, bucket = _cliente_falso()
+    bucket.list.return_value = [{"name": "logo.svg", "created_at": "2026-09-06T00:00:00Z"}]
+    resultado = ops.listar_svgs_biblioteca(cliente)
+    cliente.storage.from_.assert_called_once_with(ops.BUCKET_SVG)
+    bucket.list.assert_called_once_with("biblioteca")
+    assert resultado == [{"name": "logo.svg", "created_at": "2026-09-06T00:00:00Z"}]

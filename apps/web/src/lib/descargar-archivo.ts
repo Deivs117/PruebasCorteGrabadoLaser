@@ -1,8 +1,8 @@
 /**
  * Descarga un archivo ya generado por el sistema (Supabase Storage o
- * `data/svgs/`), dejando que el técnico elija dónde guardarlo — nunca
- * reemplaza la copia que el sistema ya guardó, es siempre una copia
- * adicional.
+ * contenido ya en memoria en el navegador), dejando que el técnico elija
+ * dónde guardarlo — nunca reemplaza la copia que el sistema ya guardó, es
+ * siempre una copia adicional.
  *
  * Usa el selector de carpeta nativo (File System Access API) cuando el
  * navegador lo soporta; si no, cae a la descarga estándar del navegador.
@@ -27,18 +27,14 @@ declare global {
   }
 }
 
-export async function descargarArchivo(
+/** La mitad "guardar" del flujo -- separada de `descargarArchivo` para los
+ * casos donde el contenido ya está en memoria en el cliente (ej. el G-code
+ * de una conversión de SVG suelta, #3) y no hace falta un round-trip al
+ * servidor solo para descargarlo. */
+export async function guardarBlobComoArchivo(
+  blob: Blob,
   nombre: string,
-  endpointBase: string,
 ): Promise<void> {
-  const respuesta = await fetch(
-    `${endpointBase}/${encodeURIComponent(nombre)}`,
-  );
-  if (!respuesta.ok) {
-    throw new Error("No se pudo descargar el archivo.");
-  }
-  const blob = await respuesta.blob();
-
   if (typeof window.showSaveFilePicker === "function") {
     try {
       const manejador = await window.showSaveFilePicker({
@@ -61,4 +57,18 @@ export async function descargarArchivo(
   enlace.download = nombre;
   enlace.click();
   URL.revokeObjectURL(url);
+}
+
+export async function descargarArchivo(
+  nombre: string,
+  endpointBase: string,
+): Promise<void> {
+  const respuesta = await fetch(
+    `${endpointBase}/${encodeURIComponent(nombre)}`,
+  );
+  if (!respuesta.ok) {
+    throw new Error("No se pudo descargar el archivo.");
+  }
+  const blob = await respuesta.blob();
+  return guardarBlobComoArchivo(blob, nombre);
 }
