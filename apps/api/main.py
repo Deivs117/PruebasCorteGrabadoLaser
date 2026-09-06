@@ -13,12 +13,14 @@ agregan de la misma forma sobre esta app.
 """
 
 from datetime import date
+from typing import Literal
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import text
 
 import creacion
+import editor
 import escritura
 import final_run
 import generacion
@@ -455,3 +457,38 @@ def eliminar_grupo_calibracion(grupo_id: str) -> dict:
         except ValueError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         return {"ok": True}
+
+
+class ParametrosOperacionBody(BaseModel):
+    velocidadMmMin: int
+    potenciaPct: int
+
+
+class ObjetoExportarBody(BaseModel):
+    tipo: Literal["svg", "raster"]
+    xMm: float
+    yMm: float
+    anchoMm: float
+    altoMm: float
+    rotacionDeg: float = 0.0
+    operaciones: list[Literal["corte", "grabado"]]
+    parametros: dict[str, ParametrosOperacionBody]
+    # Solo para tipo="svg":
+    contenidoSvg: str | None = None
+    resolucionRellenoMm: float | None = None
+    # Solo para tipo="raster":
+    dataUri: str | None = None
+
+
+class ExportarGcodeBody(BaseModel):
+    objetos: list[ObjetoExportarBody]
+
+
+@app.post("/editor/exportar")
+def exportar_gcode_editor(body: ExportarGcodeBody) -> dict:
+    with sesion() as s:
+        try:
+            objetos = [o.model_dump() for o in body.objetos]
+            return editor.exportar_gcode_combinado(s, cliente_storage, objetos)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error

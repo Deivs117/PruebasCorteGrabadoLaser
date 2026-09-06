@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import pytest
@@ -6,22 +7,25 @@ from laser_toolkit.config import MachineConfig
 from laser_toolkit.svg.api import (
     ModoGrabadoSvg,
     cargar_subpaths_svg,
+    cargar_subpaths_svg_texto,
     convertir_svg_a_gcode,
+    convertir_svg_texto_a_gcode,
     tiempo_estimado_svg_s,
 )
 
 RAIZ_REPO = Path(__file__).resolve().parent.parent
 LOGO_EMPRESA = RAIZ_REPO / "assets" / "svg" / "logo-empresa.svg"
 
+_SVG_CUADRADO_TEXTO = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+    '<path d="M0,0 L100,0 L100,100 L0,100 Z"/>'
+    "</svg>"
+)
+
 
 def _svg_cuadrado(tmp_path: Path) -> Path:
     ruta = tmp_path / "cuadrado.svg"
-    ruta.write_text(
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
-        '<path d="M0,0 L100,0 L100,100 L0,100 Z"/>'
-        "</svg>",
-        encoding="utf-8",
-    )
+    ruta.write_text(_SVG_CUADRADO_TEXTO, encoding="utf-8")
     return ruta
 
 
@@ -76,3 +80,36 @@ def test_logo_empresa_convierte_a_gcode_sin_errores():
     )
     assert len(gcode) > 0
     assert all(isinstance(linea, str) for linea in gcode)
+
+
+# --- variantes "_texto" (issue #3/#16: SVG en memoria, editor de diseño) ----
+
+
+def test_cargar_subpaths_svg_texto_da_lo_mismo_que_desde_archivo(tmp_path: Path):
+    desde_archivo = cargar_subpaths_svg(_svg_cuadrado(tmp_path), ancho_mm=20, alto_mm=20)
+    desde_texto = cargar_subpaths_svg_texto(_SVG_CUADRADO_TEXTO, ancho_mm=20, alto_mm=20)
+    assert desde_texto == desde_archivo
+
+
+def test_convertir_svg_texto_a_gcode_da_lo_mismo_que_desde_archivo(tmp_path: Path):
+    machine = MachineConfig()
+    desde_archivo = convertir_svg_a_gcode(
+        _svg_cuadrado(tmp_path), 10, 10, 500, 50, machine, modo=ModoGrabadoSvg.CONTORNO
+    )
+    desde_texto = convertir_svg_texto_a_gcode(
+        _SVG_CUADRADO_TEXTO, 10, 10, 500, 50, machine, modo=ModoGrabadoSvg.CONTORNO
+    )
+    assert desde_texto == desde_archivo
+
+
+def test_angulo_rad_rota_los_subpaths_alrededor_del_centro_de_la_caja():
+    sin_rotar = cargar_subpaths_svg_texto(_SVG_CUADRADO_TEXTO, ancho_mm=10, alto_mm=10)
+    rotado = cargar_subpaths_svg_texto(
+        _SVG_CUADRADO_TEXTO, ancho_mm=10, alto_mm=10, angulo_rad=math.pi / 4
+    )
+    assert rotado != sin_rotar
+    # Rotar un cuadrado (centrado, sin padding) alrededor de su propio centro
+    # no cambia el centro de masa de sus puntos.
+    cx_sin_rotar = sum(p[0] for p in sin_rotar[0].puntos) / len(sin_rotar[0].puntos)
+    cx_rotado = sum(p[0] for p in rotado[0].puntos) / len(rotado[0].puntos)
+    assert cx_rotado == pytest.approx(cx_sin_rotar)
