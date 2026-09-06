@@ -86,6 +86,87 @@ def crear_registro_de_suite(
     return registro
 
 
+def actualizar_suite(
+    sesion: Session,
+    suite: Suite,
+    *,
+    material: str,
+    familia: FamiliaMaterial,
+    espesor_mm: float,
+    operacion: Operacion,
+    velocidades_mm_min: list[int],
+    potencias_pct: list[int],
+    lote: str,
+    fecha: date,
+    pasadas: int = 1,
+    z_step_mm: float = 0.0,
+    tamano_celda_mm: float = 15.0,
+    espaciado_mm: float = 5.0,
+    id_prefijo: str = "C",
+) -> Suite:
+    """Actualiza los campos editables de una Suite existente (B, issue #62) --
+    mismo set de campos que `crear_suite`, pero mutando la fila en vez de
+    crear una nueva. El llamador (`apps/api/creacion.py`) ya validó con
+    `tiene_datos_cargados` que el Registro asociado no tiene ninguna
+    medición cargada -- acá no se repite esa validación, es responsabilidad
+    de quien orquesta."""
+    material_row = obtener_o_crear_material(sesion, material, familia)
+    suite.material_id = material_row.id
+    suite.espesor_mm = espesor_mm
+    suite.operacion = operacion
+    suite.velocidades_mm_min = velocidades_mm_min
+    suite.potencias_pct = potencias_pct
+    suite.pasadas = pasadas
+    suite.z_step_mm = z_step_mm
+    suite.tamano_celda_mm = tamano_celda_mm
+    suite.espaciado_mm = espaciado_mm
+    suite.id_prefijo = id_prefijo
+    suite.lote = lote
+    suite.fecha = fecha
+    sesion.flush()
+    return suite
+
+
+def actualizar_registro(
+    sesion: Session, registro: Registro, *, corrida_id: str, fecha: date, lote: str
+) -> Registro:
+    """Al editar una Suite (B), el `corrida_id` puede cambiar (depende de
+    material+espesor+operación+fecha+lote, ver `naming.nombre_base`) aunque
+    la fila de `Registro` sea la misma -- se actualiza en vez de crear una
+    nueva, para no dejar un Registro huérfano ni duplicar candidatos/fotos."""
+    registro.corrida_id = corrida_id
+    registro.fecha = fecha
+    registro.lote = lote
+    sesion.flush()
+    return registro
+
+
+def tiene_datos_cargados(registro: Registro) -> bool:
+    """True si `registro` (o alguna de sus mediciones) ya tiene evaluación,
+    medición de corrida o costeo cargado -- guard de B/#62 antes de editar
+    una Suite: pisar esos datos en silencio fue el incidente real que
+    motivaba `actualizarSuite`/`corridaYaRegistrada` en el sistema de
+    archivos viejo."""
+    if registro.kwh_corrida_medido is not None or registro.tiempo_real_corrida_s is not None:
+        return True
+    return any(
+        m.corte_pasante is not None or m.carbonizacion_1a5 is not None or m.costo_total_celda is not None
+        for m in registro.mediciones
+    )
+
+
+def reemplazar_mediciones(sesion: Session, registro: Registro, filas: list[dict]) -> list[Medicion]:
+    """Descarta las Mediciones actuales de `registro` (el llamador ya validó
+    con `tiene_datos_cargados` que ninguna tiene evaluación/costos cargados)
+    y registra las nuevas -- usado al editar una Suite (B) cuando cambia la
+    grilla de velocidad×potencia, y por lo tanto la cantidad/identidad de
+    celdas."""
+    for medicion in list(registro.mediciones):
+        sesion.delete(medicion)
+    sesion.flush()
+    return registrar_mediciones_generadas(sesion, registro, filas)
+
+
 def guardar_gcode_key(sesion: Session, registro: Registro, gcode_storage_key: str) -> Registro:
     """Asocia el `.gcode` ya subido a Supabase Storage (issue #25,
     `laser_toolkit.storage.operaciones.subir_gcode`) con su registro. Deja
