@@ -12,7 +12,7 @@ export default async function Login({ searchParams }: PageProps<"/login">) {
         <div className="text-center">
           <h1 className="text-navy text-2xl font-semibold">Laser Toolkit</h1>
           <p className="text-text-muted mt-1 text-sm">
-            Entrá con tu email de trabajo — sin contraseña.
+            Entrá con tu email de trabajo.
           </p>
         </div>
         <LoginForm siguiente={siguiente} />

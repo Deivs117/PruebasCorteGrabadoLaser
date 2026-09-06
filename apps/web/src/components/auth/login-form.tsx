@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Mail } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
-import { CircleCheckAnimado } from "@/components/ui/icons/circle-check-animado";
 import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 
@@ -15,25 +15,35 @@ interface LoginFormProps {
   siguiente: string;
 }
 
-type Estado = "idle" | "enviando" | "enviado" | "error";
+type Estado = "idle" | "enviando" | "error";
 
-const DOMINIO_PERMITIDO = "fluxsolutionscali.com";
-const MENSAJE_DOMINIO_RECHAZADO = `Solo se permiten cuentas @${DOMINIO_PERMITIDO}.`;
+/** Espejo en español de los mensajes fijos que devuelve Supabase Auth para
+ * email/contraseña -- lo demás (rate limit, etc.) se muestra tal cual. */
+function mensajeLegible(mensaje: string): string {
+  if (mensaje === "Invalid login credentials") {
+    return "Email o contraseña incorrectos.";
+  }
+  return mensaje;
+}
 
 /**
- * Login sin contraseña (magic link, issue #52): un solo campo de email.
- * `restringir_dominio_signup` (trigger de Postgres, #23) rechaza cualquier
- * dominio que no sea @fluxsolutionscali.com directo en Postgres -- pero el
- * cliente JS usa el flujo PKCE (`code_challenge`), y con ese flujo GoTrue
- * envuelve la excepción real en un "Database error saving new user"
- * genérico en vez de propagar el mensaje del trigger (confirmado
- * comparando la respuesta real del SDK contra un POST crudo a
- * `/auth/v1/otp`, que sí trae el texto del trigger tal cual). Por eso acá
- * se reinterpreta ese caso puntual en vez de mostrar `error.message` tal
- * cual -- lo demás (rate limit, etc.) sí se muestra directo.
+ * Login con email + contraseña (issue #52) -- reemplaza el magic link
+ * original: el plan free de Supabase manda como máximo 2 correos por HORA
+ * compartidos entre todo el equipo (`rate_limit_email_sent`), así que un
+ * login por link se volvía inusable con más de un par de personas
+ * entrando el mismo rato. Con contraseña, iniciar sesión no manda ningún
+ * correo -- solo hace falta uno (fuera de esta pantalla, vía el Admin API
+ * de Supabase) para crear cada cuenta la primera vez.
+ *
+ * No hay pantalla de registro acá a propósito: las cuentas las da de alta
+ * el propio Deivs (`restringir_dominio_signup`, #23, sigue validando el
+ * dominio igual del lado de la base) -- ver `scripts/crear_usuario_auth.py`
+ * en `packages/laser_toolkit`.
  */
 export function LoginForm({ siguiente }: LoginFormProps) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [estado, setEstado] = useState<Estado>("idle");
   const [mensajeError, setMensajeError] = useState("");
 
@@ -42,57 +52,25 @@ export function LoginForm({ siguiente }: LoginFormProps) {
     setEstado("enviando");
 
     const supabase = crearClienteBrowser();
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(siguiente)}`,
-      },
+      password,
     });
 
     if (error) {
       setEstado("error");
-      setMensajeError(
-        error.message.includes("Database error saving new user")
-          ? MENSAJE_DOMINIO_RECHAZADO
-          : error.message,
-      );
-    } else {
-      setEstado("enviado");
+      setMensajeError(mensajeLegible(error.message));
+      return;
     }
-  }
 
-  if (estado === "enviado") {
-    return (
-      <Card accent="teal" className="flex flex-col items-start gap-4 p-6">
-        <span
-          className="bg-teal-soft text-teal flex size-12 items-center justify-center rounded-full"
-          aria-hidden="true"
-        >
-          <CircleCheckAnimado className="size-6" strokeWidth={1.75} />
-        </span>
-        <div aria-live="polite">
-          <p className="text-navy text-base font-semibold">
-            Te enviamos un link a {email.trim()}
-          </p>
-          <p className="text-text-muted mt-1 text-sm">
-            Abrilo desde este mismo dispositivo para entrar — el link vence a
-            los pocos minutos.
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => setEstado("idle")}>
-          Usar otro email
-        </Button>
-      </Card>
-    );
+    router.push(siguiente);
+    router.refresh();
   }
 
   return (
     <Card className="flex flex-col gap-5 p-6">
       <form onSubmit={enviar} className="flex flex-col gap-4">
-        <Field
-          label="Email de trabajo"
-          hint="Solo cuentas @fluxsolutionscali.com"
-        >
+        <Field label="Email de trabajo">
           {(id) => (
             <div className="relative">
               <Mail
@@ -113,6 +91,26 @@ export function LoginForm({ siguiente }: LoginFormProps) {
           )}
         </Field>
 
+        <Field label="Contraseña">
+          {(id) => (
+            <div className="relative">
+              <Lock
+                className="text-text-muted pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                strokeWidth={1.75}
+              />
+              <input
+                id={id}
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`${INPUT_CLASSES} w-full pl-9`}
+              />
+            </div>
+          )}
+        </Field>
+
         {estado === "error" ? (
           <div
             role="alert"
@@ -127,9 +125,9 @@ export function LoginForm({ siguiente }: LoginFormProps) {
           type="submit"
           variant="primary"
           loading={estado === "enviando"}
-          disabled={email.trim() === ""}
+          disabled={email.trim() === "" || password === ""}
         >
-          {estado === "enviando" ? "Enviando…" : "Enviar link mágico"}
+          {estado === "enviando" ? "Entrando…" : "Entrar"}
         </Button>
       </form>
     </Card>

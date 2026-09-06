@@ -3,14 +3,15 @@ import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * Protección de rutas (issue #52): sin sesión activa, cualquier página real
- * redirige a `/login` -- `/login` y `/auth/*` (el callback del magic link)
- * son las únicas rutas públicas. Corre en cada request para refrescar el
- * token de sesión (patrón estándar de `@supabase/ssr` en Next.js).
+ * redirige a `/login` -- la única ruta pública (login con email+contraseña,
+ * sin magic link: no hay callback que proteger aparte). Corre en cada
+ * request para refrescar el token de sesión (patrón estándar de
+ * `@supabase/ssr` en Next.js).
  *
  * `proxy.ts`, no `middleware.ts`: esta versión de Next.js (16) renombró la
  * convención (ver AGENTS.md -- "esta NO es la versión que conocés").
  */
-const RUTAS_PUBLICAS = ["/login", "/auth"];
+const RUTAS_PUBLICAS = ["/login"];
 
 function esRutaPublica(pathname: string): boolean {
   return RUTAS_PUBLICAS.some(
