@@ -78,8 +78,12 @@ function desdeDatosIniciales(datos: SuiteFormData): EstadoFormulario {
 type ResultadoEnvio =
   | { estado: "idle" }
   | { estado: "enviando" }
+  // Camino nuevo (crear, Supabase): solo corridaId -- el .gcode se descarga
+  // vía Storage, ya no hay un csv de archivo aparte que ofrecer.
+  | { estado: "ok"; celdas: number; corridaId: string }
+  // Camino viejo (editar, todavía local -- ver B/#62): gcode/csv de disco.
   | {
-      estado: "ok";
+      estado: "ok-local";
       celdas: number;
       gcodeFileName: string;
       csvFileName: string;
@@ -182,19 +186,26 @@ export function SuiteWizard({
       const cuerpo = (await respuesta.json()) as {
         ok: boolean;
         celdas?: number;
+        corridaId?: string;
         gcodeFileName?: string;
         csvFileName?: string;
         error?: string;
       };
 
-      if (
+      if (cuerpo.ok && cuerpo.celdas && cuerpo.corridaId) {
+        setResultado({
+          estado: "ok",
+          celdas: cuerpo.celdas,
+          corridaId: cuerpo.corridaId,
+        });
+      } else if (
         cuerpo.ok &&
         cuerpo.celdas &&
         cuerpo.gcodeFileName &&
         cuerpo.csvFileName
       ) {
         setResultado({
-          estado: "ok",
+          estado: "ok-local",
           celdas: cuerpo.celdas,
           gcodeFileName: cuerpo.gcodeFileName,
           csvFileName: cuerpo.csvFileName,
@@ -213,7 +224,8 @@ export function SuiteWizard({
     }
   }
 
-  if (resultado.estado === "ok") {
+  if (resultado.estado === "ok" || resultado.estado === "ok-local") {
+    const esLocal = resultado.estado === "ok-local";
     return (
       <Reveal>
         <Card accent="teal" className="flex flex-col items-start gap-4 p-6">
@@ -236,16 +248,27 @@ export function SuiteWizard({
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <DescargarBoton
-              archivo={resultado.gcodeFileName}
-              etiqueta="Descargar G-code"
-              variant="secondary"
-            />
-            <DescargarBoton
-              archivo={resultado.csvFileName}
-              etiqueta="Descargar CSV"
-              variant="outline"
-            />
+            {esLocal ? (
+              <>
+                <DescargarBoton
+                  archivo={resultado.gcodeFileName}
+                  etiqueta="Descargar G-code"
+                  variant="secondary"
+                />
+                <DescargarBoton
+                  archivo={resultado.csvFileName}
+                  etiqueta="Descargar CSV"
+                  variant="outline"
+                />
+              </>
+            ) : (
+              <DescargarBoton
+                archivo={`${resultado.corridaId}.gcode`}
+                endpointBase="/api/descargas/gcode"
+                etiqueta="Descargar G-code"
+                variant="secondary"
+              />
+            )}
           </div>
           <div className="flex gap-3">
             {modoEdicion ? (

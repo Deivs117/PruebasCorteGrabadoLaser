@@ -20,10 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function Inicio() {
   const resumen = await getDashboardSummary();
 
-  const suitesBarrido = resumen.suites.filter((s) => s.tipo === "barrido");
-  const suitesFinalRun = resumen.suites.filter((s) => s.tipo === "final_run");
-  const sinCorridas =
-    resumen.registrosGenerados === 0 && resumen.registrosPreparados === 0;
+  const sinCorridas = resumen.registros === 0;
 
   const avisos: string[] = [];
   if (!resumen.tarifasConfiguradas) {
@@ -36,7 +33,7 @@ export default async function Inicio() {
       "Todavía no hay ninguna Ficha de Parámetro Estándar publicada.",
     );
   }
-  if (resumen.registrosPreparados === 0 && resumen.registrosGenerados === 0) {
+  if (resumen.registros === 0) {
     avisos.push("Todavía no se registró ninguna corrida de prueba.");
   }
 
@@ -58,13 +55,13 @@ export default async function Inicio() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <StatTile
             label="Suites configuradas"
-            value={resumen.suites.length}
-            helpText={`${suitesBarrido.length} de barrido · ${suitesFinalRun.length} final run`}
+            value={resumen.suitesBarrido + resumen.suitesFinalRun}
+            helpText={`${resumen.suitesBarrido} de barrido · ${resumen.suitesFinalRun} final run`}
           />
           <StatTile
             label="Corridas registradas"
-            value={resumen.registrosGenerados + resumen.registrosPreparados}
-            helpText={`${resumen.registrosPreparados} con Hoja de Registro preparada`}
+            value={resumen.registros}
+            helpText={`${resumen.registrosCompletados} con medición de corrida completa`}
           />
           <StatTile
             label="Fichas oficiales"
