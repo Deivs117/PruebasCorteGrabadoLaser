@@ -1,0 +1,15 @@
+[project]
+name = "laser-toolkit-api"
+version = "0.1.0"
+description = "Servicio Python (FastAPI) en Vercel que envuelve laser_toolkit para el frontend de apps/web. Ver issue #47."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.117.1",
+    "laser-toolkit",
+]
+
+[tool.uv.sources]
+laser-toolkit = { path = "../../packages/laser_toolkit" }
+
+[tool.vercel]
+entrypoint = "main:app"
