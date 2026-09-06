@@ -12,6 +12,8 @@ en `lectura.py`; los de escritura sin generación de G-code (#49) en
 agregan de la misma forma sobre esta app.
 """
 
+from datetime import date
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import text
@@ -87,6 +89,41 @@ def guardar_tarifas(body: GuardarTarifasBody) -> dict:
             tarifa_electrica_por_kwh=float(body.tarifaElectricaPorKwh) if body.tarifaElectricaPorKwh else None,
             tarifa_hora_maquina=float(body.tarifaHoraMaquina) if body.tarifaHoraMaquina else None,
             precios_material=[p.model_dump() for p in body.preciosMaterial],
+        )
+
+
+@app.get("/maquina")
+def maquina() -> dict:
+    with sesion() as s:
+        return lectura.configuracion_maquina(s)
+
+
+class GuardarMaquinaBody(BaseModel):
+    laserMaxS: int
+    travelFeedMmMin: int
+    potenciaModuloW: float
+    factorUtilizacionLaser: float
+    puntoFocalMm: float
+    velocidadMaxMmMin: int
+    aceleracionMmS2: float
+    areaTrabajoAnchoMm: float
+    areaTrabajoAltoMm: float
+
+
+@app.put("/maquina")
+def guardar_maquina(body: GuardarMaquinaBody) -> dict:
+    with sesion() as s:
+        return escritura.guardar_configuracion_maquina(
+            s,
+            laser_max_s=body.laserMaxS,
+            travel_feed_mm_min=body.travelFeedMmMin,
+            potencia_modulo_w=body.potenciaModuloW,
+            factor_utilizacion_laser=body.factorUtilizacionLaser,
+            punto_focal_mm=body.puntoFocalMm,
+            velocidad_max_mm_min=body.velocidadMaxMmMin,
+            aceleracion_mm_s2=body.aceleracionMmS2,
+            area_trabajo_ancho_mm=body.areaTrabajoAnchoMm,
+            area_trabajo_alto_mm=body.areaTrabajoAltoMm,
         )
 
 
@@ -384,13 +421,28 @@ def resumen_calibracion(grupo_id: str, minimoEjecuciones: int = 3) -> dict:
 class FichaBody(BaseModel):
     estado: str
     notas: str | None = None
+    costoEstandarTotal: str | None = None
+    fechaValidacion: str | None = None
+
+
+@app.get("/fichas-parametro")
+def fichas_parametro() -> list[dict]:
+    with sesion() as s:
+        return lectura.fichas_parametro(s)
 
 
 @app.post("/grupos-calibracion/{grupo_id}/ficha")
 def actualizar_ficha(grupo_id: str, body: FichaBody) -> dict:
     with sesion() as s:
         try:
-            return final_run.actualizar_ficha(s, grupo_id, estado=body.estado, notas=body.notas)
+            return final_run.actualizar_ficha(
+                s,
+                grupo_id,
+                estado=body.estado,
+                notas=body.notas,
+                costo_estandar_total=float(body.costoEstandarTotal) if body.costoEstandarTotal else None,
+                fecha_validacion=date.fromisoformat(body.fechaValidacion) if body.fechaValidacion else None,
+            )
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
 

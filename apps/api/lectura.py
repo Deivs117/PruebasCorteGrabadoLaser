@@ -26,7 +26,7 @@ from laser_toolkit.db.repo_calibracion import (
     resumen_calibracion_de_grupo,
 )
 from laser_toolkit.db.repo_materiales import listar_materiales
-from laser_toolkit.db.repo_negocio import obtener_tarifas_vigentes
+from laser_toolkit.db.repo_negocio import obtener_configuracion_maquina, obtener_tarifas_vigentes
 from laser_toolkit.db.repo_pruebas import listar_candidatos
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -67,6 +67,25 @@ def tarifas_vigentes(sesion: Session) -> dict:
             }
             for nombre, espesor, precio in precios
         ],
+    }
+
+
+def configuracion_maquina(sesion: Session) -> dict:
+    """Espejo de `leerMaquina` en `maquina-data.ts`. A diferencia de tarifas,
+    `obtener_configuracion_maquina` nunca devuelve `None` -- crea la fila con
+    los defaults de `MachineConfig` (issue #11) la primera vez, así que acá
+    siempre hay algo que mostrar."""
+    fila = obtener_configuracion_maquina(sesion)
+    return {
+        "laserMaxS": fila.laser_max_s,
+        "travelFeedMmMin": fila.travel_feed_mm_min,
+        "potenciaModuloW": fila.potencia_modulo_w,
+        "factorUtilizacionLaser": fila.factor_utilizacion_laser,
+        "puntoFocalMm": fila.punto_focal_mm,
+        "velocidadMaxMmMin": fila.velocidad_max_mm_min,
+        "aceleracionMmS2": fila.aceleracion_mm_s2,
+        "areaTrabajoAnchoMm": fila.area_trabajo_ancho_mm,
+        "areaTrabajoAltoMm": fila.area_trabajo_alto_mm,
     }
 
 
@@ -304,6 +323,32 @@ def historial(sesion: Session, material: str | None = None) -> list[dict]:
     return resultado
 
 
+def fichas_parametro(sesion: Session) -> list[dict]:
+    """Espejo de `listarFichas` en `fichas-data.ts` (F6, issue #7): todas las
+    Fichas de Parámetro que ya existen (oficiales o en revisión), con el
+    contexto de su `GrupoCalibracion` para el grid/detalle -- a diferencia
+    de `grupos_calibracion`, acá solo entran los grupos que ya tienen una
+    Ficha creada (ver `FichaParametro.grupo_calibracion`, relación 1:1)."""
+    fichas = sesion.scalars(
+        select(FichaParametro).join(GrupoCalibracion).order_by(GrupoCalibracion.material_id, GrupoCalibracion.id)
+    )
+    return [
+        {
+            "grupoId": ficha.grupo_calibracion.grupo_calibracion_id,
+            "material": ficha.grupo_calibracion.material.nombre,
+            "espesorMm": str(ficha.grupo_calibracion.espesor_mm),
+            "operacion": ficha.grupo_calibracion.operacion.value,
+            "velocidadMmMin": str(ficha.grupo_calibracion.velocidad_mm_min),
+            "potenciaPct": str(ficha.grupo_calibracion.potencia_pct),
+            "estado": ficha.estado.value,
+            "costoEstandarTotal": (str(ficha.costo_estandar_total) if ficha.costo_estandar_total is not None else ""),
+            "fechaValidacion": (ficha.fecha_validacion.isoformat() if ficha.fecha_validacion is not None else ""),
+            "notas": ficha.notas or "",
+        }
+        for ficha in fichas
+    ]
+
+
 def grupos_calibracion(sesion: Session) -> list[dict]:
     """Espejo de `listarGruposCalibracion` en `final-run-data.ts` (E, #64):
     cada grupo con sus ejecuciones (una por `FinalRun`, ordenadas), y si ya
@@ -401,8 +446,10 @@ def dashboard_resumen(sesion: Session) -> dict:
 
 __all__ = [
     "candidatos_final_run",
+    "configuracion_maquina",
     "costeo_detalle",
     "dashboard_resumen",
+    "fichas_parametro",
     "grupos_calibracion",
     "historial",
     "materiales_catalogo",

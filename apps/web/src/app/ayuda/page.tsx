@@ -128,8 +128,8 @@ const SECCIONES: Seccion[] = [
     slug: "fichas",
     label: "Fichas de Parámetro Estándar",
     resumen:
-      "Las 'recetas' oficiales por material, espesor y operación, respaldadas por un Final Run calibrado.",
-    construida: false,
+      "Las 'recetas' oficiales por material, espesor y operación, respaldadas por un Final Run calibrado: grid, detalle con costo y origen, editor 'Nueva Ficha' y exportación a PDF.",
+    construida: true,
   },
   {
     slug: "materiales",
@@ -142,8 +142,8 @@ const SECCIONES: Seccion[] = [
     slug: "maquina",
     label: "Máquina",
     resumen:
-      "Parámetros del perfil de máquina (CNC 3018 + Laser Tree LT-80W-F45): límite de láser, velocidad de desplazamiento, potencia del módulo y factor de utilización.",
-    construida: false,
+      "Parámetros del perfil de máquina (CNC 3018 + Laser Tree LT-80W-F45): límite de láser, velocidad, aceleración, potencia del módulo, punto focal y área de trabajo real de la mesa.",
+    construida: true,
   },
   {
     slug: "historial",

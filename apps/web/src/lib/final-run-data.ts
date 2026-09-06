@@ -149,17 +149,30 @@ export interface ResultadoFicha {
   error?: string;
 }
 
+export interface DatosFicha {
+  estado: EstadoFicha;
+  notas?: string;
+  /** Costo estándar total resultante (issue #7) -- string tal como lo
+   * escribe el formulario, `""` u omitido significa "sin definir todavía". */
+  costoEstandarTotal?: string;
+  /** Formato AAAA-MM-DD. */
+  fechaValidacion?: string;
+}
+
 /** Marca (o revierte) la Ficha de Parámetro Estándar de un grupo (F6, issue
- * #7) -- crea o actualiza, nunca duplica (ver `crear_o_actualizar_ficha`). */
+ * #7) -- crea o actualiza, nunca duplica (ver `crear_o_actualizar_ficha`).
+ * El toggle rápido de Final Run ("Marcar Ficha como oficial") solo manda
+ * `estado`; la pantalla Fichas de Parámetro manda el resto también. */
 export async function actualizarFichaGrupo(
   grupoId: string,
-  estado: EstadoFicha,
-  notas?: string,
+  datos: DatosFicha,
 ): Promise<ResultadoFicha> {
   try {
     await pyPost(`grupos-calibracion/${encodeURIComponent(grupoId)}/ficha`, {
-      estado,
-      notas,
+      estado: datos.estado,
+      notas: datos.notas,
+      costoEstandarTotal: datos.costoEstandarTotal,
+      fechaValidacion: datos.fechaValidacion,
     });
     return { ok: true };
   } catch (error) {
