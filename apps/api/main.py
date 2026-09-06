@@ -90,6 +90,41 @@ def guardar_tarifas(body: GuardarTarifasBody) -> dict:
         )
 
 
+@app.get("/maquina")
+def maquina() -> dict:
+    with sesion() as s:
+        return lectura.configuracion_maquina(s)
+
+
+class GuardarMaquinaBody(BaseModel):
+    laserMaxS: int
+    travelFeedMmMin: int
+    potenciaModuloW: float
+    factorUtilizacionLaser: float
+    puntoFocalMm: float
+    velocidadMaxMmMin: int
+    aceleracionMmS2: float
+    areaTrabajoAnchoMm: float
+    areaTrabajoAltoMm: float
+
+
+@app.put("/maquina")
+def guardar_maquina(body: GuardarMaquinaBody) -> dict:
+    with sesion() as s:
+        return escritura.guardar_configuracion_maquina(
+            s,
+            laser_max_s=body.laserMaxS,
+            travel_feed_mm_min=body.travelFeedMmMin,
+            potencia_modulo_w=body.potenciaModuloW,
+            factor_utilizacion_laser=body.factorUtilizacionLaser,
+            punto_focal_mm=body.puntoFocalMm,
+            velocidad_max_mm_min=body.velocidadMaxMmMin,
+            aceleracion_mm_s2=body.aceleracionMmS2,
+            area_trabajo_ancho_mm=body.areaTrabajoAnchoMm,
+            area_trabajo_alto_mm=body.areaTrabajoAltoMm,
+        )
+
+
 @app.get("/candidatos")
 def candidatos() -> list[dict]:
     with sesion() as s:
