@@ -97,6 +97,24 @@ def guardar_gcode_key(sesion: Session, registro: Registro, gcode_storage_key: st
     return registro
 
 
+def guardar_foto_medicion_key(sesion: Session, medicion: Medicion, foto_storage_key: str | None) -> Medicion:
+    """Asocia (o quita, si `foto_storage_key` es `None`) la foto de una celda
+    puntual ya subida a Storage (issue #25/#51, bucket `fotos`). Mismo patrón
+    que `guardar_gcode_key`: la subida/borrado del archivo en sí queda del
+    lado del llamador."""
+    medicion.foto_storage_key = foto_storage_key
+    sesion.flush()
+    return medicion
+
+
+def guardar_foto_bateria_key(sesion: Session, registro: Registro, foto_storage_key: str | None) -> Registro:
+    """Igual que `guardar_foto_medicion_key`, pero para la foto de toda la
+    batería (por corrida, no por celda) -- ver `Registro.foto_bateria_storage_key`."""
+    registro.foto_bateria_storage_key = foto_storage_key
+    sesion.flush()
+    return registro
+
+
 def registrar_mediciones_generadas(sesion: Session, registro: Registro, filas: list[dict]) -> list[Medicion]:
     """Vuelca las filas ya generadas por una suite (espejo de `CAMPOS_CSV` de
     `laser_toolkit.io.csv_export`) como `Medicion` -- ninguna requiere

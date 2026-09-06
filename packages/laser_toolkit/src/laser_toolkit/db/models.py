@@ -246,6 +246,12 @@ class Registro(Base):
     # key en el bucket `gcode` de Supabase Storage, no una ruta de disco.
     gcode_storage_key: Mapped[str | None] = mapped_column(Text, default=None)
 
+    # Foto de toda la batería de probetas (no una celda puntual) -- issue
+    # #51, espejo de `leerFotoBateria`/`CELDA_ID_BATERIA` en
+    # apps/web/src/lib/foto-bateria.ts. Vive acá (no en Medicion) porque es
+    # una foto por corrida, no por celda.
+    foto_bateria_storage_key: Mapped[str | None] = mapped_column(Text, default=None)
+
     # Mediciones manuales de la corrida completa (Plan Maestro, sección 4) --
     # NULL mientras no se haya completado el SOP, nunca 0 por defecto.
     kwh_corrida_medido: Mapped[float | None] = mapped_column(Float, default=None)

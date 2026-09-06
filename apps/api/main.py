@@ -15,12 +15,17 @@ agregan de la misma forma sobre esta app.
 import escritura
 import generacion
 import lectura
-from fastapi import FastAPI, HTTPException
+import storage_endpoints
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, ValidationError
 from sesiones import sesion
 from sqlalchemy import text
+from storage_cliente import cliente as cliente_storage
 
 app = FastAPI(title="laser-toolkit-api")
+
+EXTENSIONES_FOTO_PERMITIDAS = {"jpg", "jpeg", "png", "webp"}
+TAMANO_MAXIMO_FOTO_BYTES = 8 * 1024 * 1024
 
 
 @app.get("/health")
@@ -122,3 +127,77 @@ def generar_suite(payload: dict) -> dict:
         return generacion.generar(payload)
     except (ValueError, ValidationError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+def _extension_de(archivo: UploadFile) -> str:
+    extension = (archivo.filename or "").rsplit(".", 1)[-1].lower()
+    if extension not in EXTENSIONES_FOTO_PERMITIDAS:
+        raise HTTPException(status_code=400, detail="Formato no soportado (usá jpg, png o webp).")
+    return extension
+
+
+async def _contenido_de(archivo: UploadFile) -> bytes:
+    contenido = await archivo.read()
+    if len(contenido) > TAMANO_MAXIMO_FOTO_BYTES:
+        raise HTTPException(status_code=400, detail="La foto pesa más de 8MB.")
+    return contenido
+
+
+@app.post("/fotos/{corrida_id}/{id_prueba}")
+async def subir_foto_celda(corrida_id: str, id_prueba: str, archivo: UploadFile = File(...)) -> dict:  # noqa: B008
+    extension = _extension_de(archivo)
+    contenido = await _contenido_de(archivo)
+    with sesion() as s:
+        try:
+            return storage_endpoints.subir_foto_celda(s, cliente_storage, corrida_id, id_prueba, contenido, extension)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.delete("/fotos/{corrida_id}/{id_prueba}")
+def eliminar_foto_celda(corrida_id: str, id_prueba: str) -> dict:
+    with sesion() as s:
+        try:
+            storage_endpoints.eliminar_foto_celda(s, cliente_storage, corrida_id, id_prueba)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        return {"ok": True}
+
+
+@app.post("/fotos-bateria/{corrida_id}")
+async def subir_foto_bateria(corrida_id: str, archivo: UploadFile = File(...)) -> dict:  # noqa: B008
+    extension = _extension_de(archivo)
+    contenido = await _contenido_de(archivo)
+    with sesion() as s:
+        try:
+            return storage_endpoints.subir_foto_bateria(s, cliente_storage, corrida_id, contenido, extension)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.delete("/fotos-bateria/{corrida_id}")
+def eliminar_foto_bateria(corrida_id: str) -> dict:
+    with sesion() as s:
+        try:
+            storage_endpoints.eliminar_foto_bateria(s, cliente_storage, corrida_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        return {"ok": True}
+
+
+@app.get("/descargas/gcode/{corrida_id}")
+def descargar_gcode(corrida_id: str) -> dict:
+    with sesion() as s:
+        try:
+            return {"url": storage_endpoints.url_firmada_gcode(s, cliente_storage, corrida_id)}
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/descargas/svg/{suite_id}")
+def descargar_svg(suite_id: int) -> dict:
+    with sesion() as s:
+        try:
+            return {"url": storage_endpoints.url_firmada_svg(s, cliente_storage, suite_id)}
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
