@@ -242,6 +242,10 @@ class Registro(Base):
     fecha: Mapped[date] = mapped_column(Date)
     lote: Mapped[str] = mapped_column(String(20))
 
+    # El .gcode que efectivamente se corrió en esta corrida (issue #25) --
+    # key en el bucket `gcode` de Supabase Storage, no una ruta de disco.
+    gcode_storage_key: Mapped[str | None] = mapped_column(Text, default=None)
+
     # Mediciones manuales de la corrida completa (Plan Maestro, sección 4) --
     # NULL mientras no se haya completado el SOP, nunca 0 por defecto.
     kwh_corrida_medido: Mapped[float | None] = mapped_column(Float, default=None)

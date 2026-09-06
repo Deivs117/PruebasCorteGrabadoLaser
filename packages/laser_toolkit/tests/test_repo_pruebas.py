@@ -16,6 +16,7 @@ from laser_toolkit.db.repo_pruebas import (
     crear_registro_de_suite,
     crear_suite,
     desmarcar_candidato,
+    guardar_gcode_key,
     listar_candidatos,
     marcar_candidato,
     registrar_mediciones_generadas,
@@ -128,6 +129,13 @@ def test_completar_evaluacion_no_pisa_lo_ya_cargado(sesion):
     assert medicion.corte_pasante is True
     assert medicion.notas == "primera pasada"
     assert medicion.carbonizacion_1a5 == 3
+
+
+def test_guardar_gcode_key_asocia_la_key_de_storage(sesion):
+    registro = _armar_registro_con_mediciones(sesion)
+    assert registro.gcode_storage_key is None
+    guardar_gcode_key(sesion, registro, "MDF-Trupan/MDF-Trupan_3mm_corte_2026-09-03_L07.gcode")
+    assert registro.gcode_storage_key == "MDF-Trupan/MDF-Trupan_3mm_corte_2026-09-03_L07.gcode"
 
 
 def test_marcar_y_desmarcar_candidato_es_idempotente(sesion):
