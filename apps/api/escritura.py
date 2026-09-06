@@ -16,6 +16,7 @@ from __future__ import annotations
 from laser_toolkit.db.models import FamiliaMaterial, Material, Medicion, Registro
 from laser_toolkit.db.repo_materiales import obtener_o_crear_material
 from laser_toolkit.db.repo_negocio import (
+    actualizar_configuracion_maquina,
     construir_machine_config,
     construir_tarifas_config,
     fijar_precio_material,
@@ -34,6 +35,7 @@ from sqlalchemy.orm import Session
 
 from lectura import (
     candidato_a_dict,
+    configuracion_maquina,
     costeo_detalle,
     materiales_catalogo,
     registro_detalle,
@@ -93,6 +95,39 @@ def guardar_tarifas(
         )
     sesion.commit()
     return tarifas_vigentes(sesion)
+
+
+def guardar_configuracion_maquina(
+    sesion: Session,
+    *,
+    laser_max_s: int,
+    travel_feed_mm_min: int,
+    potencia_modulo_w: float,
+    factor_utilizacion_laser: float,
+    punto_focal_mm: float,
+    velocidad_max_mm_min: int,
+    aceleracion_mm_s2: float,
+    area_trabajo_ancho_mm: float,
+    area_trabajo_alto_mm: float,
+) -> dict:
+    """Espejo de `guardarMaquina` en `maquina-data.ts`. A diferencia de
+    tarifas, esto pasa a ser el default global real de toda la máquina
+    (issue #11) -- sobreescribe la fila única en vez de agregar un
+    historial."""
+    actualizar_configuracion_maquina(
+        sesion,
+        laser_max_s=laser_max_s,
+        travel_feed_mm_min=travel_feed_mm_min,
+        potencia_modulo_w=potencia_modulo_w,
+        factor_utilizacion_laser=factor_utilizacion_laser,
+        punto_focal_mm=punto_focal_mm,
+        velocidad_max_mm_min=velocidad_max_mm_min,
+        aceleracion_mm_s2=aceleracion_mm_s2,
+        area_trabajo_ancho_mm=area_trabajo_ancho_mm,
+        area_trabajo_alto_mm=area_trabajo_alto_mm,
+    )
+    sesion.commit()
+    return configuracion_maquina(sesion)
 
 
 def _medicion_por_identidad(sesion: Session, corrida_id: str, id_prueba: str) -> Medicion:
