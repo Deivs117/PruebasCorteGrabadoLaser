@@ -1,14 +1,13 @@
 import os
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from laser_toolkit.db import models  # noqa: F401  (registra las tablas en Base.metadata)
 
 # Import de los modelos (issue #22) para que --autogenerate los detecte.
 from laser_toolkit.db.base import Base
-from laser_toolkit.db import models  # noqa: F401  (registra las tablas en Base.metadata)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
