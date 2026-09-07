@@ -64,6 +64,15 @@ Al abrir un worktree nuevo:
 
 Al terminar y mergear la tarea: `git worktree remove ../wt-<algo>` para no acumular directorios muertos — pero solo cuando el ticket ya cumplió su propósito (mergeado hasta donde correspondía), nunca a mitad de camino.
 
+### Borrar la sub-rama en cuanto se fusiona a `feature/<categoría>`
+
+Una sub-rama de tarea cumple su ciclo de vida apenas su PR se fusiona en `feature/<categoría>` — sus commits ya quedaron ahí y van a viajar solos en los próximos merges de la cadena (`feature/<categoría>` → `develop` → `master`). No hace falta ni conviene esperar a que la tarea llegue a `master` para borrarla: dejarla viva después de fusionada solo acumula ramas muertas que no aportan nada (ya no hay nada que promover desde ellas).
+
+- `gh pr merge <n> --merge --delete-branch` ya borra la copia remota al mismo tiempo que fusiona — usarlo siempre para PRs de sub-rama (nunca `gh pr merge` a secas).
+- Si falla borrar la copia LOCAL con `cannot delete branch ... used by worktree`, es porque el worktree de esa tarea sigue abierto: `git worktree remove ../wt-<algo>` primero (mismo criterio de arriba: el ticket ya cumplió su propósito ahí), y recién ahí `git branch -d <sub-rama>` a mano si hace falta.
+- Antes de borrar algo a mano (sin pasar por `--delete-branch`), confirmar que de verdad está absorbida: `git branch -r --contains origin/<sub-rama>` tiene que listar la rama de categoría (o `master`, si ya promovió toda la cadena) — si solo se lista a sí misma, todavía no está fusionada en ningún lado, no borrar.
+- **Nunca** borrar `feature/frontend`, `feature/backend`, `feature/data`, `feature/deploy`, `develop` ni `master` — esas son permanentes, no cumplen un ciclo y no ciclan.
+
 ## Estado del ticket en el GitHub Project (Kanban)
 
 El [Project](https://github.com/orgs/Flux-Solutions-Cali/projects/1) tiene 5 columnas (campo `Status`) y el estado de un ticket **tiene que reflejar en qué paso real está**, nunca saltar directo de `Backlog` a `Hecho` — eso es lo que ha estado pasando y deja de ser información útil para saber qué se está haciendo en paralelo:
