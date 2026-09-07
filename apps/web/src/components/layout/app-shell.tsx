@@ -12,6 +12,9 @@ interface AppShellProps {
    * server-side en `layout.tsx`, nunca acá (evita un round-trip extra al
    * cliente solo para mostrarlo en el Topbar). */
   userEmail: string | null;
+  /** Cuenta maestra de la sesión activa (#117) -- resuelto server-side
+   * igual que `userEmail`, mismo criterio (nunca en el cliente). */
+  esCuentaMaestra: boolean;
 }
 
 /** `/login` no lleva sidebar/topbar -- es la única página pública (issue
@@ -37,7 +40,11 @@ function esViewportAngosto(): boolean {
  * fondo oscurecido (transform + fade, nunca un display:none/block
  * instantáneo) que sí se oculta del todo.
  */
-export function AppShell({ children, userEmail }: AppShellProps) {
+export function AppShell({
+  children,
+  userEmail,
+  esCuentaMaestra,
+}: AppShellProps) {
   const [sidebarAbierto, setSidebarAbierto] = useState(true);
   const pathname = usePathname();
   const rutaPublica = esRutaPublica(pathname);
@@ -95,6 +102,7 @@ export function AppShell({ children, userEmail }: AppShellProps) {
         open={sidebarAbierto}
         onNavigate={cerrarSiEsAngosto}
         onToggle={() => setSidebarAbierto((v) => !v)}
+        esCuentaMaestra={esCuentaMaestra}
       />
 
       <button

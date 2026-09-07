@@ -253,6 +253,18 @@ body {
   }
 }
 
+/* Panel de Generación de Credenciales (sidebar, #117): la llave gira en
+   vaivén alrededor del ojal, como girando en una cerradura. */
+@keyframes keyround-gira {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-20deg);
+  }
+}
+
 /* Moneda de Tarifas (sidebar): rebote vertical corto, una vez por hover,
    como si acabara de caer. */
 @keyframes dollarsign-rebote {
