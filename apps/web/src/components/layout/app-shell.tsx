@@ -91,7 +91,11 @@ export function AppShell({ children, userEmail }: AppShellProps) {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar open={sidebarAbierto} onNavigate={cerrarSiEsAngosto} />
+      <Sidebar
+        open={sidebarAbierto}
+        onNavigate={cerrarSiEsAngosto}
+        onToggle={() => setSidebarAbierto((v) => !v)}
+      />
 
       <button
         type="button"
@@ -114,8 +118,7 @@ export function AppShell({ children, userEmail }: AppShellProps) {
         )}
       >
         <Topbar
-          sidebarAbierto={sidebarAbierto}
-          onToggleSidebar={() => setSidebarAbierto((v) => !v)}
+          onAbrirSidebar={() => setSidebarAbierto(true)}
           userEmail={userEmail}
         />
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>

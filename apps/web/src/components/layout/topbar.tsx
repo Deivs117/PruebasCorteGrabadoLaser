@@ -1,14 +1,14 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { MorphIcon } from "morphicons/react";
-import { PanelLeftClose, PanelLeftOpen } from "lucide";
+import { PanelLeftOpen } from "lucide-react";
 import { getNavLabel } from "@/lib/nav";
 import { CerrarSesionButton } from "@/components/auth/cerrar-sesion-button";
 
 interface TopbarProps {
-  sidebarAbierto: boolean;
-  onToggleSidebar: () => void;
+  /** Solo hace falta para el botón de abrir en mobile -- en escritorio el
+   * control de colapsar/expandir vive en el propio `Sidebar` (#114). */
+  onAbrirSidebar: () => void;
   /** Email de la sesión activa (issue #52), o `null` si por algún motivo
    * el shell se renderiza sin sesión (no debería pasar: el middleware ya
    * redirige a /login antes). */
@@ -16,15 +16,12 @@ interface TopbarProps {
 }
 
 /**
- * Barra superior: título de la sección activa + control del sidebar. El
- * mismo botón colapsa el sidebar a franja de íconos en escritorio, o lo
- * oculta del todo en viewports angostos (#114) -- ver `Sidebar`.
+ * Barra superior: título de la sección activa + (solo en mobile) el botón
+ * para abrir el panel deslizante -- en escritorio el sidebar nunca
+ * desaparece del todo, así que ahí no hace falta ningún botón acá (#114,
+ * el control de colapsar/expandir vive en el propio `Sidebar`).
  */
-export function Topbar({
-  sidebarAbierto,
-  onToggleSidebar,
-  userEmail,
-}: TopbarProps) {
+export function Topbar({ onAbrirSidebar, userEmail }: TopbarProps) {
   const pathname = usePathname();
   const titulo = getNavLabel(pathname);
 
@@ -32,19 +29,11 @@ export function Topbar({
     <header className="border-border bg-surface sticky top-0 z-30 flex h-[var(--shell-topbar-h)] shrink-0 items-center gap-4 border-b px-4 sm:px-6">
       <button
         type="button"
-        onClick={onToggleSidebar}
-        aria-expanded={sidebarAbierto}
-        aria-label={
-          sidebarAbierto ? "Colapsar navegación" : "Expandir navegación"
-        }
-        className="text-navy hover:bg-navy-soft flex size-9 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
+        onClick={onAbrirSidebar}
+        aria-label="Abrir navegación"
+        className="text-navy hover:bg-navy-soft flex size-9 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)] lg:hidden"
       >
-        <MorphIcon
-          icon={sidebarAbierto ? PanelLeftClose : PanelLeftOpen}
-          spring="smooth"
-          size={20}
-          strokeWidth={1.75}
-        />
+        <PanelLeftOpen size={20} strokeWidth={1.75} />
       </button>
 
       {/* Etiqueta de la sección activa, no el <h1> de la página: cada
