@@ -300,6 +300,12 @@ def dashboard() -> dict:
         return lectura.dashboard_resumen(s)
 
 
+@app.get("/reportes")
+def reportes() -> dict:
+    with sesion() as s:
+        return lectura.reportes_resumen(s)
+
+
 @app.get("/registros")
 def listar_registros() -> list[dict]:
     with sesion() as s:
