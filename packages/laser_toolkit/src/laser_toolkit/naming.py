@@ -16,8 +16,14 @@ def slug_material(material: str) -> str:
     "MDF Trupan" -> "MDF-Trupan". Extraido a una funcion propia (antes vivia
     duplicado inline en `nombre_base` e `id_grupo_calibracion`) para que
     `laser_toolkit.storage.rutas` (issue #25) use exactamente el mismo slug,
-    sin repetir la lógica de normalización."""
-    return "-".join(material.strip().split())
+    sin repetir la lógica de normalización.
+
+    También normaliza "/" a guión (ej. "TPU/Silicona" -> "TPU-Silicona"): el
+    slug se usa como primer segmento de ruta en Storage (`storage.rutas`) y
+    queda embebido en `corrida_id`/`grupo_calibracion_id`, que a su vez viajan
+    como parámetro de rutas dinámicas de Next.js -- una barra sin escapar ahí
+    se interpreta como un segmento de ruta extra, no como parte del nombre."""
+    return "-".join(material.strip().replace("/", " ").split())
 
 
 def nombre_base(config: SuiteConfig) -> str:
