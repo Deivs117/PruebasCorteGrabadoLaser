@@ -67,6 +67,24 @@ class ConfiguracionRaster(BaseModel):
         description="Reduce la intensidad a N niveles discretos. None = modulacion continua (sin reducir).",
     )
     resolucion_mm: float = Field(default=RESOLUCION_RASTER_MM_POR_DEFECTO, gt=0)
+    # Rango real de potencia calibrado (issue #95, follow-up de #15/#6): el
+    # pixel mas claro de la imagen mapea a `potencia_baja_pct` (minimo que
+    # efectivamente marca el material), el mas oscuro a `potencia_alta_pct`
+    # (maximo antes de carbonizar). Los defaults 0/100 preservan el
+    # comportamiento anterior (escala directa 0%-potencia_max_pct) para
+    # quien no pasa ninguno de los dos -- los valores reales calibrados
+    # salen de dos Final Run de grabado independientes (#6), no de aca.
+    potencia_baja_pct: int = Field(default=0, ge=0, le=100)
+    potencia_alta_pct: int = Field(default=100, ge=0, le=100)
+
+    @model_validator(mode="after")
+    def _potencia_alta_mayor_que_baja(self) -> ConfiguracionRaster:
+        if self.potencia_alta_pct <= self.potencia_baja_pct:
+            raise ValueError(
+                "potencia_alta_pct debe ser mayor que potencia_baja_pct "
+                f"(baja={self.potencia_baja_pct}, alta={self.potencia_alta_pct})."
+            )
+        return self
 
     @model_validator(mode="after")
     def _pesos_solo_tienen_sentido_en_mezcla(self) -> ConfiguracionRaster:
