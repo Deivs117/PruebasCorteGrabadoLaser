@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PanelLeftOpen } from "lucide-react";
+import { KeyRound, PanelLeftOpen } from "lucide-react";
 import { getNavLabel } from "@/lib/nav";
 import { CerrarSesionButton } from "@/components/auth/cerrar-sesion-button";
+import { iconButtonClasses } from "@/lib/button-styles";
 
 interface TopbarProps {
   /** Solo hace falta para el botón de abrir en mobile -- en escritorio el
@@ -43,6 +45,14 @@ export function Topbar({ onAbrirSidebar, userEmail }: TopbarProps) {
       {userEmail ? (
         <div className="ml-auto flex items-center gap-3">
           <p className="text-text-muted hidden text-xs sm:block">{userEmail}</p>
+          <Link
+            href="/cuenta"
+            aria-label="Mi cuenta"
+            title="Mi cuenta"
+            className={iconButtonClasses()}
+          >
+            <KeyRound className="size-4" strokeWidth={1.75} />
+          </Link>
           <CerrarSesionButton />
         </div>
       ) : null}

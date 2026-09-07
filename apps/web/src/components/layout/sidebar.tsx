@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { clsx } from "clsx";
-import { NAV_SECTIONS } from "@/lib/nav";
+import { navSections } from "@/lib/nav";
 import { LogoEmpresa } from "@/components/layout/logo-empresa";
 import { Tooltip } from "@/components/ui/tooltip";
 
@@ -17,6 +17,10 @@ interface SidebarProps {
   open: boolean;
   onNavigate: () => void;
   onToggle: () => void;
+  /** Cuenta maestra de la sesión activa (#117) -- el único caso donde
+   * aparece la sección "Administración" (Panel de Generación de
+   * Credenciales), mismo gate que protege la ruta en `app/admin/page.tsx`. */
+  esCuentaMaestra: boolean;
 }
 
 /**
@@ -29,8 +33,14 @@ interface SidebarProps {
  * colapsado, no hay ningún botón visible -- el logo mismo, al hacer hover o
  * foco, se transforma en la acción de expandir (mismo patrón que Gemini).
  */
-export function Sidebar({ open, onNavigate, onToggle }: SidebarProps) {
+export function Sidebar({
+  open,
+  onNavigate,
+  onToggle,
+  esCuentaMaestra,
+}: SidebarProps) {
   const pathname = usePathname();
+  const secciones = navSections(esCuentaMaestra);
 
   return (
     <nav
@@ -95,7 +105,7 @@ export function Sidebar({ open, onNavigate, onToggle }: SidebarProps) {
       </div>
 
       <div className="flex flex-1 flex-col gap-6 px-3 pb-6">
-        {NAV_SECTIONS.map((seccion, indice) => (
+        {secciones.map((seccion, indice) => (
           <ul
             key={seccion.titulo ?? `seccion-${indice}`}
             className="flex flex-col gap-1"

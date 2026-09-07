@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Urbanist, DM_Mono } from "next/font/google";
 import { AppShell } from "@/components/layout/app-shell";
+import { esCuentaMaestra } from "@/lib/admin-data";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import "./globals.css";
 
@@ -39,7 +40,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${urbanist.variable} ${dmMono.variable} h-full`}
     >
       <body className="flex h-full min-h-screen flex-col antialiased">
-        <AppShell userEmail={user?.email ?? null}>{children}</AppShell>
+        <AppShell
+          userEmail={user?.email ?? null}
+          esCuentaMaestra={esCuentaMaestra(user?.email)}
+        >
+          {children}
+        </AppShell>
       </body>
     </html>
   );

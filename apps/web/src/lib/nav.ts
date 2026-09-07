@@ -8,6 +8,7 @@ import { GaugeAnimado } from "@/components/ui/icons/gauge-animado";
 import { HelpCircleAnimado } from "@/components/ui/icons/help-circle-animado";
 import { HistoryAnimado } from "@/components/ui/icons/history-animado";
 import { HomeAnimado } from "@/components/ui/icons/home-animado";
+import { KeyRoundAnimado } from "@/components/ui/icons/key-round-animado";
 import { LayersAnimado } from "@/components/ui/icons/layers-animado";
 import { Settings2Animado } from "@/components/ui/icons/settings2-animado";
 import { ShapesAnimado } from "@/components/ui/icons/shapes-animado";
@@ -106,11 +107,37 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
+/** Ítem del Panel de Generación de Credenciales (#117) -- nunca parte de
+ * `NAV_SECTIONS` a secas: solo aparece para la cuenta maestra (ver
+ * `navSections`), la misma condición que protege la ruta en sí
+ * (`app/admin/page.tsx`). */
+const ITEM_ADMIN: NavItem = {
+  href: "/admin",
+  label: "Generar Credenciales",
+  icon: KeyRoundAnimado,
+};
+
+/** "Mi cuenta" (#117) no vive en el sidebar -- se llega desde el ícono del
+ * Topbar, junto al email de la sesión -- pero sigue necesitando label para
+ * el título de la sección activa (`getNavLabel`). */
+const LABELS_FUERA_DEL_SIDEBAR: Record<string, string> = {
+  "/cuenta": "Mi cuenta",
+  [ITEM_ADMIN.href]: ITEM_ADMIN.label,
+};
+
+/** Secciones a renderizar en el sidebar para esta sesión -- `NAV_SECTIONS`
+ * más "Administración" si la cuenta activa es la cuenta maestra (#117).
+ * El link nunca aparece para nadie más, mismo gate que la propia ruta. */
+export function navSections(esCuentaMaestra: boolean): NavSection[] {
+  if (!esCuentaMaestra) return NAV_SECTIONS;
+  return [...NAV_SECTIONS, { titulo: "Administración", items: [ITEM_ADMIN] }];
+}
+
 export function getNavLabel(pathname: string): string {
   for (const seccion of NAV_SECTIONS) {
     for (const item of seccion.items) {
       if (item.href === pathname) return item.label;
     }
   }
-  return "Laser Toolkit";
+  return LABELS_FUERA_DEL_SIDEBAR[pathname] ?? "Laser Toolkit";
 }
