@@ -142,8 +142,8 @@ const SECCIONES: Seccion[] = [
     slug: "materiales",
     label: "Materiales",
     resumen:
-      "Librería de materiales soportados con su ficha técnica: parámetros optomecánicos, comportamiento térmico y qué operaciones ya tienen datos.",
-    construida: false,
+      "Catálogo de materiales: espesores disponibles y qué operaciones (corte/grabado) ya tienen suite corrida se derivan automáticamente, nunca se cargan a mano. El detalle de cada uno enlaza su ficha técnica en docs/materiales/ cuando existe. Agregar un material nuevo al catálogo también se puede hacer desde acá.",
+    construida: true,
   },
   {
     slug: "maquina",
