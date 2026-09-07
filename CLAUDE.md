@@ -93,6 +93,12 @@ IDs de las opciones: Backlog `54671fca` · Listo para hacer `1c4b27fa` · En pro
 
 Si además se sabe quién/qué sesión lo está trabajando, completar también el campo `Responsable` — ayuda a que dos sesiones no tomen el mismo ticket sin saberlo.
 
+## Verificar cambios de UI: nunca con Claude in Chrome
+
+**No usar las herramientas `mcp__claude-in-chrome__*`** (screenshots, hover, inspección de DOM en el navegador) para verificar un cambio de frontend en este repo — ya costó cerca del 90% del presupuesto de una sesión completa verificar visualmente una corrección de UI trivial (icon-only hover), sin margen para terminar el resto del trabajo pendiente ese día.
+
+Verificación suficiente para un cambio de UI: `lint` + `typecheck` + `format:check` + `build` en verde, más una lectura cuidadosa del código (clases condicionales, props, lógica de estado) — mismo criterio que ya se usaba cuando el login bloqueaba pruebas E2E por `curl`. Si hace falta confirmar algo visual de verdad, pedírselo al usuario en vez de gastar la sesión en ello.
+
 ## CI/CD
 
 `.github/workflows/ci.yml` corre en cada push/PR a `master`/`develop`/`feature/**`: un job de backend (`ruff` + `pyright` + `pytest` sobre `packages/laser_toolkit`) y un job de frontend (`lint` + `typecheck` + `format:check` + `build` sobre `apps/web`). El deploy en sí no vive en GitHub Actions — lo maneja la integración nativa de Vercel con el repo (preview por rama, producción en push a `master`).
