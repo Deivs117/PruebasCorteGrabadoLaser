@@ -1,18 +1,25 @@
-import { Layers } from "lucide-react";
-import { PlaceholderPage } from "@/components/placeholder-page";
+import { AyudaLink } from "@/components/ui/ayuda-link";
+import { MaterialesGrid } from "@/components/materiales/materiales-grid";
+import { listarMaterialesConDatos } from "@/lib/materiales-catalog";
 
-export default function Materiales() {
+// El catálogo y las suites cambian en cualquier momento desde otras
+// secciones, así que esta página no se puede congelar como estática.
+export const dynamic = "force-dynamic";
+
+export default async function Materiales() {
+  const materiales = await listarMaterialesConDatos();
+
   return (
-    <PlaceholderPage
-      ayudaSeccion="materiales"
-      icon={Layers}
-      title="Materiales"
-      description="Librería de materiales soportados (hoy: MDF) con su ficha técnica — parámetros optomecánicos, comportamiento térmico y qué operaciones ya tienen datos."
-      planeado={[
-        "Grid de materiales con espesores disponibles",
-        "Badge de qué operaciones (corte/grabado) ya tienen suite o ficha",
-        "Panel de detalle con la ficha técnica completa del material",
-      ]}
-    />
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-navy text-2xl font-semibold">Materiales</h1>
+        <p className="text-text-muted mt-1 text-sm">
+          Espesores y operaciones se derivan automáticamente de las suites ya
+          corridas — nunca se cargan a mano.
+        </p>
+        <AyudaLink seccion="materiales" />
+      </div>
+      <MaterialesGrid materiales={materiales} />
+    </div>
   );
 }
