@@ -1,5 +1,21 @@
 from laser_toolkit.config import FinalRunConfig, SuiteConfig
-from laser_toolkit.naming import id_grupo_calibracion, nombre_base, nombre_base_final_run
+from laser_toolkit.naming import id_grupo_calibracion, nombre_base, nombre_base_final_run, slug_material
+
+
+def test_slug_material_normaliza_espacios():
+    assert slug_material("MDF Trupan") == "MDF-Trupan"
+
+
+def test_slug_material_normaliza_barras():
+    """TPU/silicona (#8): una barra sin normalizar quedaría embebida en
+    corrida_id/grupo_calibracion_id, y esos IDs viajan como parámetro de
+    rutas dinámicas de Next.js -- una barra ahí se interpreta como un
+    segmento de ruta extra, no como parte del nombre."""
+    assert slug_material("TPU/Silicona") == "TPU-Silicona"
+
+
+def test_slug_material_normaliza_barras_y_espacios_mezclados():
+    assert slug_material(" TPU / Silicona ") == "TPU-Silicona"
 
 
 def test_nombre_base_con_fecha_fija():
