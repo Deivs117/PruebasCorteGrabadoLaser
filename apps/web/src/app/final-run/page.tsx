@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { Reveal } from "@/components/ui/reveal";
+import { DescargarBoton } from "@/components/registro/descargar-boton";
 import { EliminarGrupoButton } from "@/components/final-run/eliminar-grupo-button";
 import { GenerarEjecucionButton } from "@/components/final-run/generar-ejecucion-button";
 import { ResumenCalibracion } from "@/components/final-run/resumen-calibracion";
@@ -124,6 +125,15 @@ export default async function FinalRun() {
                           >
                             {ejecucion.calibrada ? "Medida" : "Sin medir"}
                           </Badge>
+                          {/* Antes solo se podía bajar el G-code en el
+                              banner efímero de justo después de generar la
+                              ejecución (#129) -- acá queda disponible
+                              siempre, mientras la ejecución exista. */}
+                          <DescargarBoton
+                            archivo={`${ejecucion.corridaId}.gcode`}
+                            etiqueta="G-code"
+                            endpointBase="/api/descargas/gcode"
+                          />
                           <Link
                             href={`/registro/${encodeURIComponent(ejecucion.corridaId)}`}
                             className="text-blue hover:text-blue-hover text-xs font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
