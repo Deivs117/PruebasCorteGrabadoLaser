@@ -16,9 +16,9 @@ interface TopbarProps {
 }
 
 /**
- * Barra superior: título de la sección activa + control del sidebar,
- * visible en cualquier ancho de pantalla (antes solo existía en viewports
- * angostos, así que en escritorio no había forma de esconder el sidebar).
+ * Barra superior: título de la sección activa + control del sidebar. El
+ * mismo botón colapsa el sidebar a franja de íconos en escritorio, o lo
+ * oculta del todo en viewports angostos (#114) -- ver `Sidebar`.
  */
 export function Topbar({
   sidebarAbierto,
@@ -35,7 +35,7 @@ export function Topbar({
         onClick={onToggleSidebar}
         aria-expanded={sidebarAbierto}
         aria-label={
-          sidebarAbierto ? "Ocultar navegación" : "Mostrar navegación"
+          sidebarAbierto ? "Colapsar navegación" : "Expandir navegación"
         }
         className="text-navy hover:bg-navy-soft flex size-9 items-center justify-center rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
       >
