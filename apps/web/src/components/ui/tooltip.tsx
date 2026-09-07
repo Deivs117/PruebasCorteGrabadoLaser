@@ -23,6 +23,12 @@ const MARGEN_PX = 8;
  * eso fuerza `overflow-x` a comportarse como `auto` también -- un tooltip
  * posicionado adentro se recortaría contra el ancho angosto del riel de
  * íconos en vez de sobresalir hacia el contenido.
+ *
+ * El `<span ref>` que envuelve a `children` es `display: contents` a
+ * propósito (no debe agregar una caja al layout del `<li>` que lo rodea) --
+ * pero por eso mismo nunca hay que medir SU rect (#133): un elemento
+ * `display: contents` no genera caja propia, así que su
+ * `getBoundingClientRect()` da todo en cero. Se mide el primer hijo real.
  */
 export function Tooltip({ label, children, lado = "derecha" }: TooltipProps) {
   const [visible, setVisible] = useState(false);
@@ -30,7 +36,14 @@ export function Tooltip({ label, children, lado = "derecha" }: TooltipProps) {
   const referenciaRef = useRef<HTMLSpanElement>(null);
 
   function mostrar() {
-    const rect = referenciaRef.current?.getBoundingClientRect();
+    // No medir el propio `<span>` -- por tener `display: contents` (ver
+    // comentario de abajo) no genera caja propia, y `getBoundingClientRect()`
+    // sobre un elemento así devuelve un rect en cero (confirmado: el tooltip
+    // terminaba anclado en la esquina superior izquierda de la pantalla,
+    // #133). El hijo real (el `<Link>` del ítem) sí tiene caja -- medir ese.
+    const elemento = referenciaRef.current
+      ?.firstElementChild as HTMLElement | null;
+    const rect = elemento?.getBoundingClientRect();
     if (!rect) return;
     setPosicion({
       top: rect.top + rect.height / 2,
