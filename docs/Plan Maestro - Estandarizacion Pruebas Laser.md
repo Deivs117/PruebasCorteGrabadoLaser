@@ -202,27 +202,30 @@ Una corrida que usa **una sola combinación fija** de velocidad/potencia — la 
 
 Eso resuelve la variación *dentro* de una corrida. Para la variación *entre* corridas (calentamiento de la máquina, voltaje de la red, desgaste de la lente, etc.), la misma Final Run se ejecuta **como mínimo 3 veces de forma independiente** (`ejecucion` = 1, 2, 3…), cada una un job físico separado con su propia lectura de medidor de inicio a fin.
 
-### 10.3 Flujo de comandos
+### 10.3 Flujo real (web app, desde la migración a Supabase — issue #64)
+
+**Ya no es por CLI/YAML** (`generate-final-run`/`prepare-record`/`summarize-final-run` siguen existiendo en `laser_toolkit.cli` pero apuntan a `data/registros/*.csv`, que ya no existe — ver #40). El flujo real es la pantalla **Final Run (Calibración)** de la web app:
 
 ```
-uv run laser-toolkit generate-final-run configs/<material>_final_run.yaml --ejecucion 1
-# ... correr en la máquina, medir (SOP), evaluar ...
-uv run laser-toolkit prepare-record data/registros/FINAL_..._ejec1.csv
-# completar kwh_corrida_medido y tiempo_real_corrida_s en el _registro.csv
+Final Run → "Nueva Final Run" → elegir un candidato marcado (o cargar
+  material/espesor/velocidad/potencia a mano) → arranca el grupo con
+  su primera ejecución.
 
-# repetir con --ejecucion 2, --ejecucion 3, en momentos independientes
+Por cada ejecución: correr en la máquina (SOP de una página), medir con el
+  medidor, cargar kwh_corrida_medido/tiempo_real_corrida_s en Hoja de
+  Registro (misma pantalla que el barrido) → "Generar siguiente ejecución"
+  en Final Run, repetir en un momento independiente.
 
-uv run laser-toolkit summarize-final-run \
-    data/registros/FINAL_..._ejec1_registro.csv \
-    data/registros/FINAL_..._ejec2_registro.csv \
-    data/registros/FINAL_..._ejec3_registro.csv
+Final Run muestra el resumen de calibración en vivo (kWh/unidad,
+  desviación estándar, CV%) y el estado CALIBRADO en cuanto se alcanza el
+  mínimo de ejecuciones (default 3) — sin comando aparte para "resumir".
 ```
 
-`summarize-final-run` agrupa por `grupo_calibracion_id` (material + espesor + operación + velocidad + potencia, sin importar fecha ni ejecución) y calcula, entre ejecuciones: **kWh por unidad** y **tiempo por unidad**, cada uno con su **desviación estándar** y **coeficiente de variación (CV%)**. Reporta `CALIBRADO` solo si hay al menos las ejecuciones mínimas configuradas (default 3, `--minimo-ejecuciones`); si no, dice cuántas faltan.
+**Grabado de imágenes realistas (issue #6/#3):** a diferencia del grabado plano (una sola combinación velocidad/potencia alcanza), grabar una imagen por intensidad de píxel necesita un **rango** de potencia — modula continuamente entre una sombra clara y una oscura, aprovechando el rango 0-10000 del spindle. Esto no es una calibración especial: son **dos grupos de Final Run normales e independientes** para el mismo material+espesor (misma velocidad, potencia distinta) — uno de **potencia baja** y uno de **potencia alta** — cada uno calibrado con sus propias ≥3 ejecuciones como cualquier otro. La herramienta de producción (#17) elige el par de Fichas resultante para armar el rango.
 
 ### 10.4 A dónde va el resultado
 
-El kWh/unidad y tiempo/unidad calibrados de una Final Run **son** el dato de energía que se documenta en la Ficha de Parámetro Estándar (F6) — no una nueva estimación, sino la medición directa de exactamente la combinación que se va a usar en producción. El CV% queda como evidencia de qué tan confiable es ese número (un CV alto indica que algo más inestable está pasando en el proceso, vale la pena investigar antes de confiar en el promedio).
+El kWh/unidad y tiempo/unidad calibrados de una Final Run **son** el dato de energía que se documenta en la Ficha de Parámetro Estándar (F6) — no una nueva estimación, sino la medición directa de exactamente la combinación que se va a usar en producción. El CV% queda como evidencia de qué tan confiable es ese número (un CV alto indica que algo más inestable está pasando en el proceso, vale la pena investigar antes de confiar en el promedio). Para grabado de imágenes (arriba), la Ficha de baja y la de alta se documentan por separado — cada una es una Final Run completa a todos los efectos.
 
 ---
 
