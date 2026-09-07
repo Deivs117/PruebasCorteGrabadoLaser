@@ -18,6 +18,7 @@ from laser_toolkit.db.models import (
     CandidatoFinalRun,
     EstadoFicha,
     FamiliaMaterial,
+    FinalRun,
     GrupoCalibracion,
     Material,
 )
@@ -45,6 +46,36 @@ def _familia_del_material(sesion: Session, nombre: str) -> FamiliaMaterial:
     alguien la elija explícito."""
     material = sesion.scalar(select(Material).where(Material.nombre == nombre))
     return material.familia if material is not None else FamiliaMaterial.OTRO
+
+
+def _mismo_gcode(anterior: FinalRun, config: FinalRunConfig) -> bool:
+    """True si `anterior` generaría el mismo G-code que `config` (#132) --
+    material/espesor/operación/velocidad/potencia ya son iguales por
+    construcción (`obtener_o_crear_grupo_calibracion` agrupa por esos
+    campos), así que solo hace falta comparar lo que varía por ejecución en
+    `FinalRun`. `ejecucion`/`lote`/`fecha` quedan afuera a propósito: no
+    afectan ni una celda ni un trazo, ver `laser_toolkit.suites.final_run`."""
+    return (
+        anterior.pasadas == config.pasadas
+        and anterior.repeticiones == config.repeticiones
+        and anterior.tamano_celda_mm == config.tamano_celda_mm
+        and anterior.espaciado_mm == config.espaciado_mm
+        and anterior.id_prefijo == config.id_prefijo
+        and anterior.z_step_mm == config.z_step_mm
+    )
+
+
+def _gcode_storage_key_reusable(grupo: GrupoCalibracion, config: FinalRunConfig) -> str | None:
+    """Busca una ejecución previa del mismo grupo con exactamente la misma
+    configuración de generación -- si la hay, su `.gcode` ya subido sirve
+    para esta también (#132), no hace falta un archivo nuevo casi idéntico."""
+    for anterior in grupo.final_runs:
+        if not _mismo_gcode(anterior, config):
+            continue
+        for registro in anterior.registros:
+            if registro.gcode_storage_key:
+                return registro.gcode_storage_key
+    return None
 
 
 def _grupo_por_id(sesion: Session, grupo_calibracion_id: str) -> GrupoCalibracion:
@@ -79,7 +110,10 @@ def crear_ejecucion(sesion: Session, payload: dict) -> dict:
     )
     siguiente = max((fr.ejecucion for fr in grupo.final_runs), default=0) + 1
 
-    resultado_generacion = generacion.generar_final_run({**payload, "ejecucion": siguiente})
+    resultado_generacion = generacion.generar_final_run(
+        {**payload, "ejecucion": siguiente},
+        reusar_gcode_storage_key=_gcode_storage_key_reusable(grupo, config),
+    )
 
     fecha = date.fromisoformat(config.fecha) if config.fecha else date.today()
     final_run = crear_final_run(
@@ -187,6 +221,13 @@ def eliminar_grupo(sesion: Session, cliente_storage: Client, grupo_calibracion_i
     pero real: acá sí hay filas de verdad detrás, no solo archivos sueltos."""
     grupo = _grupo_por_id(sesion, grupo_calibracion_id)
 
+    # Varias ejecuciones del grupo pueden compartir la misma
+    # gcode_storage_key (#132, ejecuciones que repiten la configuración) --
+    # borrar el mismo objeto de Storage más de una vez no rompe nada (no es
+    # un error borrar algo que ya no está), pero sí es una llamada de red de
+    # más, así que se deduplica.
+    claves_gcode_borradas: set[str] = set()
+
     for final_run in grupo.final_runs:
         for registro in final_run.registros:
             medicion_ids = [m.id for m in registro.mediciones]
@@ -203,8 +244,9 @@ def eliminar_grupo(sesion: Session, cliente_storage: Client, grupo_calibracion_i
                     eliminar_de_storage(cliente_storage, "fotos", medicion.foto_storage_key)
             if registro.foto_bateria_storage_key:
                 eliminar_de_storage(cliente_storage, "fotos", registro.foto_bateria_storage_key)
-            if registro.gcode_storage_key:
+            if registro.gcode_storage_key and registro.gcode_storage_key not in claves_gcode_borradas:
                 eliminar_de_storage(cliente_storage, "gcode", registro.gcode_storage_key)
+                claves_gcode_borradas.add(registro.gcode_storage_key)
 
             sesion.delete(registro)  # cascada ORM borra las Mediciones (ver models.py)
         sesion.delete(final_run)
