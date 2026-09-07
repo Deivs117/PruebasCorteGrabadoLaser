@@ -10,9 +10,12 @@ cambia de dónde sale el dato (Supabase en vez de `data/`/`configs/`).
 
 from __future__ import annotations
 
+import statistics
+
 from laser_toolkit.db.models import (
     CandidatoFinalRun,
     EstadoFicha,
+    FamiliaMaterial,
     FichaParametro,
     GrupoCalibracion,
     Material,
@@ -287,37 +290,71 @@ def costeo_detalle(sesion: Session, corrida_id: str) -> dict | None:
     }
 
 
-def historial(sesion: Session, material: str | None = None) -> list[dict]:
-    """Vista agregada de solo lectura (D, issue #63) -- misma fuente que
-    `registros()` (Hoja de Registro, C), con el costo total de la corrida
-    completa ya sumado y un filtro opcional por material. Historial nunca
-    escribe nada: es la vista condensada para audiencia no solo técnica que
-    pide #12/#63 -- Hoja de Registro sigue siendo la pantalla de trabajo
-    activo (editar/completar/costear)."""
-    filas = sesion.scalars(select(Registro).order_by(Registro.fecha.desc(), Registro.created_at.desc()))
-    resultado = []
-    for registro in filas:
-        material_registro, espesor_mm, operacion = _contexto_registro(registro)
-        if material is not None and material_registro != material:
+def panorama_familias(sesion: Session) -> list[dict]:
+    """Observabilidad de alto nivel por `FamiliaMaterial` (D reestructurado,
+    issue #12) -- el panorama sin filtros/export; el detalle por
+    material+espesor+operación puntual es #13 (Reportes), no acá.
+
+    Siempre devuelve las 4 familias, en el orden del enum, incluso sin
+    ningún dato todavía -- "nunca ocultar la familia ni inventar un cero
+    engañoso" (issue): los campos de rango/promedio quedan `None` (el
+    frontend los muestra como "sin datos", no como 0).
+    """
+    familia_por_material = {m.nombre: m.familia for m in sesion.scalars(select(Material))}
+
+    materiales_por_familia: dict[FamiliaMaterial, set[str]] = {f: set() for f in FamiliaMaterial}
+    for nombre, familia in familia_por_material.items():
+        materiales_por_familia[familia].add(nombre)
+
+    corridas_por_familia: dict[FamiliaMaterial, int] = {f: 0 for f in FamiliaMaterial}
+    evaluadas_por_familia: dict[FamiliaMaterial, int] = {f: 0 for f in FamiliaMaterial}
+    costeadas_por_familia: dict[FamiliaMaterial, int] = {f: 0 for f in FamiliaMaterial}
+    costos_por_familia: dict[FamiliaMaterial, list[float]] = {f: [] for f in FamiliaMaterial}
+
+    for registro in sesion.scalars(select(Registro)):
+        material_nombre, _, _ = _contexto_registro(registro)
+        # Fallback defensivo, igual que #10 (materiales-catalog.ts): un
+        # registro real nunca se pierde de esta cuenta aunque su material,
+        # por lo que sea, no esté en el catálogo.
+        familia = familia_por_material.get(material_nombre, FamiliaMaterial.OTRO)
+        corridas_por_familia[familia] += 1
+        for medicion in registro.mediciones:
+            if medicion.corte_pasante is not None and medicion.carbonizacion_1a5 is not None:
+                evaluadas_por_familia[familia] += 1
+            if medicion.costo_total_celda is not None:
+                costeadas_por_familia[familia] += 1
+                costos_por_familia[familia].append(medicion.costo_total_celda)
+
+    # kwh/unidad calibrado: solo cuenta un GrupoCalibracion cuyo resumen
+    # estadístico ya es `calibrado` (>= mínimo de ejecuciones medidas, ver
+    # `resumen_calibracion_de_grupo`) -- un grupo con Final Run incompleta
+    # levanta ValueError (mediciones reales sin respaldo de estimación), se
+    # trata igual que "todavía no calibrado", nunca como error de la página.
+    kwh_por_familia: dict[FamiliaMaterial, list[float]] = {f: [] for f in FamiliaMaterial}
+    for grupo in sesion.scalars(select(GrupoCalibracion)):
+        try:
+            resumen = resumen_calibracion_de_grupo(sesion, grupo)
+        except ValueError:
             continue
-        mediciones = registro.mediciones
-        evaluadas = sum(1 for m in mediciones if m.corte_pasante is not None and m.carbonizacion_1a5 is not None)
-        costos = [m.costo_total_celda for m in mediciones]
-        costeado = len(mediciones) > 0 and all(c is not None for c in costos)
+        if resumen.calibrado:
+            kwh_por_familia[grupo.material.familia].append(resumen.kwh_por_unidad_medio)
+
+    resultado = []
+    for familia in FamiliaMaterial:
+        costos = costos_por_familia[familia]
+        kwhs = kwh_por_familia[familia]
         resultado.append(
             {
-                "corridaId": registro.corrida_id,
-                "material": material_registro,
-                "espesorMm": str(espesor_mm),
-                "operacion": operacion,
-                "lote": registro.lote,
-                "fecha": registro.fecha.isoformat(),
-                "totalCeldas": len(mediciones),
-                "celdasEvaluadas": evaluadas,
-                "evaluada": len(mediciones) > 0 and evaluadas == len(mediciones),
-                "medida": registro.kwh_corrida_medido is not None and registro.tiempo_real_corrida_s is not None,
-                "costeado": costeado,
-                "costoTotalCorrida": _costo_str(sum(c for c in costos if c is not None) if costeado else None),
+                "familia": familia.value,
+                "materialesDistintos": len(materiales_por_familia[familia]),
+                "corridas": corridas_por_familia[familia],
+                "pruebasEvaluadas": evaluadas_por_familia[familia],
+                "pruebasCosteadas": costeadas_por_familia[familia],
+                "kwhPorUnidadMin": _costo_str(min(kwhs) if kwhs else None),
+                "kwhPorUnidadMax": _costo_str(max(kwhs) if kwhs else None),
+                "costoPorCeldaMin": _costo_str(min(costos) if costos else None),
+                "costoPorCeldaMax": _costo_str(max(costos) if costos else None),
+                "costoPorCeldaPromedio": _costo_str(statistics.mean(costos) if costos else None),
             }
         )
     return resultado
@@ -444,6 +481,77 @@ def dashboard_resumen(sesion: Session) -> dict:
     }
 
 
+def reportes_resumen(sesion: Session) -> dict:
+    """Reportes (#13): detalle por material+espesor+operación -- costo
+    promedio por combinación (sobre celdas ya costeadas) y evolución de
+    kWh/unidad calibrado en el tiempo (una Final Run por punto). A
+    diferencia de Historial (#12, panorama por familia sin filtros), esto
+    es el detalle exportable por combinación puntual.
+
+    Sin costeo o sin Final Run medida, la combinación/el grupo simplemente
+    no aparece -- nunca se muestra un promedio o un punto inventado.
+
+    Nota (issue #13): la fórmula de "ahorro estimado tras calibrar" del
+    Prompt 11 necesita una línea base explícita de comparación, todavía sin
+    definir -- deliberadamente fuera de este resumen, no un olvido."""
+    combos: dict[tuple[str, float, str], list[float]] = {}
+    for registro in sesion.scalars(select(Registro)):
+        material, espesor_mm, operacion = _contexto_registro(registro)
+        for medicion in registro.mediciones:
+            if medicion.costo_total_celda is not None:
+                combos.setdefault((material, espesor_mm, operacion), []).append(medicion.costo_total_celda)
+
+    costo_promedio_por_combo = [
+        {
+            "material": material,
+            "espesorMm": str(espesor_mm),
+            "operacion": operacion,
+            "costoPromedioCelda": str(round(sum(valores) / len(valores), 2)),
+            "nCeldas": len(valores),
+        }
+        for (material, espesor_mm, operacion), valores in sorted(combos.items())
+    ]
+
+    serie_kwh_calibrado = []
+    for grupo in sesion.scalars(select(GrupoCalibracion).order_by(GrupoCalibracion.grupo_calibracion_id)):
+        puntos = [
+            {
+                "fecha": final_run.fecha.isoformat(),
+                "ejecucion": final_run.ejecucion,
+                "kwhPorUnidad": round(reg.kwh_corrida_medido / max(len(reg.mediciones), 1), 6),
+            }
+            for final_run in grupo.final_runs
+            for reg in final_run.registros
+            if reg.kwh_corrida_medido is not None
+        ]
+        if not puntos:
+            continue
+        puntos.sort(key=lambda p: (p["fecha"], p["ejecucion"]))
+        serie_kwh_calibrado.append(
+            {
+                "grupoCalibracionId": grupo.grupo_calibracion_id,
+                "material": grupo.material.nombre,
+                "espesorMm": str(grupo.espesor_mm),
+                "operacion": grupo.operacion.value,
+                "velocidadMmMin": grupo.velocidad_mm_min,
+                "potenciaPct": grupo.potencia_pct,
+                "puntos": [{**p, "kwhPorUnidad": str(p["kwhPorUnidad"])} for p in puntos],
+            }
+        )
+
+    n_corridas = sesion.scalar(select(func.count()).select_from(Registro)) or 0
+    costo_acumulado = sesion.scalar(select(func.coalesce(func.sum(Medicion.costo_total_celda), 0.0))) or 0.0
+
+    return {
+        "costoPromedioPorCombo": costo_promedio_por_combo,
+        "serieKwhCalibrado": serie_kwh_calibrado,
+        "totales": {
+            "nCorridas": n_corridas,
+            "costoAcumulado": str(round(costo_acumulado, 2)),
+        },
+    }
+
+
 __all__ = [
     "candidatos_final_run",
     "configuracion_maquina",
@@ -451,10 +559,11 @@ __all__ = [
     "dashboard_resumen",
     "fichas_parametro",
     "grupos_calibracion",
-    "historial",
     "materiales_catalogo",
+    "panorama_familias",
     "registro_detalle",
     "registros",
+    "reportes_resumen",
     "resumen_calibracion",
     "suite_detalle",
     "suites",

@@ -1,59 +1,35 @@
-import { History } from "lucide-react";
 import { AyudaLink } from "@/components/ui/ayuda-link";
-import { EmptyState } from "@/components/ui/empty-state";
-import { LinkButton } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
-import { HistorialListado } from "@/components/historial/historial-listado";
-import { colorDeMaterial } from "@/lib/material-color";
-import { leerCatalogoMateriales } from "@/lib/materiales-catalog";
-import { listarHistorial } from "@/lib/historial-data";
+import { FamiliaPanel } from "@/components/historial/familia-panel";
+import { listarPanoramaFamilias } from "@/lib/historial-data";
 
-// Se completan/costean corridas en cualquier momento desde otras secciones,
-// así que esta lista no se puede congelar como estática en el build.
+// El panorama cambia en cualquier momento (nuevas corridas, evaluaciones,
+// costeos desde otras secciones), así que esta página no se puede congelar
+// como estática en el build.
 export const dynamic = "force-dynamic";
 
 export default async function Historial() {
-  const [corridas, catalogo] = await Promise.all([
-    listarHistorial(),
-    leerCatalogoMateriales(),
-  ]);
-
-  const familiaPorMaterial = new Map(
-    catalogo.map((m) => [m.nombre.toLowerCase(), m.familia]),
-  );
-  const conMaterial = corridas.map((corrida) => ({
-    ...corrida,
-    familia: familiaPorMaterial.get(corrida.material.toLowerCase()) ?? "otro",
-    color: colorDeMaterial(corrida.material),
-  }));
+  const panorama = await listarPanoramaFamilias();
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-navy text-2xl font-semibold">Historial</h1>
         <p className="text-text-muted mt-1 text-sm">
-          Resumen de todas las corridas hechas en el taller, de solo lectura —
-          para completar o costear una corrida, andá a Hoja de Registro.
+          Panorama de alto nivel por familia de material — cuántas pruebas tiene
+          cada una, en qué rango se mueve, cuál es su costo promedio. Para el
+          detalle de una corrida puntual, andá a Hoja de Registro o Costeo.
         </p>
         <AyudaLink seccion="historial" />
       </div>
 
-      {corridas.length === 0 ? (
-        <Reveal>
-          <EmptyState
-            icon={History}
-            title="Todavía no hay ninguna corrida en el historial"
-            description="Apenas se genere y corra una suite de prueba, va a aparecer acá."
-            action={
-              <LinkButton href="/suites" variant="primary">
-                Ir a Suites de Prueba
-              </LinkButton>
-            }
-          />
-        </Reveal>
-      ) : (
-        <HistorialListado corridas={conMaterial} />
-      )}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {panorama.map((familia, indice) => (
+          <Reveal key={familia.familia} delayMs={indice * 40}>
+            <FamiliaPanel panorama={familia} />
+          </Reveal>
+        ))}
+      </div>
     </div>
   );
 }

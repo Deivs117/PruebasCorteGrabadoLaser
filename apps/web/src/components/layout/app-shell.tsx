@@ -12,6 +12,9 @@ interface AppShellProps {
    * server-side en `layout.tsx`, nunca acá (evita un round-trip extra al
    * cliente solo para mostrarlo en el Topbar). */
   userEmail: string | null;
+  /** Cuenta maestra de la sesión activa (#117) -- resuelto server-side
+   * igual que `userEmail`, mismo criterio (nunca en el cliente). */
+  esCuentaMaestra: boolean;
 }
 
 /** `/login` no lleva sidebar/topbar -- es la única página pública (issue
@@ -30,13 +33,18 @@ function esViewportAngosto(): boolean {
 }
 
 /**
- * Estructura general: sidebar + topbar + contenido. El sidebar se puede
- * ocultar en cualquier ancho de pantalla (antes solo existía como panel
- * deslizante en viewports angostos, sin forma de esconderlo en escritorio).
- * En viewports angostos, además, actúa como panel deslizante con fondo
- * oscurecido (transform + fade, nunca un display:none/block instantáneo).
+ * Estructura general: sidebar + topbar + contenido. En escritorio, el
+ * sidebar nunca desaparece del todo: `sidebarAbierto=false` lo colapsa a
+ * una franja angosta de solo íconos (#114, patrón Gemini) en vez de
+ * ocultarlo. En viewports angostos sigue actuando como panel deslizante con
+ * fondo oscurecido (transform + fade, nunca un display:none/block
+ * instantáneo) que sí se oculta del todo.
  */
-export function AppShell({ children, userEmail }: AppShellProps) {
+export function AppShell({
+  children,
+  userEmail,
+  esCuentaMaestra,
+}: AppShellProps) {
   const [sidebarAbierto, setSidebarAbierto] = useState(true);
   const pathname = usePathname();
   const rutaPublica = esRutaPublica(pathname);
@@ -90,7 +98,12 @@ export function AppShell({ children, userEmail }: AppShellProps) {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar open={sidebarAbierto} onNavigate={cerrarSiEsAngosto} />
+      <Sidebar
+        open={sidebarAbierto}
+        onNavigate={cerrarSiEsAngosto}
+        onToggle={() => setSidebarAbierto((v) => !v)}
+        esCuentaMaestra={esCuentaMaestra}
+      />
 
       <button
         type="button"
@@ -105,12 +118,15 @@ export function AppShell({ children, userEmail }: AppShellProps) {
       <div
         className={clsx(
           "flex min-w-0 flex-1 flex-col transition-[padding] duration-[var(--duration-slow)] ease-[var(--ease-motion)]",
-          sidebarAbierto && "lg:pl-[var(--shell-sidebar-w)]",
+          // El sidebar siempre está visible en escritorio (#114) -- ya sea
+          // expandido o colapsado a la franja de íconos, nunca en 0.
+          sidebarAbierto
+            ? "lg:pl-[var(--shell-sidebar-w)]"
+            : "lg:pl-[var(--shell-sidebar-w-collapsed)]",
         )}
       >
         <Topbar
-          sidebarAbierto={sidebarAbierto}
-          onToggleSidebar={() => setSidebarAbierto((v) => !v)}
+          onAbrirSidebar={() => setSidebarAbierto(true)}
           userEmail={userEmail}
         />
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>

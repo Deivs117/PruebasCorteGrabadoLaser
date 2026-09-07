@@ -28,7 +28,7 @@ export function CerrarSesionButton() {
       disabled={saliendo}
       aria-label="Cerrar sesión"
       title="Cerrar sesión"
-      className={iconButtonClasses("neutral")}
+      className={iconButtonClasses("danger")}
     >
       <LogOut className="size-4" strokeWidth={1.75} />
     </button>
