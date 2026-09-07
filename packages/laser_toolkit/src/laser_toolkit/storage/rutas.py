@@ -44,3 +44,11 @@ PREFIJO_BIBLIOTECA_SVG = "biblioteca"
 
 def ruta_svg_biblioteca(nombre: str) -> str:
     return f"{PREFIJO_BIBLIOTECA_SVG}/{nombre}"
+
+
+# `proyectos`: un archivo por objeto del lienzo que tenga SVG/imagen propios
+# (issue #18) -- anidado por proyecto para poder borrar todo de una carpeta
+# al eliminar el proyecto (`eliminar_carpeta_proyecto`), igual que `fotos`
+# anida por corrida.
+def ruta_asset_proyecto(proyecto_id: int, objeto_id: str, extension: str) -> str:
+    return f"{proyecto_id}/{objeto_id}.{extension}"

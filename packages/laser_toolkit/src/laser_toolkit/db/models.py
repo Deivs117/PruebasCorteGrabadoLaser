@@ -12,9 +12,15 @@ Decisiones de tipado deliberadas:
   portable/testeable contra SQLite en CI sin depender de una Supabase real
   para los tests unitarios de #22/#24. Supabase (Postgres) igual lo guarda
   como `jsonb` sin perder nada -- se puede indexar más adelante si hace falta.
-- No hay tabla para "proyectos de diseño" del editor (#18): ese es su propio
-  sub-issue de #3, con su propio modelo -- mezclarlo acá haría este schema
-  menos legible sin necesidad.
+- "Proyectos de diseño" del editor (#18, sub-issue de #3): `ProyectoDiseno`
+  guarda los objetos del lienzo (posición, transformación, canal/parámetros)
+  como una lista JSON -- igual criterio que `velocidades_mm_min` arriba: el
+  objeto es la unidad natural (no hay queries que necesiten filtrar por un
+  campo de un objeto individual), normalizar en una tabla aparte solo
+  agregaría joins sin beneficio real. Las imágenes/SVG de cada objeto NO se
+  guardan inline en el JSON (infla la fila y duplica lo que ya hace Storage)
+  -- se suben al bucket `proyectos` (issue #25, `laser_toolkit.storage`) y el
+  JSON guarda la key, no el contenido.
 """
 
 from __future__ import annotations
@@ -92,6 +98,7 @@ class Material(Base):
     suites: Mapped[list[Suite]] = relationship(back_populates="material")
     grupos_calibracion: Mapped[list[GrupoCalibracion]] = relationship(back_populates="material")
     precios: Mapped[list[PrecioMaterial]] = relationship(back_populates="material")
+    proyectos_diseno: Mapped[list[ProyectoDiseno]] = relationship(back_populates="material")
 
 
 # ============================================================
@@ -357,6 +364,7 @@ class FichaParametro(Base):
     )
 
     grupo_calibracion: Mapped[GrupoCalibracion] = relationship(back_populates="ficha_parametro")
+    proyectos_diseno: Mapped[list[ProyectoDiseno]] = relationship(back_populates="ficha_parametro")
 
 
 # ============================================================
@@ -431,3 +439,62 @@ class ConfiguracionMaquina(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+# ============================================================
+# Proyectos de diseño del Editor (issue #18, sub-issue de #3)
+# ============================================================
+
+
+class ProyectoDiseno(Base):
+    """Un diseño reutilizable del Editor (#3): la posición/transformación/
+    canal de cada objeto del lienzo, para reabrirlo sin resubir la imagen ni
+    reconfigurar todo de nuevo (ej. el mismo logo grabado en distintos
+    lotes). Espejo de `ObjetoLienzo` (`apps/web/src/lib/editor-tipos.ts`),
+    ver el docstring de módulo para la decisión de tipado de `objetos`.
+
+    `material`/`ficha_parametro` son opcionales a propósito: un proyecto se
+    puede armar y guardar antes de decidir en qué material se va a cortar."""
+
+    __tablename__ = "proyectos_diseno"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(120))
+    material_id: Mapped[int | None] = mapped_column(ForeignKey("materiales.id"), default=None, index=True)
+    ficha_parametro_id: Mapped[int | None] = mapped_column(
+        ForeignKey("fichas_parametro.id"), default=None, index=True
+    )
+    # Lista de objetos del lienzo -- ver nota de tipado JSON al inicio del
+    # archivo. Cada elemento espeja `ObjetoLienzo` en camelCase (mismo criterio
+    # que `ObjetoExportarBody` en `apps/api/main.py`: el consumidor real de
+    # esta forma es el frontend, no una query SQL), salvo que `contenidoSvg`/
+    # `dataUri` se reemplazan por `svgStorageKey`/`imagenStorageKey` -- el
+    # contenido real vive en el bucket `proyectos` de Storage, no acá.
+    objetos: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    material: Mapped[Material | None] = relationship(back_populates="proyectos_diseno")
+    ficha_parametro: Mapped[FichaParametro | None] = relationship(back_populates="proyectos_diseno")
+    exportaciones: Mapped[list[ProyectoDisenoExportacion]] = relationship(
+        back_populates="proyecto",
+        cascade="all, delete-orphan",
+        order_by="ProyectoDisenoExportacion.exportado_en",
+    )
+
+
+class ProyectoDisenoExportacion(Base):
+    """Historial de exportaciones a G-code de un proyecto (#18) -- tabla de
+    solo-inserción, mismo criterio que `TarifasHistorial`: cada exportación
+    real queda registrada, nunca se sobrescribe la anterior."""
+
+    __tablename__ = "proyecto_diseno_exportaciones"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    proyecto_id: Mapped[int] = mapped_column(ForeignKey("proyectos_diseno.id"), index=True)
+    gcode_storage_key: Mapped[str] = mapped_column(Text)
+    exportado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    proyecto: Mapped[ProyectoDiseno] = relationship(back_populates="exportaciones")

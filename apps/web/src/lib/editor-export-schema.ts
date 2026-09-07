@@ -44,6 +44,9 @@ export const exportarGcodeSchema = z.object({
       ]),
     )
     .min(1, "El lienzo no tiene ningún objeto para exportar."),
+  // Issue #18, opcional: si la exportación se pide desde un proyecto de
+  // diseño ya guardado, la key del .gcode también queda en su historial.
+  proyectoId: z.number().int().nullish(),
 });
 
 export type ObjetoExportar = z.infer<
