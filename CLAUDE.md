@@ -45,6 +45,21 @@ master                              ← producción, deploy automático (Vercel)
 - `master` tiene branch protection: requiere que el CI esté en verde antes de mergear.
 - **Todo commit sigue Conventional Commits** (`tipo(área): mensaje`, ver `.pre-commit-config.yaml`) y **todo PR referencia un ticket** (`Closes #N` o `Refs #N`, ver `.github/PULL_REQUEST_TEMPLATE.md`) — es lo que da trazabilidad entre código y el [GitHub Project](https://github.com/orgs/Flux-Solutions-Cali/projects/1).
 
+### Si `feature/<categoría>` está desactualizada respecto a `develop`
+
+Antes de abrir la sub-rama, comparar: `git rev-list --count origin/feature/<categoría>..origin/develop`. Si no es 0, **poner la categoría al día primero, con un merge**, no branchear la sub-rama directo desde `develop`:
+
+```
+git fetch origin
+git worktree add ../wt-<categoría>-al-dia origin/feature/<categoría>
+(cd ../wt-<categoría>-al-dia && git checkout feature/<categoría> && git merge origin/develop && git push)
+git worktree remove ../wt-<categoría>-al-dia
+```
+
+Recién ahí, `git worktree add ../wt-<algo> -b <categoría>-<slug>-<issue> origin/feature/<categoría>` (ya al día).
+
+**Por qué, y qué se hizo distinto antes:** en #117 se brancheó la sub-rama directo desde `develop` porque la categoría estaba varios commits atrás, y el PR de la sub-rama se abrió igual con base `feature/<categoría>` — eso funciona (GitHub igual arma el diff y el merge pone a la categoría al día de paso), pero mezcla en un solo PR "poner la categoría al día" con "el cambio real de la tarea", y el título/descripción del PR terminan sin reflejar que ahí también viajaron N commits ajenos a la tarea. Un merge explícito de `develop` a la categoría, aparte y antes, deja eso trazado en su propio commit de merge — mismo resultado (la sub-rama nace al día), historia más legible.
+
 ## Worktrees para sesiones agénticas
 
 **Toda tarea que implique crear una rama/commits (agéntica o no) se hace en su propio `git worktree`, nunca directo en el directorio principal del repo.**
@@ -63,6 +78,15 @@ Al abrir un worktree nuevo:
 - El comando `cd` de una sesión no puede salir del directorio de trabajo principal asignado a la sesión — para correr comandos dentro de un worktree hermano hace falta un subshell explícito: `(cd ../wt-algo && comando)`.
 
 Al terminar y mergear la tarea: `git worktree remove ../wt-<algo>` para no acumular directorios muertos — pero solo cuando el ticket ya cumplió su propósito (mergeado hasta donde correspondía), nunca a mitad de camino.
+
+### Borrar la sub-rama en cuanto se fusiona a `feature/<categoría>`
+
+Una sub-rama de tarea cumple su ciclo de vida apenas su PR se fusiona en `feature/<categoría>` — sus commits ya quedaron ahí y van a viajar solos en los próximos merges de la cadena (`feature/<categoría>` → `develop` → `master`). No hace falta ni conviene esperar a que la tarea llegue a `master` para borrarla: dejarla viva después de fusionada solo acumula ramas muertas que no aportan nada (ya no hay nada que promover desde ellas).
+
+- `gh pr merge <n> --merge --delete-branch` ya borra la copia remota al mismo tiempo que fusiona — usarlo siempre para PRs de sub-rama (nunca `gh pr merge` a secas). Correr `git worktree remove ../wt-<algo>` (ver arriba) ANTES de este comando, no después: si el worktree de esa sub-rama sigue abierto, `--delete-branch` falla con `cannot delete branch ... used by worktree` y en ese caso **no borra ninguna de las dos copias** (ni local ni remota, aunque el mensaje de error solo mencione la local) -- confirmado en la práctica, dos veces.
+- Si aun así quedó a mitad (worktree cerrado recién después del merge): `git branch -d <sub-rama>` para la copia local y `git push origin --delete <sub-rama>` para la remota, por separado.
+- Antes de borrar algo a mano (sin pasar por `--delete-branch`), confirmar que de verdad está absorbida: `git branch -r --contains origin/<sub-rama>` tiene que listar la rama de categoría (o `master`, si ya promovió toda la cadena) — si solo se lista a sí misma, todavía no está fusionada en ningún lado, no borrar.
+- **Nunca** borrar `feature/frontend`, `feature/backend`, `feature/data`, `feature/deploy`, `develop` ni `master` — esas son permanentes, no cumplen un ciclo y no ciclan.
 
 ## Estado del ticket en el GitHub Project (Kanban)
 
