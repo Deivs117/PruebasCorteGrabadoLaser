@@ -51,6 +51,13 @@ interface ObjetoLienzoBase {
    * archivo (por defecto sí — la mayoría de los casos de uso reales no
    * quiere deformar el diseño). */
   mantenerProporcion: boolean;
+  /** Espejado horizontal/vertical (#107, barra de acciones rápida) —
+   * puramente visual en el cliente por ahora, igual que `rotacionDeg` en su
+   * momento: `laser_toolkit`/`apps/api` todavía no reciben este campo, así
+   * que el G-code exportado no refleja el espejado (ver `aObjetoExportar`
+   * en `editor-lienzo.tsx`, fuera del alcance de #107). */
+  espejadoH: boolean;
+  espejadoV: boolean;
 }
 
 export interface ObjetoSvgLienzo extends ObjetoLienzoBase {

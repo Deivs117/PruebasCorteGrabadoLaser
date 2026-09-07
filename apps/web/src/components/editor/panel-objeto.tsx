@@ -6,6 +6,10 @@ import { Field, INPUT_CLASSES } from "@/components/ui/field";
 import { iconButtonClasses } from "@/lib/button-styles";
 import { TrashCanAnimado } from "@/components/ui/icons/trash-can-animado";
 import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
+import {
+  CLASES_ACTIVAS_POR_CATEGORIA,
+  categoriaDeOperacion,
+} from "@/lib/editor-colores";
 import type {
   ObjetoLienzo,
   Operacion,
@@ -243,7 +247,9 @@ export function PanelObjeto({
               className={clsx(
                 "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
                 objeto.operaciones.includes(op.valor)
-                  ? "border-blue bg-blue-soft text-navy"
+                  ? CLASES_ACTIVAS_POR_CATEGORIA[
+                      categoriaDeOperacion(objeto, op.valor)
+                    ]
                   : "border-border text-text-muted hover:bg-navy-soft",
               )}
             >
