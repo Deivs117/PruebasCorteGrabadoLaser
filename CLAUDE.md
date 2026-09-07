@@ -45,6 +45,21 @@ master                              ← producción, deploy automático (Vercel)
 - `master` tiene branch protection: requiere que el CI esté en verde antes de mergear.
 - **Todo commit sigue Conventional Commits** (`tipo(área): mensaje`, ver `.pre-commit-config.yaml`) y **todo PR referencia un ticket** (`Closes #N` o `Refs #N`, ver `.github/PULL_REQUEST_TEMPLATE.md`) — es lo que da trazabilidad entre código y el [GitHub Project](https://github.com/orgs/Flux-Solutions-Cali/projects/1).
 
+### Si `feature/<categoría>` está desactualizada respecto a `develop`
+
+Antes de abrir la sub-rama, comparar: `git rev-list --count origin/feature/<categoría>..origin/develop`. Si no es 0, **poner la categoría al día primero, con un merge**, no branchear la sub-rama directo desde `develop`:
+
+```
+git fetch origin
+git worktree add ../wt-<categoría>-al-dia origin/feature/<categoría>
+(cd ../wt-<categoría>-al-dia && git checkout feature/<categoría> && git merge origin/develop && git push)
+git worktree remove ../wt-<categoría>-al-dia
+```
+
+Recién ahí, `git worktree add ../wt-<algo> -b <categoría>-<slug>-<issue> origin/feature/<categoría>` (ya al día).
+
+**Por qué, y qué se hizo distinto antes:** en #117 se brancheó la sub-rama directo desde `develop` porque la categoría estaba varios commits atrás, y el PR de la sub-rama se abrió igual con base `feature/<categoría>` — eso funciona (GitHub igual arma el diff y el merge pone a la categoría al día de paso), pero mezcla en un solo PR "poner la categoría al día" con "el cambio real de la tarea", y el título/descripción del PR terminan sin reflejar que ahí también viajaron N commits ajenos a la tarea. Un merge explícito de `develop` a la categoría, aparte y antes, deja eso trazado en su propio commit de merge — mismo resultado (la sub-rama nace al día), historia más legible.
+
 ## Worktrees para sesiones agénticas
 
 **Toda tarea que implique crear una rama/commits (agéntica o no) se hace en su propio `git worktree`, nunca directo en el directorio principal del repo.**
