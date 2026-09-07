@@ -444,6 +444,77 @@ def dashboard_resumen(sesion: Session) -> dict:
     }
 
 
+def reportes_resumen(sesion: Session) -> dict:
+    """Reportes (#13): detalle por material+espesor+operación -- costo
+    promedio por combinación (sobre celdas ya costeadas) y evolución de
+    kWh/unidad calibrado en el tiempo (una Final Run por punto). A
+    diferencia de Historial (#12, panorama por familia sin filtros), esto
+    es el detalle exportable por combinación puntual.
+
+    Sin costeo o sin Final Run medida, la combinación/el grupo simplemente
+    no aparece -- nunca se muestra un promedio o un punto inventado.
+
+    Nota (issue #13): la fórmula de "ahorro estimado tras calibrar" del
+    Prompt 11 necesita una línea base explícita de comparación, todavía sin
+    definir -- deliberadamente fuera de este resumen, no un olvido."""
+    combos: dict[tuple[str, float, str], list[float]] = {}
+    for registro in sesion.scalars(select(Registro)):
+        material, espesor_mm, operacion = _contexto_registro(registro)
+        for medicion in registro.mediciones:
+            if medicion.costo_total_celda is not None:
+                combos.setdefault((material, espesor_mm, operacion), []).append(medicion.costo_total_celda)
+
+    costo_promedio_por_combo = [
+        {
+            "material": material,
+            "espesorMm": str(espesor_mm),
+            "operacion": operacion,
+            "costoPromedioCelda": str(round(sum(valores) / len(valores), 2)),
+            "nCeldas": len(valores),
+        }
+        for (material, espesor_mm, operacion), valores in sorted(combos.items())
+    ]
+
+    serie_kwh_calibrado = []
+    for grupo in sesion.scalars(select(GrupoCalibracion).order_by(GrupoCalibracion.grupo_calibracion_id)):
+        puntos = [
+            {
+                "fecha": final_run.fecha.isoformat(),
+                "ejecucion": final_run.ejecucion,
+                "kwhPorUnidad": round(reg.kwh_corrida_medido / max(len(reg.mediciones), 1), 6),
+            }
+            for final_run in grupo.final_runs
+            for reg in final_run.registros
+            if reg.kwh_corrida_medido is not None
+        ]
+        if not puntos:
+            continue
+        puntos.sort(key=lambda p: (p["fecha"], p["ejecucion"]))
+        serie_kwh_calibrado.append(
+            {
+                "grupoCalibracionId": grupo.grupo_calibracion_id,
+                "material": grupo.material.nombre,
+                "espesorMm": str(grupo.espesor_mm),
+                "operacion": grupo.operacion.value,
+                "velocidadMmMin": grupo.velocidad_mm_min,
+                "potenciaPct": grupo.potencia_pct,
+                "puntos": [{**p, "kwhPorUnidad": str(p["kwhPorUnidad"])} for p in puntos],
+            }
+        )
+
+    n_corridas = sesion.scalar(select(func.count()).select_from(Registro)) or 0
+    costo_acumulado = sesion.scalar(select(func.coalesce(func.sum(Medicion.costo_total_celda), 0.0))) or 0.0
+
+    return {
+        "costoPromedioPorCombo": costo_promedio_por_combo,
+        "serieKwhCalibrado": serie_kwh_calibrado,
+        "totales": {
+            "nCorridas": n_corridas,
+            "costoAcumulado": str(round(costo_acumulado, 2)),
+        },
+    }
+
+
 __all__ = [
     "candidatos_final_run",
     "configuracion_maquina",
@@ -455,6 +526,7 @@ __all__ = [
     "materiales_catalogo",
     "registro_detalle",
     "registros",
+    "reportes_resumen",
     "resumen_calibracion",
     "suite_detalle",
     "suites",
