@@ -19,6 +19,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import text
 
+import admin_auth
 import creacion
 import editor
 import escritura
@@ -557,3 +558,39 @@ def convertir_svg_biblioteca(nombre: str, body: ConvertirSvgBody) -> dict:
         return {"ok": True, "gcode": "\n".join(gcode)}
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+# Panel de Generación de Credenciales (#117): el gate de "solo cuenta
+# maestra" NO vive acá -- lo valida el route handler de Next.js antes de
+# llamar a estos endpoints, ver docstring de `admin_auth.py`.
+
+
+@app.get("/admin/usuarios")
+def listar_usuarios_admin() -> list[dict]:
+    return admin_auth.listar_usuarios(cliente_storage)
+
+
+class CrearUsuarioAdminBody(BaseModel):
+    email: str
+    password: str | None = None
+
+
+@app.post("/admin/usuarios")
+def crear_usuario_admin(body: CrearUsuarioAdminBody) -> dict:
+    try:
+        return admin_auth.crear_usuario(cliente_storage, body.email, body.password)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+class ResetearPasswordAdminBody(BaseModel):
+    email: str
+    password: str | None = None
+
+
+@app.post("/admin/usuarios/reset")
+def resetear_password_admin(body: ResetearPasswordAdminBody) -> dict:
+    try:
+        return admin_auth.resetear_password(cliente_storage, body.email, body.password)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
