@@ -5,6 +5,7 @@ from PIL import Image
 from laser_toolkit.config import MachineConfig
 from laser_toolkit.raster.api import (
     calcular_contorno_imagen,
+    calcular_contorno_imagen_con_margen,
     convertir_imagen_a_gcode_grabado,
     generar_gcode_corte_y_grabado,
 )
@@ -41,6 +42,17 @@ def test_calcular_contorno_imagen_jpeg_da_rectangulo():
     contornos = calcular_contorno_imagen(buffer.getvalue(), ancho_mm=10.0, alto_mm=10.0)
     assert len(contornos) == 1
     assert set(contornos[0].puntos) == {(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)}
+
+
+def test_calcular_contorno_imagen_con_margen_agranda_el_rectangulo():
+    imagen = Image.new("RGB", (10, 10), color=(9, 9, 9))
+    buffer = io.BytesIO()
+    imagen.save(buffer, format="JPEG")
+    contornos, ancho, alto = calcular_contorno_imagen_con_margen(
+        buffer.getvalue(), ancho_mm=10.0, alto_mm=10.0, margen_mm=2.0
+    )
+    assert (ancho, alto) == (14.0, 14.0)
+    assert set(contornos[0].puntos) == {(0.0, 0.0), (14.0, 0.0), (14.0, 14.0), (0.0, 14.0)}
 
 
 def test_generar_gcode_corte_y_grabado_omite_operacion_sin_parametros():

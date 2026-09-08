@@ -100,6 +100,7 @@ export function SubirObjetoDropzone({
       mantenerProporcion: true,
       espejadoH: false,
       espejadoV: false,
+      materialProduccion: null,
       resolucionRellenoMm: 0.3,
       toolpath: {},
     });
@@ -136,6 +137,7 @@ export function SubirObjetoDropzone({
       espejadoH: false,
       espejadoV: false,
       ...preprocesamiento,
+      materialProduccion: null,
     });
     setRasterPendiente(null);
   }
