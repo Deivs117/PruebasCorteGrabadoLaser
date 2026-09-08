@@ -46,7 +46,8 @@ def convertir_imagen_a_gcode_grabado(
     ancho_mm: float,
     alto_mm: float,
     velocidad_mm_min: int,
-    potencia_max_pct: int,
+    potencia_baja_pct: int,
+    potencia_alta_pct: int,
     machine: MachineConfig,
     config: ConfiguracionRaster | None = None,
     x_offset_mm: float = 0.0,
@@ -54,9 +55,9 @@ def convertir_imagen_a_gcode_grabado(
     angulo_rad: float = 0.0,
 ) -> list[str]:
     """Decodifica `datos` y genera el G-code de grabado por intensidad de
-    pixel (barrido en zigzag, potencia continua) -- la funcion atomica de
-    conversion imagen -> G-code, analoga a
-    `laser_toolkit.svg.api.convertir_svg_a_gcode`."""
+    pixel (barrido en zigzag, potencia continua entre `potencia_baja_pct` y
+    `potencia_alta_pct`, issue #95) -- la funcion atomica de conversion
+    imagen -> G-code, analoga a `laser_toolkit.svg.api.convertir_svg_a_gcode`."""
     imagen = decodificar_imagen(datos)
     matriz = calcular_matriz_intensidad(imagen, ancho_mm, alto_mm, config or ConfiguracionRaster())
     return gcode_grabado_raster(
@@ -66,7 +67,8 @@ def convertir_imagen_a_gcode_grabado(
         x_offset_mm,
         y_offset_mm,
         velocidad_mm_min,
-        potencia_max_pct,
+        potencia_baja_pct,
+        potencia_alta_pct,
         machine,
         angulo_rad=angulo_rad,
     )
@@ -79,7 +81,8 @@ def generar_gcode_corte_y_grabado(
     machine: MachineConfig,
     *,
     grabado_velocidad_mm_min: int | None = None,
-    grabado_potencia_max_pct: int | None = None,
+    grabado_potencia_baja_pct: int | None = None,
+    grabado_potencia_alta_pct: int | None = None,
     grabado_config: ConfiguracionRaster | None = None,
     corte_velocidad_mm_min: int | None = None,
     corte_potencia_pct: int | None = None,
@@ -95,7 +98,11 @@ def generar_gcode_corte_y_grabado(
     gcode: list[str] = []
     imagen = decodificar_imagen(datos)
 
-    if grabado_velocidad_mm_min is not None and grabado_potencia_max_pct is not None:
+    if (
+        grabado_velocidad_mm_min is not None
+        and grabado_potencia_baja_pct is not None
+        and grabado_potencia_alta_pct is not None
+    ):
         config = grabado_config or ConfiguracionRaster()
         matriz = calcular_matriz_intensidad(imagen, ancho_mm, alto_mm, config)
         gcode += gcode_grabado_raster(
@@ -105,7 +112,8 @@ def generar_gcode_corte_y_grabado(
             x_offset_mm,
             y_offset_mm,
             grabado_velocidad_mm_min,
-            grabado_potencia_max_pct,
+            grabado_potencia_baja_pct,
+            grabado_potencia_alta_pct,
             machine,
             angulo_rad=angulo_rad,
         )

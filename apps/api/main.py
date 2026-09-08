@@ -469,8 +469,17 @@ def eliminar_grupo_calibracion(grupo_id: str) -> dict:
 
 
 class ParametrosOperacionBody(BaseModel):
+    """Parametros de una operacion (corte o grabado) de un objeto del
+    editor. `potenciaPct` es el par velocidad/potencia de una sola pasada
+    (corte, y grabado de SVG por relleno constante) -- `potenciaBajaPct`/
+    `potenciaAltaPct` son el rango real de potencia calibrado del grabado
+    raster (issue #95); cada objeto usa uno u otro segun `tipo`/operacion,
+    nunca ambos a la vez."""
+
     velocidadMmMin: int
-    potenciaPct: int
+    potenciaPct: int | None = None
+    potenciaBajaPct: int | None = None
+    potenciaAltaPct: int | None = None
 
 
 class ObjetoExportarBody(BaseModel):
