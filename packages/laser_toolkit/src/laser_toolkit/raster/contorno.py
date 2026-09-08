@@ -22,7 +22,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from typing import cast
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 from laser_toolkit.svg.geometry import Punto, Subpath
 
@@ -43,6 +43,69 @@ def extraer_contorno(imagen: Image.Image, ancho_mm: float, alto_mm: float) -> li
         if minimo < 255:
             return _extraer_contorno_alfa(alfa, ancho_mm, alto_mm)
     return [_contorno_rectangulo(ancho_mm, alto_mm)]
+
+
+def extraer_contorno_con_margen(
+    imagen: Image.Image, ancho_mm: float, alto_mm: float, margen_mm: float
+) -> tuple[list[Subpath], float, float]:
+    """Igual que `extraer_contorno`, pero expande el resultado `margen_mm`
+    hacia afuera en cada direccion (issue #108: el vector de corte generado
+    automaticamente necesita separacion respecto del borde real del diseño
+    -- cortar justo sobre el borde deja cualquier imprecision de la maquina
+    recortando el diseño mismo).
+
+    Devuelve tambien el nuevo ancho/alto en mm que ocupa el contorno (crece
+    `2*margen_mm` respecto de `ancho_mm`/`alto_mm`, centrado) -- quien llama
+    necesita ese tamaño para ubicar el objeto resultante en el lienzo, no
+    solo su geometria.
+
+    Sin canal alfa real (o `margen_mm == 0`), el margen simplemente agranda
+    el rectangulo (mismo fallback que `_contorno_rectangulo`). Con canal
+    alfa, dilata la mascara binaria con un filtro maximo (aproximacion
+    Chebyshev/cuadrada, no euclidea circular -- mismo tipo de aproximacion
+    ya aceptado en `_trazar_bordes_mascara`) y vuelve a trazar el borde sobre
+    la mascara ya crecida, reusando `_extraer_contorno_alfa` tal cual."""
+    if margen_mm < 0:
+        raise ValueError(f"El margen del contorno no puede ser negativo (recibido: {margen_mm}).")
+
+    ancho_total_mm = ancho_mm + 2 * margen_mm
+    alto_total_mm = alto_mm + 2 * margen_mm
+
+    if margen_mm == 0:
+        return extraer_contorno(imagen, ancho_mm, alto_mm), ancho_mm, alto_mm
+
+    if "A" in imagen.getbands():
+        alfa = imagen.getchannel("A")
+        minimo, _maximo = cast("tuple[int, int]", alfa.getextrema())
+        if minimo < 255:
+            alfa_dilatada = _dilatar_mascara_alfa(alfa, ancho_mm, alto_mm, margen_mm)
+            contorno = _extraer_contorno_alfa(alfa_dilatada, ancho_total_mm, alto_total_mm)
+            return contorno, ancho_total_mm, alto_total_mm
+
+    return [_contorno_rectangulo(ancho_total_mm, alto_total_mm)], ancho_total_mm, alto_total_mm
+
+
+def _dilatar_mascara_alfa(
+    alfa: Image.Image, ancho_mm: float, alto_mm: float, margen_mm: float
+) -> Image.Image:
+    """Agranda el lienzo de `alfa` por `margen_mm` de relleno transparente en
+    cada lado y aplica un filtro maximo (dilatacion morfologica) del radio
+    equivalente en pixeles -- crece la silueta hacia afuera sin depender de
+    ninguna libreria de geometria vectorial (no hay una en el proyecto,
+    decision de #3 para `raster.contorno`).
+
+    El radio en pixeles usa el promedio de escala X/Y (`ancho_px/ancho_mm` y
+    `alto_px/alto_mm`) -- exacto cuando la imagen no viene distorsionada
+    (aspecto preservado, el caso normal con `mantenerProporcion`), aproximado
+    en el caso raro contrario."""
+    ancho_px, alto_px = alfa.size
+    escala_x = ancho_px / ancho_mm
+    escala_y = alto_px / alto_mm
+    radio_px = max(1, round(margen_mm * (escala_x + escala_y) / 2))
+
+    lienzo = Image.new("L", (ancho_px + 2 * radio_px, alto_px + 2 * radio_px), 0)
+    lienzo.paste(alfa, (radio_px, radio_px))
+    return lienzo.filter(ImageFilter.MaxFilter(2 * radio_px + 1))
 
 
 def _contorno_rectangulo(ancho_mm: float, alto_mm: float) -> Subpath:
