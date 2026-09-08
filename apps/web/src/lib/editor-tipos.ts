@@ -15,9 +15,31 @@ export type Operacion = "corte" | "grabado";
  * array normal en todos lados. */
 export type Operaciones = Operacion[];
 
+/** Referencia a la Ficha de Parámetro Estándar que bloqueó estos valores en
+ * modo Producción (#17) -- puramente informativa para la UI (mostrar de
+ * dónde salió el número, permitir "cambiar de Ficha"): el G-code exportado
+ * se sigue armando a partir de `velocidadMmMin`/`potenciaPct` (o
+ * `potenciaBajaPct`/`potenciaAltaPct`), nunca de este id, así que no hace
+ * falta que viaje a `editor-export-schema.ts`. Si viaja o no a un proyecto
+ * guardado (#18) es decisión de cada schema que lo declare.
+ *
+ * `svg` (o un objeto raster en `corte`) usa una sola Ficha (`fichaGrupoId`).
+ * Un objeto raster en `grabado` (#17, ampliación de #95) necesita DOS
+ * Fichas GRABADO del mismo material+espesor como extremos del rango de
+ * intensidad -- `fichaBajaGrupoId`/`fichaAltaGrupoId`, cuyos
+ * `potenciaPct` calibrados llenan `potenciaBajaPct`/`potenciaAltaPct`. */
 export interface ParametrosOperacion {
   velocidadMmMin: number;
   potenciaPct: number;
+  /** Rango real de potencia calibrado para grabado raster (#95/#17) -- se
+   * usa EN VEZ de `potenciaPct` cuando está presente (ver
+   * `_rango_potencia_grabado` en `apps/api/editor.py`); `potenciaPct` queda
+   * igual para no romper el toolpath de un solo valor de SVG/Prueba. */
+  potenciaBajaPct?: number;
+  potenciaAltaPct?: number;
+  fichaGrupoId?: string;
+  fichaBajaGrupoId?: string;
+  fichaAltaGrupoId?: string;
 }
 
 /** Estado de la conversión a G-code de una operación puntual de un objeto —
@@ -58,6 +80,16 @@ interface ObjetoLienzoBase {
    * en `editor-lienzo.tsx`, fuera del alcance de #107). */
   espejadoH: boolean;
   espejadoV: boolean;
+  /** Material+espesor elegido para modo Producción (#17) -- decisión: POR
+   * OBJETO, no global del lienzo, mismo criterio que `operaciones`/
+   * `parametros` (ya modelados por objeto): un mismo diseño puede combinar
+   * piezas de materiales distintos (ej. una base de MDF con un detalle de
+   * acrílico), así que atarlo al lienzo entero habría sido más restrictivo
+   * de lo que el modelo actual ya permite. El toggle Producción/Prueba en sí
+   * SÍ es global (`EditorLienzo`, no acá): es una intención de todo el
+   * trabajo ("¿esto es una prueba de parámetros o una pieza real?"), no una
+   * propiedad de un objeto puntual. `null` = todavía sin elegir. */
+  materialProduccion: { material: string; espesorMm: number | null } | null;
 }
 
 export interface ObjetoSvgLienzo extends ObjetoLienzoBase {

@@ -481,6 +481,14 @@ class ParametrosOperacionBody(BaseModel):
     potenciaPct: int | None = None
     potenciaBajaPct: int | None = None
     potenciaAltaPct: int | None = None
+    # Referencia a la Ficha de Parámetro que bloqueó estos valores en modo
+    # Producción (#17) -- puramente informativa (de dónde salió el número),
+    # nunca se usa para generar G-code (eso sigue viniendo de los campos
+    # numéricos de arriba). Sin declararla acá, Pydantic la descarta en
+    # silencio al guardar un proyecto (#18) y reabrirlo perdería el "candado".
+    fichaGrupoId: str | None = None
+    fichaBajaGrupoId: str | None = None
+    fichaAltaGrupoId: str | None = None
 
 
 class ObjetoExportarBody(BaseModel):
@@ -521,6 +529,14 @@ def exportar_gcode_editor(body: ExportarGcodeBody) -> dict:
 # ============================================================
 
 
+class MaterialProduccionBody(BaseModel):
+    """Material+espesor elegido para modo Producción (#17) -- por objeto, no
+    por proyecto (ver nota de diseño en `editor-tipos.ts`)."""
+
+    material: str
+    espesorMm: float | None = None
+
+
 class ObjetoProyectoBody(BaseModel):
     """Espejo de `ObjetoLienzo` (`apps/web/src/lib/editor-tipos.ts`) -- a
     diferencia de `ObjetoExportarBody`, acá viajan también `id`/`nombre`/
@@ -543,6 +559,9 @@ class ObjetoProyectoBody(BaseModel):
     # body y un objeto espejado se guardaría "derecho".
     espejadoH: bool = False
     espejadoV: bool = False
+    # #17: material+espesor elegido en modo Producción -- mismo criterio que
+    # espejadoH/V de arriba, sin declararlo acá se pierde en silencio.
+    materialProduccion: MaterialProduccionBody | None = None
     # Solo para tipo="svg":
     nombreArchivoSvg: str | None = None
     contenidoSvg: str | None = None

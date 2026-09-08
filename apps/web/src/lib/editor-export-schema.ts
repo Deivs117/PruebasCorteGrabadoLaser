@@ -1,10 +1,30 @@
 import { z } from "zod";
 
-/** Espejo de `ParametrosOperacionBody` en `apps/api/main.py`. */
-const parametrosOperacionSchema = z.object({
-  velocidadMmMin: z.number().int().gt(0),
-  potenciaPct: z.number().int().gt(0).lte(100),
-});
+/** Espejo de `ParametrosOperacionBody` en `apps/api/main.py`. `potenciaPct`
+ * es el par velocidad/potencia de una sola pasada (corte, y grabado de SVG
+ * por relleno constante); `potenciaBajaPct`/`potenciaAltaPct` son el rango
+ * real de potencia calibrado del grabado raster (#95, UI en #17) -- un
+ * objeto usa uno u otro según `tipo`/operación, nunca ninguno de los dos a
+ * la vez (de ahí el `refine`, espejo del guard de `_rango_potencia_grabado`
+ * en `apps/api/editor.py`). Las referencias a Ficha (`fichaGrupoId` y
+ * afines, #17) no viajan acá a propósito: son puramente informativas para
+ * la UI del editor, el G-code se arma solo con los valores numéricos. */
+const parametrosOperacionSchema = z
+  .object({
+    velocidadMmMin: z.number().int().gt(0),
+    potenciaPct: z.number().int().gt(0).lte(100).optional(),
+    potenciaBajaPct: z.number().int().gte(0).lte(100).optional(),
+    potenciaAltaPct: z.number().int().gt(0).lte(100).optional(),
+  })
+  .refine(
+    (p) =>
+      p.potenciaPct !== undefined ||
+      (p.potenciaBajaPct !== undefined && p.potenciaAltaPct !== undefined),
+    {
+      message:
+        "Cada operación necesita potenciaPct, o potenciaBajaPct y potenciaAltaPct juntos.",
+    },
+  );
 
 const camposComunes = {
   xMm: z.number(),
