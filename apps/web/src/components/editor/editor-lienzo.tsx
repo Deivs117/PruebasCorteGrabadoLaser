@@ -20,6 +20,7 @@ import { PanelObjeto } from "@/components/editor/panel-objeto";
 import { SubirObjetoDropzone } from "@/components/editor/subir-objeto-dropzone";
 import { limitesDe, objetoExcedeArea } from "@/lib/editor-area";
 import { colorSeleccionDe } from "@/lib/editor-colores";
+import { listarFichasCliente, type FichaCliente } from "@/lib/fichas-cliente";
 import {
   MARGEN_REGLA_PX,
   ZOOM_PASO,
@@ -86,6 +87,10 @@ function aObjetoProyecto(objeto: ObjetoLienzo): ObjetoProyecto {
     // al reabrir el proyecto.
     espejadoH: objeto.espejadoH,
     espejadoV: objeto.espejadoV,
+    // #17 (posterior a #18): material+espesor de modo Producción -- sin
+    // esto, reabrir un proyecto guardado en Producción pierde el "candado"
+    // aunque los números de velocidad/potencia se mantengan bien.
+    materialProduccion: objeto.materialProduccion,
   };
   return objeto.tipo === "svg"
     ? {
@@ -178,6 +183,43 @@ export function EditorLienzo({
   );
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [vistaToolpath, setVistaToolpath] = useState(false);
+
+  // Modo Producción/Prueba (#17): GLOBAL a todo el lienzo -- es una
+  // intención de todo el trabajo en curso ("¿esto es una prueba de
+  // parámetros o una pieza real?"), no una propiedad de un objeto puntual
+  // (a diferencia de `materialProduccion`/las Fichas elegidas, que sí son
+  // por-objeto, ver nota en `editor-tipos.ts`). No se persiste en el
+  // proyecto guardado (#18) a propósito: no cambia el G-code exportado
+  // (eso ya quedó fijado en `parametros` de cada objeto), así que reabrir
+  // un proyecto siempre arranca en Prueba, con los mismos números.
+  const [modoProduccion, setModoProduccion] = useState(false);
+  const [fichas, setFichas] = useState<FichaCliente[]>([]);
+  const [cargandoFichas, setCargandoFichas] = useState(false);
+  const [errorFichas, setErrorFichas] = useState<string | null>(null);
+
+  // Las Fichas se cargan recién al entrar a Producción por primera vez, no
+  // en cada carga del editor -- la mayoría de las sesiones son de Prueba y
+  // no necesitan este round-trip.
+  useEffect(() => {
+    if (!modoProduccion || fichas.length > 0 || cargandoFichas) return;
+    // Fetch de datos externos (Fichas de Parámetro) al entrar a Producción
+    // -- mismo patrón justificado que `setMontado` más arriba en este
+    // archivo, no hay forma de derivarlo durante el render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCargandoFichas(true);
+    setErrorFichas(null);
+    listarFichasCliente()
+      .then(setFichas)
+      .catch((error: unknown) =>
+        setErrorFichas(
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar las Fichas de Parámetro.",
+        ),
+      )
+      .finally(() => setCargandoFichas(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modoProduccion]);
   const contenedorRef = useRef<HTMLDivElement>(null);
   const [anchoContenedorPx, setAnchoContenedorPx] = useState(600);
   const [exportando, setExportando] = useState(false);
@@ -500,6 +542,10 @@ export function EditorLienzo({
         mantenerProporcion: true,
         espejadoH: objeto.espejadoH,
         espejadoV: objeto.espejadoV,
+        // #17 se integró después de que esto se escribió (#108): el
+        // contorno nace en modo Prueba, sin Ficha elegida todavía -- igual
+        // que cualquier objeto nuevo del lienzo.
+        materialProduccion: null,
         resolucionRellenoMm: 0.3,
         toolpath: {},
         objetoOrigenId: objeto.id,
@@ -659,6 +705,49 @@ export function EditorLienzo({
 
   return (
     <div className="flex flex-col gap-4">
+      <Card className="flex flex-wrap items-center gap-3 p-3">
+        <span className="text-navy text-sm font-semibold">
+          Modo del editor:
+        </span>
+        <div
+          role="group"
+          aria-label="Modo Producción o Prueba"
+          className="border-border flex gap-1 rounded-full border p-0.5"
+        >
+          <button
+            type="button"
+            aria-pressed={!modoProduccion}
+            onClick={() => setModoProduccion(false)}
+            className={clsx(
+              "rounded-full px-3 py-1 text-sm font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+              !modoProduccion
+                ? "bg-blue-soft text-blue"
+                : "text-text-muted hover:bg-navy-soft",
+            )}
+          >
+            Prueba
+          </button>
+          <button
+            type="button"
+            aria-pressed={modoProduccion}
+            onClick={() => setModoProduccion(true)}
+            className={clsx(
+              "rounded-full px-3 py-1 text-sm font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+              modoProduccion
+                ? "bg-teal-soft text-teal"
+                : "text-text-muted hover:bg-navy-soft",
+            )}
+          >
+            Producción
+          </button>
+        </div>
+        <p className="text-text-muted flex-1 text-xs">
+          {modoProduccion
+            ? "Velocidad y potencia quedan bloqueadas a la Ficha de Parámetro aprobada de cada objeto — no se pueden tocar sin querer."
+            : "Velocidad y potencia son libres, para explorar parámetros de materiales sin Ficha todavía."}
+        </p>
+      </Card>
+
       <SubirObjetoDropzone
         onAgregar={agregarObjeto}
         siguientePosicion={siguientePosicion}
@@ -999,6 +1088,11 @@ export function EditorLienzo({
               onGenerarToolpath={(operacion) =>
                 generarToolpath(seleccionado.id, operacion)
               }
+              modoProduccion={modoProduccion}
+              onSalirDeProduccion={() => setModoProduccion(false)}
+              fichas={fichas}
+              cargandoFichas={cargandoFichas}
+              errorFichas={errorFichas}
               onGenerarContorno={(margenMm) =>
                 generarContornoCorte(seleccionado.id, margenMm)
               }
