@@ -25,7 +25,8 @@ def test_convertir_imagen_a_gcode_grabado_extremo_a_extremo():
         ancho_mm=10,
         alto_mm=10,
         velocidad_mm_min=500,
-        potencia_max_pct=80,
+        potencia_baja_pct=0,
+        potencia_alta_pct=80,
         machine=machine,
         config=ConfiguracionRaster(resolucion_mm=2.0),
     )
@@ -51,7 +52,8 @@ def test_generar_gcode_corte_y_grabado_omite_operacion_sin_parametros():
         alto_mm=10,
         machine=machine,
         grabado_velocidad_mm_min=500,
-        grabado_potencia_max_pct=80,
+        grabado_potencia_baja_pct=0,
+        grabado_potencia_alta_pct=80,
     )
     assert "G1" in "".join(solo_grabado)
     # M4 (grabado dinamico) esta, pero nunca se corta el contorno -- no hay
@@ -68,7 +70,8 @@ def test_generar_gcode_corte_y_grabado_combina_ambas_operaciones():
         alto_mm=10,
         machine=machine,
         grabado_velocidad_mm_min=500,
-        grabado_potencia_max_pct=80,
+        grabado_potencia_baja_pct=0,
+        grabado_potencia_alta_pct=80,
         corte_velocidad_mm_min=300,
         corte_potencia_pct=90,
     )
@@ -78,7 +81,8 @@ def test_generar_gcode_corte_y_grabado_combina_ambas_operaciones():
         alto_mm=10,
         machine=machine,
         grabado_velocidad_mm_min=500,
-        grabado_potencia_max_pct=80,
+        grabado_potencia_baja_pct=0,
+        grabado_potencia_alta_pct=80,
     )
     assert len(combinado) > len(solo_grabado)
     # El corte del contorno usa F300 (velocidad de corte, no la de grabado).

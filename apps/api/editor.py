@@ -48,6 +48,30 @@ def _angulo_rad_desde_lienzo(rotacion_deg: float) -> float:
     return -math.radians(rotacion_deg)
 
 
+def _rango_potencia_grabado(grabado: dict | None) -> tuple[int | None, int | None]:
+    """Compatibilidad hacia atrás (#95): el editor todavía no tiene UI para
+    elegir `potenciaBajaPct`/`potenciaAltaPct` por separado en un objeto
+    raster (eso es #17, sin hacer todavía) -- hoy sigue mandando un solo
+    `potenciaPct`, igual que antes de #95. Sin este fallback,
+    `generar_gcode_corte_y_grabado` recibiría los dos `None` y OMITE el
+    grabado en silencio (ver su guard `is not None`), una regresión real
+    del grabado raster que ya funcionaba.
+
+    `baja=0, alta=potenciaPct` reproduce EXACTO el escalado anterior a #95
+    (`S = intensidad * potencia_max_pct`, con potencia_max_pct=potenciaPct):
+    la interpolación lineal nueva da `S = 0 + intensidad*(potenciaPct-0)`,
+    la misma fórmula. Cuando #17 agregue la UI de rango real, mandará
+    `potenciaBajaPct`/`potenciaAltaPct` directo y este fallback deja de
+    activarse (se prioriza siempre que estén los dos)."""
+    if grabado is None:
+        return None, None
+    if grabado.get("potenciaBajaPct") is not None and grabado.get("potenciaAltaPct") is not None:
+        return grabado["potenciaBajaPct"], grabado["potenciaAltaPct"]
+    if grabado.get("potenciaPct") is not None:
+        return 0, grabado["potenciaPct"]
+    return None, None
+
+
 def _gcode_de_objeto(objeto: dict, machine: MachineConfig) -> list[str]:
     ancho_mm: float = objeto["anchoMm"]
     alto_mm: float = objeto["altoMm"]
@@ -82,13 +106,15 @@ def _gcode_de_objeto(objeto: dict, machine: MachineConfig) -> list[str]:
     datos = _decodificar_data_uri(objeto["dataUri"])
     grabado = parametros["grabado"] if "grabado" in operaciones else None
     corte = parametros["corte"] if "corte" in operaciones else None
+    grabado_potencia_baja_pct, grabado_potencia_alta_pct = _rango_potencia_grabado(grabado)
     return generar_gcode_corte_y_grabado(
         datos,
         ancho_mm,
         alto_mm,
         machine,
         grabado_velocidad_mm_min=grabado["velocidadMmMin"] if grabado else None,
-        grabado_potencia_max_pct=grabado["potenciaPct"] if grabado else None,
+        grabado_potencia_baja_pct=grabado_potencia_baja_pct,
+        grabado_potencia_alta_pct=grabado_potencia_alta_pct,
         grabado_config=ConfiguracionRaster(),
         corte_velocidad_mm_min=corte["velocidadMmMin"] if corte else None,
         corte_potencia_pct=corte["potenciaPct"] if corte else None,

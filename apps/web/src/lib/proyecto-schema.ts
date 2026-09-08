@@ -23,6 +23,11 @@ const camposComunes = {
     grabado: parametrosOperacionSchema,
   }),
   mantenerProporcion: z.boolean(),
+  // #107 agregó espejadoH/espejadoV después de que este schema se escribió
+  // (#18) -- default `false` para que un proyecto guardado ANTES de #107
+  // siga leyéndose bien (nunca existió el campo, nunca hubo espejo).
+  espejadoH: z.boolean().default(false),
+  espejadoV: z.boolean().default(false),
 };
 
 const objetoProyectoSvgSchema = z.object({
