@@ -8,6 +8,7 @@ import { Layer, Rect, Stage, Transformer } from "react-konva";
 import { clsx } from "clsx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
 import { iconButtonClasses } from "@/lib/button-styles";
 import { TrashCanAnimado } from "@/components/ui/icons/trash-can-animado";
@@ -106,6 +107,12 @@ function aObjetoProyecto(objeto: ObjetoLienzo): ObjetoProyecto {
     // esto, reabrir un proyecto guardado en Producción pierde el "candado"
     // aunque los números de velocidad/potencia se mantengan bien.
     materialProduccion: objeto.materialProduccion,
+    // #150 (posterior a #18 y a #108): vínculo con el objeto de origen, si
+    // lo hay -- ver la nota de diseño en `editor-tipos.ts`. Antes de #150
+    // no se persistía porque el campo no tenía ningún comportamiento real
+    // todavía; ahora sí, así que perderlo al reabrir un proyecto
+    // desincronizaría el contorno de su imagen en silencio.
+    objetoOrigenId: objeto.objetoOrigenId,
   };
   return objeto.tipo === "svg"
     ? {
@@ -414,16 +421,31 @@ export function EditorLienzo({
           return;
       }
       evento.preventDefault();
-      setObjetos((anteriores) =>
-        anteriores.map((o) =>
-          seleccionadosIds.includes(o.id)
-            ? { ...o, xMm: o.xMm + deltaXMm, yMm: o.yMm + deltaYMm }
-            : o,
-        ),
+      // Cualquier miembro de la selección sirve como representante: como
+      // `propagarAlGrupo` está en `true`, el delta se aplica a todo
+      // `seleccionadosIds` por igual (unidad rígida), no solo al primero.
+      // El chequeo de `.length === 0` de arriba ya garantiza que hay al
+      // menos uno -- este `if` es solo para que TypeScript lo vea también
+      // (`noUncheckedIndexedAccess` tipa `arr[0]` como `T | undefined`).
+      const idRepresentante = seleccionadosIds[0];
+      if (idRepresentante === undefined) return;
+      moverOTransformarObjeto(
+        idRepresentante,
+        (o) => ({
+          xMm: o.xMm + deltaXMm,
+          yMm: o.yMm + deltaYMm,
+        }),
+        { propagarAlGrupo: true },
       );
     }
     window.addEventListener("keydown", alPresionarTecla);
     return () => window.removeEventListener("keydown", alPresionarTecla);
+    // `moverOTransformarObjeto` no entra a la lista: se redefine en cada
+    // render y siempre cierra sobre el mismo `seleccionadosIds` de ESE
+    // render -- como el efecto ya se vuelve a correr cuando
+    // `seleccionadosIds` cambia, captura la versión fresca igual, sin
+    // necesidad de re-registrar el listener en cada render de más.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seleccionadosIds]);
 
   // Pan con espacio apretado (#149, ver nota en la declaración de `marquee`
@@ -477,27 +499,6 @@ export function EditorLienzo({
     });
   }
 
-  /** #149 -- mover un objeto arrastrado con el mouse. Si ese objeto forma
-   * parte de la selección múltiple actual, el delta de movimiento se aplica
-   * a TODOS los seleccionados por igual (unidad rígida); si no, se mueve
-   * solo. Se calcula como delta (no se pisa directamente `xMm`/`yMm`) para
-   * no perder las posiciones relativas entre los objetos del grupo. */
-  function moverObjetoConGrupo(id: string, xMm: number, yMm: number) {
-    const actual = objetos.find((o) => o.id === id);
-    if (!actual) return;
-    const deltaXMm = xMm - actual.xMm;
-    const deltaYMm = yMm - actual.yMm;
-    if (deltaXMm === 0 && deltaYMm === 0) return;
-    const grupo = seleccionadosIds.includes(id) ? seleccionadosIds : [id];
-    setObjetos((anteriores) =>
-      anteriores.map((o) =>
-        grupo.includes(o.id)
-          ? { ...o, xMm: o.xMm + deltaXMm, yMm: o.yMm + deltaYMm }
-          : o,
-      ),
-    );
-  }
-
   /** Recibe una función en vez de un objeto parcial: `ObjetoLienzo` es una
    * unión discriminada (svg/raster) y un `Partial<ObjetoLienzo>` genérico
    * solo admitiría los campos comunes a ambas variantes — la función deja
@@ -512,17 +513,97 @@ export function EditorLienzo({
     );
   }
 
-  function actualizarCampos(
+  /** Actualiza cambios (posición/rotación/tamaño u otro campo común a
+   * ambas variantes de `ObjetoLienzo`) y además propaga el mismo delta de
+   * posición/rotación/escala al objeto vinculado (#150, `objetoOrigenId` de
+   * #108) si lo hay -- se usa en cualquier punto que mueva/rote/escale un
+   * objeto (drag, handles del `Transformer`,
+   * nudge por teclado, panel numérico), para que el contorno de corte
+   * generado automáticamente siga a su imagen de origen en vez de quedar
+   * atrás cuando se ajusta la imagen después de generarlo.
+   *
+   * Recibe una función (no un objeto de cambios ya resuelto) porque el
+   * nudge por teclado necesita partir del valor actual (`o.xMm + delta`),
+   * mismo motivo que `actualizarObjeto`. Como el contorno nace centrado
+   * exactamente en el mismo punto que la imagen (`generarContornoCorte`),
+   * aplicarle el mismo delta absoluto (traslación, rotación, factor de
+   * escala) alcanza para mantenerlo coincidente -- no hace falta pivotear
+   * alrededor de un centro distinto. Los campos no geométricos de `cambios`
+   * (`operaciones`, `parametros`, etc.) nunca se propagan: cada objeto
+   * vinculado sigue teniendo sus propias operaciones/material, el vínculo
+   * es solo geométrico. Solo se propaga hacia adelante (origen → vinculado)
+   * -- mover el contorno solo, a mano, no desincroniza la imagen.
+   *
+   * `propagarAlGrupo` (#149): cuando `id` integra la selección múltiple
+   * actual, el mismo delta de TRASLACIÓN (nunca rotación/escala -- un
+   * drag simple no rota ni escala) se replica al resto de `seleccionadosIds`
+   * como unidad rígida. Default `false` a propósito: los handles del
+   * `Transformer` (resize/rotación) ya reportan, nodo por nodo, el estado
+   * final de CADA objeto seleccionado (Konva arma y deshace el bounding box
+   * combinado solo) -- volver a aplicarles el delta acá los movería doble.
+   * Solo el drag simple (`onMover`, sin `Transformer` de por medio) y el
+   * nudge por teclado necesitan este parámetro en `true`. Cualquier objeto
+   * vinculado (`objetoOrigenId`) a ALGÚN miembro del grupo que se mueve
+   * -- no solo a `id` -- también se arrastra con el mismo delta. */
+  function moverOTransformarObjeto(
     id: string,
-    cambios: Omit<Partial<ObjetoLienzo>, "tipo">,
+    calcularCambios: (
+      objeto: ObjetoLienzo,
+    ) => Omit<Partial<ObjetoLienzo>, "tipo">,
+    opciones: { propagarAlGrupo?: boolean } = {},
   ) {
-    actualizarObjeto(id, (o) => ({ ...o, ...cambios }));
+    const { propagarAlGrupo = false } = opciones;
+    setObjetos((anteriores) => {
+      const original = anteriores.find((o) => o.id === id);
+      if (!original) return anteriores;
+      const cambios = calcularCambios(original);
+      const actualizado = { ...original, ...cambios } as ObjetoLienzo;
+
+      const deltaXMm = actualizado.xMm - original.xMm;
+      const deltaYMm = actualizado.yMm - original.yMm;
+      const deltaRotacionDeg = actualizado.rotacionDeg - original.rotacionDeg;
+      const escalaAncho =
+        original.anchoMm !== 0 ? actualizado.anchoMm / original.anchoMm : 1;
+      const escalaAlto =
+        original.altoMm !== 0 ? actualizado.altoMm / original.altoMm : 1;
+
+      if (
+        deltaXMm === 0 &&
+        deltaYMm === 0 &&
+        deltaRotacionDeg === 0 &&
+        escalaAncho === 1 &&
+        escalaAlto === 1
+      ) {
+        return anteriores.map((o) => (o.id === id ? actualizado : o));
+      }
+
+      const grupo =
+        propagarAlGrupo && seleccionadosIds.includes(id)
+          ? new Set(seleccionadosIds)
+          : new Set([id]);
+
+      return anteriores.map((o) => {
+        if (o.id === id) return actualizado;
+        if (grupo.has(o.id)) {
+          return { ...o, xMm: o.xMm + deltaXMm, yMm: o.yMm + deltaYMm };
+        }
+        if (!o.objetoOrigenId || !grupo.has(o.objetoOrigenId)) return o;
+        return {
+          ...o,
+          xMm: o.xMm + deltaXMm,
+          yMm: o.yMm + deltaYMm,
+          rotacionDeg: (((o.rotacionDeg + deltaRotacionDeg) % 360) + 360) % 360,
+          anchoMm: o.anchoMm * escalaAncho,
+          altoMm: o.altoMm * escalaAlto,
+        };
+      });
+    });
   }
 
   /** #109 -- `preprocesamiento` es exclusivo de los objetos raster, así que
    * (mismo motivo que `toolpath`, ver el comentario de `actualizarObjeto`)
    * necesita narrowear al tipo concreto en vez de pasar por
-   * `actualizarCampos`/`Partial<ObjetoLienzo>` genérico. */
+   * `moverOTransformarObjeto`/`Partial<ObjetoLienzo>` genérico. */
   function cambiarPreprocesamiento(
     id: string,
     preprocesamiento: PreprocesamientoRaster,
@@ -532,17 +613,54 @@ export function EditorLienzo({
     );
   }
 
+  /** Eliminar un objeto que tiene un contorno vinculado (#150,
+   * `objetoOrigenId`) es el caso de riesgo real que motivó ese ticket: si
+   * el contorno queda huérfano, el operario puede no notar que ya no
+   * corresponde a ninguna imagen y exportar igual -- el G-code corta un
+   * contorno que ya no representa nada. En vez de dejarlo huérfano en
+   * silencio, se pide confirmación explícita para borrar ambos juntos;
+   * cancelar aborta la eliminación completa. Generalizado a lista de ids
+   * (#149, `eliminarObjetos`): `vinculados` junta los contornos de
+   * CUALQUIER objeto de la lista que no esté ya incluido él mismo. */
+  const [pendienteEliminar, setPendienteEliminar] = useState<{
+    ids: string[];
+    vinculados: ObjetoLienzo[];
+  } | null>(null);
+
+  function eliminarObjetosInmediato(ids: Set<string>) {
+    setObjetos((anteriores) => anteriores.filter((o) => !ids.has(o.id)));
+    setSeleccionadosIds((anteriores) =>
+      anteriores.filter((id) => !ids.has(id)),
+    );
+  }
+
   /** #149 -- eliminar acepta una lista de ids: `[id]` cubre el caso de un
    * solo objeto (panel numérico, chip de la lista de objetos) y una lista
    * más larga cubre "eliminar selección" desde `BarraAccionesObjeto`. */
   function eliminarObjetos(ids: string[]) {
     const idsAEliminar = new Set(ids);
-    setObjetos((anteriores) =>
-      anteriores.filter((o) => !idsAEliminar.has(o.id)),
+    const vinculados = objetos.filter(
+      (o) =>
+        o.objetoOrigenId &&
+        idsAEliminar.has(o.objetoOrigenId) &&
+        !idsAEliminar.has(o.id),
     );
-    setSeleccionadosIds((anteriores) =>
-      anteriores.filter((id) => !idsAEliminar.has(id)),
+    if (vinculados.length > 0) {
+      setPendienteEliminar({ ids, vinculados });
+      return;
+    }
+    eliminarObjetosInmediato(idsAEliminar);
+  }
+
+  function confirmarEliminarConVinculados() {
+    if (!pendienteEliminar) return;
+    eliminarObjetosInmediato(
+      new Set([
+        ...pendienteEliminar.ids,
+        ...pendienteEliminar.vinculados.map((v) => v.id),
+      ]),
     );
+    setPendienteEliminar(null);
   }
 
   /** Clona cada objeto de `ids` con un id nuevo, corrido unos mm para que se
@@ -1116,10 +1234,14 @@ export function EditorLienzo({
                           seleccionarObjeto(objeto.id, aditivo)
                         }
                         onMover={(xMm, yMm) =>
-                          moverObjetoConGrupo(objeto.id, xMm, yMm)
+                          moverOTransformarObjeto(
+                            objeto.id,
+                            () => ({ xMm, yMm }),
+                            { propagarAlGrupo: true },
+                          )
                         }
                         onTransformar={(cambios) =>
-                          actualizarCampos(objeto.id, cambios)
+                          moverOTransformarObjeto(objeto.id, () => cambios)
                         }
                         registrarNodo={(nodo) => {
                           if (nodo) nodosRef.current.set(objeto.id, nodo);
@@ -1389,7 +1511,7 @@ export function EditorLienzo({
                 areaTrabajoAltoMm,
               )}
               onCambiar={(cambios) =>
-                actualizarCampos(seleccionadoUnico.id, cambios)
+                moverOTransformarObjeto(seleccionadoUnico.id, () => cambios)
               }
               onEliminar={() => eliminarObjetos([seleccionadoUnico.id])}
               onGenerarToolpath={(operacion) =>
@@ -1477,6 +1599,23 @@ export function EditorLienzo({
           )}
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={pendienteEliminar !== null}
+        title="Eliminar también el contorno vinculado"
+        description={
+          pendienteEliminar
+            ? `${
+                pendienteEliminar.ids.length === 1
+                  ? `"${objetos.find((o) => o.id === pendienteEliminar.ids[0])?.nombre ?? ""}" tiene`
+                  : "Lo que estás por eliminar tiene"
+              } ${pendienteEliminar.vinculados.length === 1 ? "un contorno de corte generado a partir de una imagen" : `${pendienteEliminar.vinculados.length} contornos de corte generados a partir de una imagen`}. Si lo eliminás sin borrar también el contorno, va a quedar suelto en el lienzo sin corresponder a ninguna imagen -- riesgo real de exportar un G-code que corta en el lugar equivocado.`
+            : ""
+        }
+        confirmLabel="Eliminar ambos"
+        onConfirm={confirmarEliminarConVinculados}
+        onCancel={() => setPendienteEliminar(null)}
+      />
     </div>
   );
 }
