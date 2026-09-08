@@ -26,6 +26,7 @@ import escritura
 import final_run
 import generacion
 import lectura
+import proyectos
 import storage_endpoints
 import suites_admin
 import svgs
@@ -469,8 +470,25 @@ def eliminar_grupo_calibracion(grupo_id: str) -> dict:
 
 
 class ParametrosOperacionBody(BaseModel):
+    """Parametros de una operacion (corte o grabado) de un objeto del
+    editor. `potenciaPct` es el par velocidad/potencia de una sola pasada
+    (corte, y grabado de SVG por relleno constante) -- `potenciaBajaPct`/
+    `potenciaAltaPct` son el rango real de potencia calibrado del grabado
+    raster (issue #95); cada objeto usa uno u otro segun `tipo`/operacion,
+    nunca ambos a la vez."""
+
     velocidadMmMin: int
-    potenciaPct: int
+    potenciaPct: int | None = None
+    potenciaBajaPct: int | None = None
+    potenciaAltaPct: int | None = None
+    # Referencia a la Ficha de Parámetro que bloqueó estos valores en modo
+    # Producción (#17) -- puramente informativa (de dónde salió el número),
+    # nunca se usa para generar G-code (eso sigue viniendo de los campos
+    # numéricos de arriba). Sin declararla acá, Pydantic la descarta en
+    # silencio al guardar un proyecto (#18) y reabrirlo perdería el "candado".
+    fichaGrupoId: str | None = None
+    fichaBajaGrupoId: str | None = None
+    fichaAltaGrupoId: str | None = None
 
 
 class ObjetoExportarBody(BaseModel):
@@ -487,10 +505,29 @@ class ObjetoExportarBody(BaseModel):
     resolucionRellenoMm: float | None = None
     # Solo para tipo="raster":
     dataUri: str | None = None
+    # Preprocesamiento de imagen (issue #109), solo para tipo="raster" --
+    # espejo plano de `PreprocesamientoRaster`/`ObjetoRasterLienzo` en
+    # `raster-preprocesamiento.ts`/`editor-tipos.ts` (que también quedan
+    # planos ahí, calzando 1 a 1 con este body) y de `ConfiguracionRaster`
+    # (`laser_toolkit.raster.config`, issue #15). Se valida contra el modelo
+    # real al construir `ConfiguracionRaster` en
+    # `editor._configuracion_raster_de_objeto`, no acá -- estos campos son
+    # opcionales para que un objeto legacy sin ellos siga usando los
+    # defaults de `ConfiguracionRaster()` de siempre.
+    canal: str | None = None
+    pesoRojo: float | None = None
+    pesoVerde: float | None = None
+    pesoAzul: float | None = None
+    gamma: float | None = None
+    invertir: bool | None = None
+    nivelesPosterizado: int | None = None
 
 
 class ExportarGcodeBody(BaseModel):
     objetos: list[ObjetoExportarBody]
+    # Issue #18, opcional: si la exportación viene de un proyecto de diseño
+    # ya guardado, esta key también queda en su historial de exportaciones.
+    proyectoId: int | None = None
 
 
 @app.post("/editor/exportar")
@@ -498,9 +535,147 @@ def exportar_gcode_editor(body: ExportarGcodeBody) -> dict:
     with sesion() as s:
         try:
             objetos = [o.model_dump() for o in body.objetos]
-            return editor.exportar_gcode_combinado(s, cliente_storage, objetos)
+            return editor.exportar_gcode_combinado(s, cliente_storage, objetos, proyecto_id=body.proyectoId)
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+class ContornoCorteBody(BaseModel):
+    """Issue #108: entrada del botón "Generar contorno de corte" del panel
+    del objeto raster -- la imagen (mismo data URI que ya guarda el objeto
+    `tipo="raster"`) más el tamaño en mm al que está puesta hoy en el
+    lienzo y el margen que hay que dejar hacia afuera de su silueta."""
+
+    dataUri: str
+    anchoMm: float
+    altoMm: float
+    margenMm: float = 2.0
+
+
+@app.post("/editor/contorno-corte")
+def generar_contorno_corte(body: ContornoCorteBody) -> dict:
+    try:
+        return editor.calcular_contorno_corte(body.dataUri, body.anchoMm, body.altoMm, body.margenMm)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+# ============================================================
+# Proyectos de diseño reutilizables del Editor (issue #18)
+# ============================================================
+
+
+class MaterialProduccionBody(BaseModel):
+    """Material+espesor elegido para modo Producción (#17) -- por objeto, no
+    por proyecto (ver nota de diseño en `editor-tipos.ts`)."""
+
+    material: str
+    espesorMm: float | None = None
+
+
+class ObjetoProyectoBody(BaseModel):
+    """Espejo de `ObjetoLienzo` (`apps/web/src/lib/editor-tipos.ts`) -- a
+    diferencia de `ObjetoExportarBody`, acá viajan también `id`/`nombre`/
+    `mantenerProporcion` (hacen falta para reconstruir el estado exacto del
+    lienzo al reabrir el proyecto, no solo para generar G-code)."""
+
+    id: str
+    nombre: str
+    tipo: Literal["svg", "raster"]
+    xMm: float
+    yMm: float
+    anchoMm: float
+    altoMm: float
+    rotacionDeg: float = 0.0
+    operaciones: list[Literal["corte", "grabado"]]
+    parametros: dict[str, ParametrosOperacionBody]
+    mantenerProporcion: bool = True
+    # #107 (posterior a este endpoint, #18): espejado horizontal/vertical --
+    # sin declararlos acá, Pydantic los descarta en silencio al validar el
+    # body y un objeto espejado se guardaría "derecho".
+    espejadoH: bool = False
+    espejadoV: bool = False
+    # #17: material+espesor elegido en modo Producción -- mismo criterio que
+    # espejadoH/V de arriba, sin declararlo acá se pierde en silencio.
+    materialProduccion: MaterialProduccionBody | None = None
+    # #150 (posterior a #108): `id` del objeto raster de origen cuando este
+    # objeto es un contorno de corte generado automáticamente -- ahora tiene
+    # comportamiento real (mover/rotar/escalar la imagen arrastra el
+    # contorno) así que vale la pena persistirlo; antes de #150 no se
+    # persistía a propósito porque no había ningún vínculo real que
+    # preservar. `None` para SVG/raster subidos a mano (nunca tuvieron
+    # origen) y para proyectos guardados antes de #150.
+    objetoOrigenId: str | None = None
+    # Solo para tipo="svg":
+    nombreArchivoSvg: str | None = None
+    contenidoSvg: str | None = None
+    resolucionRellenoMm: float | None = None
+    # Solo para tipo="raster":
+    dataUri: str | None = None
+    # Preprocesamiento de imagen (issue #109) -- ver el comentario en
+    # `ObjetoExportarBody`, mismo criterio (espejo plano, opcional).
+    canal: str | None = None
+    pesoRojo: float | None = None
+    pesoVerde: float | None = None
+    pesoAzul: float | None = None
+    gamma: float | None = None
+    invertir: bool | None = None
+    nivelesPosterizado: int | None = None
+
+
+class GuardarProyectoBody(BaseModel):
+    nombre: str
+    objetos: list[ObjetoProyectoBody]
+    materialNombre: str | None = None
+    materialFamilia: str | None = None
+    fichaParametroId: int | None = None
+
+
+@app.get("/proyectos")
+def listar_proyectos_diseno() -> list[dict]:
+    with sesion() as s:
+        return proyectos.listar(s)
+
+
+@app.get("/proyectos/{proyecto_id}")
+def obtener_proyecto_diseno(proyecto_id: int) -> dict:
+    with sesion() as s:
+        try:
+            return proyectos.detalle(s, cliente_storage, proyecto_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.post("/proyectos")
+def crear_proyecto_diseno(body: GuardarProyectoBody) -> dict:
+    with sesion() as s:
+        try:
+            payload = body.model_dump()
+            payload["objetos"] = [o.model_dump() for o in body.objetos]
+            return proyectos.crear(s, cliente_storage, payload)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.put("/proyectos/{proyecto_id}")
+def actualizar_proyecto_diseno(proyecto_id: int, body: GuardarProyectoBody) -> dict:
+    with sesion() as s:
+        try:
+            payload = body.model_dump()
+            payload["objetos"] = [o.model_dump() for o in body.objetos]
+            return proyectos.actualizar(s, cliente_storage, proyecto_id, payload)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.delete("/proyectos/{proyecto_id}")
+def eliminar_proyecto_diseno(proyecto_id: int) -> dict:
+    with sesion() as s:
+        try:
+            proyectos.eliminar(s, cliente_storage, proyecto_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        return {"ok": True}
 
 
 @app.get("/svgs")

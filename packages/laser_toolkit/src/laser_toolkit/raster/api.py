@@ -9,7 +9,7 @@ from __future__ import annotations
 from laser_toolkit.config import MachineConfig
 from laser_toolkit.raster.canal import calcular_matriz_intensidad
 from laser_toolkit.raster.config import ConfiguracionRaster
-from laser_toolkit.raster.contorno import extraer_contorno
+from laser_toolkit.raster.contorno import extraer_contorno, extraer_contorno_con_margen
 from laser_toolkit.raster.gcode import gcode_grabado_raster
 from laser_toolkit.raster.imagen import decodificar_imagen
 from laser_toolkit.svg.gcode import gcode_contorno
@@ -18,6 +18,7 @@ from laser_toolkit.svg.transform import Punto, rotar_punto
 
 __all__ = [
     "calcular_contorno_imagen",
+    "calcular_contorno_imagen_con_margen",
     "convertir_imagen_a_gcode_grabado",
     "generar_gcode_corte_y_grabado",
 ]
@@ -41,12 +42,24 @@ def calcular_contorno_imagen(datos: bytes, ancho_mm: float, alto_mm: float) -> l
     return extraer_contorno(imagen, ancho_mm, alto_mm)
 
 
+def calcular_contorno_imagen_con_margen(
+    datos: bytes, ancho_mm: float, alto_mm: float, margen_mm: float
+) -> tuple[list[Subpath], float, float]:
+    """Igual que `calcular_contorno_imagen`, pero expande el contorno
+    `margen_mm` hacia afuera en cada direccion (issue #108, boton "Generar
+    contorno de corte" del editor). Devuelve tambien el nuevo ancho/alto en
+    mm que ocupa el contorno -- ver `raster.contorno.extraer_contorno_con_margen`."""
+    imagen = decodificar_imagen(datos)
+    return extraer_contorno_con_margen(imagen, ancho_mm, alto_mm, margen_mm)
+
+
 def convertir_imagen_a_gcode_grabado(
     datos: bytes,
     ancho_mm: float,
     alto_mm: float,
     velocidad_mm_min: int,
-    potencia_max_pct: int,
+    potencia_baja_pct: int,
+    potencia_alta_pct: int,
     machine: MachineConfig,
     config: ConfiguracionRaster | None = None,
     x_offset_mm: float = 0.0,
@@ -54,9 +67,9 @@ def convertir_imagen_a_gcode_grabado(
     angulo_rad: float = 0.0,
 ) -> list[str]:
     """Decodifica `datos` y genera el G-code de grabado por intensidad de
-    pixel (barrido en zigzag, potencia continua) -- la funcion atomica de
-    conversion imagen -> G-code, analoga a
-    `laser_toolkit.svg.api.convertir_svg_a_gcode`."""
+    pixel (barrido en zigzag, potencia continua entre `potencia_baja_pct` y
+    `potencia_alta_pct`, issue #95) -- la funcion atomica de conversion
+    imagen -> G-code, analoga a `laser_toolkit.svg.api.convertir_svg_a_gcode`."""
     imagen = decodificar_imagen(datos)
     matriz = calcular_matriz_intensidad(imagen, ancho_mm, alto_mm, config or ConfiguracionRaster())
     return gcode_grabado_raster(
@@ -66,7 +79,8 @@ def convertir_imagen_a_gcode_grabado(
         x_offset_mm,
         y_offset_mm,
         velocidad_mm_min,
-        potencia_max_pct,
+        potencia_baja_pct,
+        potencia_alta_pct,
         machine,
         angulo_rad=angulo_rad,
     )
@@ -79,7 +93,8 @@ def generar_gcode_corte_y_grabado(
     machine: MachineConfig,
     *,
     grabado_velocidad_mm_min: int | None = None,
-    grabado_potencia_max_pct: int | None = None,
+    grabado_potencia_baja_pct: int | None = None,
+    grabado_potencia_alta_pct: int | None = None,
     grabado_config: ConfiguracionRaster | None = None,
     corte_velocidad_mm_min: int | None = None,
     corte_potencia_pct: int | None = None,
@@ -95,7 +110,11 @@ def generar_gcode_corte_y_grabado(
     gcode: list[str] = []
     imagen = decodificar_imagen(datos)
 
-    if grabado_velocidad_mm_min is not None and grabado_potencia_max_pct is not None:
+    if (
+        grabado_velocidad_mm_min is not None
+        and grabado_potencia_baja_pct is not None
+        and grabado_potencia_alta_pct is not None
+    ):
         config = grabado_config or ConfiguracionRaster()
         matriz = calcular_matriz_intensidad(imagen, ancho_mm, alto_mm, config)
         gcode += gcode_grabado_raster(
@@ -105,7 +124,8 @@ def generar_gcode_corte_y_grabado(
             x_offset_mm,
             y_offset_mm,
             grabado_velocidad_mm_min,
-            grabado_potencia_max_pct,
+            grabado_potencia_baja_pct,
+            grabado_potencia_alta_pct,
             machine,
             angulo_rad=angulo_rad,
         )

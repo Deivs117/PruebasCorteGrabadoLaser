@@ -23,8 +23,19 @@ from laser_toolkit.gcode.writer import sobrerecorrido_mm
 from laser_toolkit.svg.transform import Punto, rotar_punto
 
 
-def _valor_s(intensidad: float, potencia_max_pct: float, machine: MachineConfig) -> int:
-    return round(intensidad * (potencia_max_pct / 100) * machine.laser_max_s)
+def _valor_s(
+    intensidad: float, potencia_baja_pct: float, potencia_alta_pct: float, machine: MachineConfig
+) -> int:
+    """Interpolacion lineal de intensidad de pixel (0.0-1.0) a `S` dentro del
+    rango real de potencia calibrado (issue #95, follow-up de #15): el pixel
+    mas claro (`intensidad=0.0`) no es laser apagado, es `potencia_baja_pct`
+    -- el minimo que efectivamente marca el material; el mas oscuro
+    (`intensidad=1.0`) es `potencia_alta_pct` -- el maximo antes de
+    carbonizar. Ya no una escala directa 0%-`potencia_max_pct` (esa asumia
+    "blanco del canal" = "laser apagado", incorrecto para imagenes
+    realistas)."""
+    potencia_pct = potencia_baja_pct + intensidad * (potencia_alta_pct - potencia_baja_pct)
+    return round((potencia_pct / 100) * machine.laser_max_s)
 
 
 def _muestras_fila_en_orden(fila: list[float], ancho_mm: float, ida: bool) -> list[tuple[float, float]]:
@@ -50,16 +61,18 @@ def gcode_grabado_raster(
     x_offset_mm: float,
     y_offset_mm: float,
     velocidad_mm_min: int,
-    potencia_max_pct: int,
+    potencia_baja_pct: int,
+    potencia_alta_pct: int,
     machine: MachineConfig,
     angulo_rad: float = 0.0,
 ) -> list[str]:
     """G-code de grabado de `matriz_intensidad` (ver `raster.canal`,
     `fila[col]` en 0.0-1.0) como barrido en zigzag horizontal, una linea por
-    fila. `potencia_max_pct` es el techo de potencia (el pixel mas oscuro de
-    toda la imagen llega a este valor); pixeles menos oscuros lo escalan
-    proporcionalmente -- modulacion continua real, no un valor fijo por
-    celda."""
+    fila. `potencia_baja_pct`/`potencia_alta_pct` son el rango real de
+    potencia calibrado (issue #95): el pixel mas claro de toda la imagen
+    llega a `potencia_baja_pct`, el mas oscuro a `potencia_alta_pct`; el
+    resto interpola linealmente entre ambos -- modulacion continua real, no
+    un valor fijo por celda."""
     if not matriz_intensidad or not matriz_intensidad[0]:
         return []
 
@@ -91,7 +104,7 @@ def gcode_grabado_raster(
         lineas.append(f"G1 X{x_e:.3f} Y{y_e:.3f} F{velocidad_mm_min} S0")
         for x_local, intensidad in _muestras_fila_en_orden(fila, ancho_mm, ida):
             x_p, y_p = posicionar(x_local, y_local)
-            s = _valor_s(intensidad, potencia_max_pct, machine)
+            s = _valor_s(intensidad, potencia_baja_pct, potencia_alta_pct, machine)
             lineas.append(f"G1 X{x_p:.3f} Y{y_p:.3f} F{velocidad_mm_min} S{s}")
         x_s, y_s = posicionar(salida_local, y_local)
         lineas.append(f"G1 X{x_s:.3f} Y{y_s:.3f} F{velocidad_mm_min} S0")

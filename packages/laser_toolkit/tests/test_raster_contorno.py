@@ -1,6 +1,6 @@
 from PIL import Image
 
-from laser_toolkit.raster.contorno import extraer_contorno
+from laser_toolkit.raster.contorno import extraer_contorno, extraer_contorno_con_margen
 
 
 def _rgba_con_cuadrado_opaco(ancho: int, alto: int, cuadrado: tuple[int, int, int, int]) -> Image.Image:
@@ -63,3 +63,46 @@ def test_dos_siluetas_separadas_dan_dos_contornos():
         imagen.putpixel((x, y), (0, 0, 0, 255))
     contornos = extraer_contorno(imagen, ancho_mm=20.0, alto_mm=10.0)
     assert len(contornos) == 2
+
+
+def test_margen_cero_da_el_mismo_resultado_que_sin_margen():
+    imagen = _rgba_con_cuadrado_opaco(10, 10, (3, 3, 7, 7))
+    con_margen, ancho, alto = extraer_contorno_con_margen(imagen, ancho_mm=10.0, alto_mm=10.0, margen_mm=0.0)
+    sin_margen = extraer_contorno(imagen, ancho_mm=10.0, alto_mm=10.0)
+    assert con_margen == sin_margen
+    assert (ancho, alto) == (10.0, 10.0)
+
+
+def test_margen_negativo_es_un_error():
+    imagen = Image.new("RGB", (10, 10), color=(1, 2, 3))
+    try:
+        extraer_contorno_con_margen(imagen, ancho_mm=10.0, alto_mm=10.0, margen_mm=-1.0)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Un margen negativo tenia que levantar ValueError.")
+
+
+def test_margen_en_rectangulo_agranda_ambas_dimensiones():
+    imagen = Image.new("RGB", (10, 10), color=(9, 9, 9))  # sin banda alfa, como un JPEG
+    contornos, ancho, alto = extraer_contorno_con_margen(imagen, ancho_mm=10.0, alto_mm=20.0, margen_mm=2.0)
+    assert (ancho, alto) == (14.0, 24.0)
+    assert len(contornos) == 1
+    assert set(contornos[0].puntos) == {(0.0, 0.0), (14.0, 0.0), (14.0, 24.0), (0.0, 24.0)}
+
+
+def test_margen_en_silueta_alfa_crece_la_silueta_hacia_afuera():
+    # Cuadrado opaco (3,3)-(7,7) en una imagen 10x10 -- con margen la silueta
+    # tiene que quedar mas grande que la original, y el lienzo total tambien.
+    imagen = _rgba_con_cuadrado_opaco(10, 10, (3, 3, 7, 7))
+    sin_margen = extraer_contorno(imagen, ancho_mm=10.0, alto_mm=10.0)
+    con_margen, ancho, alto = extraer_contorno_con_margen(imagen, ancho_mm=10.0, alto_mm=10.0, margen_mm=2.0)
+    assert (ancho, alto) == (14.0, 14.0)
+    assert len(con_margen) == 1
+
+    def _area_bbox(contornos):
+        xs = [p[0] for sp in contornos for p in sp.puntos]
+        ys = [p[1] for sp in contornos for p in sp.puntos]
+        return (max(xs) - min(xs)) * (max(ys) - min(ys))
+
+    assert _area_bbox(con_margen) > _area_bbox(sin_margen)

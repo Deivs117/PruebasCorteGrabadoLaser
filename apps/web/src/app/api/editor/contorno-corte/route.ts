@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { exportarGcodeCombinado } from "@/lib/editor-data";
-import { exportarGcodeSchema } from "@/lib/editor-export-schema";
+import { generarContornoCorte } from "@/lib/editor-contorno-data";
+import { contornoCorteSchema } from "@/lib/editor-contorno-schema";
 
 export async function POST(request: Request) {
   const cuerpo: unknown = await request.json().catch(() => null);
-  const analisis = exportarGcodeSchema.safeParse(cuerpo);
+  const analisis = contornoCorteSchema.safeParse(cuerpo);
 
   if (!analisis.success) {
     return NextResponse.json(
@@ -16,9 +16,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const resultado = await exportarGcodeCombinado(
-    analisis.data.objetos,
-    analisis.data.proyectoId,
-  );
+  const resultado = await generarContornoCorte(analisis.data);
   return NextResponse.json(resultado, { status: resultado.ok ? 200 : 422 });
 }
