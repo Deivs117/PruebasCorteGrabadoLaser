@@ -72,6 +72,27 @@ def _rango_potencia_grabado(grabado: dict | None) -> tuple[int | None, int | Non
     return None, None
 
 
+def _configuracion_raster_de_objeto(objeto: dict) -> ConfiguracionRaster:
+    """Arma la `ConfiguracionRaster` real a partir de los campos opcionales
+    de preprocesamiento de imagen de un objeto raster (issue #109: canal,
+    pesos de mezcla, gamma, invertir, niveles de posterizado -- ver
+    `ObjetoExportarBody`/`ObjetoProyectoBody` en `main.py`). Un objeto
+    guardado antes de #109 no trae estos campos (todos `None`) -- se
+    filtran antes de construir, para que `ConfiguracionRaster()` aplique sus
+    propios defaults exactamente como antes de #109 (comportamiento
+    idéntico, sin regresión para proyectos viejos)."""
+    campos = {
+        "canal": objeto.get("canal"),
+        "peso_rojo": objeto.get("pesoRojo"),
+        "peso_verde": objeto.get("pesoVerde"),
+        "peso_azul": objeto.get("pesoAzul"),
+        "gamma": objeto.get("gamma"),
+        "invertir": objeto.get("invertir"),
+        "niveles_posterizado": objeto.get("nivelesPosterizado"),
+    }
+    return ConfiguracionRaster(**{k: v for k, v in campos.items() if v is not None})
+
+
 def _gcode_de_objeto(objeto: dict, machine: MachineConfig) -> list[str]:
     ancho_mm: float = objeto["anchoMm"]
     alto_mm: float = objeto["altoMm"]
@@ -115,7 +136,7 @@ def _gcode_de_objeto(objeto: dict, machine: MachineConfig) -> list[str]:
         grabado_velocidad_mm_min=grabado["velocidadMmMin"] if grabado else None,
         grabado_potencia_baja_pct=grabado_potencia_baja_pct,
         grabado_potencia_alta_pct=grabado_potencia_alta_pct,
-        grabado_config=ConfiguracionRaster(),
+        grabado_config=_configuracion_raster_de_objeto(objeto),
         corte_velocidad_mm_min=corte["velocidadMmMin"] if corte else None,
         corte_potencia_pct=corte["potenciaPct"] if corte else None,
         x_offset_mm=x_offset_mm,

@@ -6,6 +6,8 @@ import { UploadCloudAnimado } from "@/components/ui/icons/upload-cloud-animado";
 import { svgADataUri } from "@/lib/svg-data-uri";
 import { PARAMETROS_POR_DEFECTO, type ObjetoLienzo } from "@/lib/editor-tipos";
 import { medirImagen } from "@/components/editor/usar-imagen-cargada";
+import { ModalPreprocesamientoImagen } from "@/components/editor/modal-preprocesamiento-imagen";
+import type { PreprocesamientoRaster } from "@/lib/raster-preprocesamiento";
 
 interface SubirObjetoDropzoneProps {
   onAgregar: (objeto: ObjetoLienzo) => void;
@@ -52,6 +54,15 @@ export function SubirObjetoDropzone({
   const [sobreZona, setSobreZona] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  // Imagen raster recién leída, en espera de que el modal de
+  // preprocesamiento (#109) confirme sus parámetros antes de agregarla de
+  // verdad al lienzo -- el SVG no pasa por acá, se agrega directo.
+  const [rasterPendiente, setRasterPendiente] = useState<{
+    archivo: File;
+    dataUri: string;
+    anchoMm: number;
+    altoMm: number;
+  } | null>(null);
 
   async function agregarSvg(archivo: File) {
     const formulario = new FormData();
@@ -97,6 +108,17 @@ export function SubirObjetoDropzone({
   async function agregarRaster(archivo: File) {
     const dataUri = await leerComoDataUri(archivo);
     const { anchoPx, altoPx } = await medirImagen(dataUri);
+    const { anchoMm, altoMm } = dimensionesIniciales(anchoPx, altoPx);
+    // Todavía no se agrega al lienzo -- primero se abre el modal de
+    // preprocesamiento (#109); `onAgregar` se llama recién al confirmar
+    // (`confirmarRaster`), con los parámetros de canal/gamma/invertir/
+    // posterizado que haya elegido ahí.
+    setRasterPendiente({ archivo, dataUri, anchoMm, altoMm });
+  }
+
+  function confirmarRaster(preprocesamiento: PreprocesamientoRaster) {
+    if (!rasterPendiente) return;
+    const { archivo, dataUri, anchoMm, altoMm } = rasterPendiente;
     const { xMm, yMm } = siguientePosicion();
     onAgregar({
       id: crypto.randomUUID(),
@@ -105,14 +127,17 @@ export function SubirObjetoDropzone({
       dataUri,
       xMm,
       yMm,
-      ...dimensionesIniciales(anchoPx, altoPx),
+      anchoMm,
+      altoMm,
       rotacionDeg: 0,
       operaciones: ["grabado"],
       parametros: PARAMETROS_POR_DEFECTO,
       mantenerProporcion: true,
       espejadoH: false,
       espejadoV: false,
+      ...preprocesamiento,
     });
+    setRasterPendiente(null);
   }
 
   async function subir(archivo: File) {
@@ -190,6 +215,16 @@ export function SubirObjetoDropzone({
           e.target.value = "";
         }}
       />
+      {rasterPendiente ? (
+        <ModalPreprocesamientoImagen
+          abierto
+          dataUri={rasterPendiente.dataUri}
+          anchoMm={rasterPendiente.anchoMm}
+          altoMm={rasterPendiente.altoMm}
+          onConfirmar={confirmarRaster}
+          onCancelar={() => setRasterPendiente(null)}
+        />
+      ) : null}
     </div>
   );
 }
