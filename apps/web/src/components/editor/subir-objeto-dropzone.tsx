@@ -87,6 +87,8 @@ export function SubirObjetoDropzone({
       operaciones: ["grabado"],
       parametros: PARAMETROS_POR_DEFECTO,
       mantenerProporcion: true,
+      espejadoH: false,
+      espejadoV: false,
       resolucionRellenoMm: 0.3,
       toolpath: {},
     });
@@ -108,6 +110,8 @@ export function SubirObjetoDropzone({
       operaciones: ["grabado"],
       parametros: PARAMETROS_POR_DEFECTO,
       mantenerProporcion: true,
+      espejadoH: false,
+      espejadoV: false,
     });
   }
 
