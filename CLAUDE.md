@@ -123,6 +123,18 @@ Si además se sabe quién/qué sesión lo está trabajando, completar también e
 
 Verificación suficiente para un cambio de UI: `lint` + `typecheck` + `format:check` + `build` en verde, más una lectura cuidadosa del código (clases condicionales, props, lógica de estado) — mismo criterio que ya se usaba cuando el login bloqueaba pruebas E2E por `curl`. Si hace falta confirmar algo visual de verdad, pedírselo al usuario en vez de gastar la sesión en ello.
 
+## Acotar la salida de Bash (context tracker: "Bash results")
+
+Un `Bash` sin acotar (build completo, `git log`, diff de un PR grande, `cat` de un archivo largo) puede meterse solo un porcentaje de dos dígitos del contexto de una sesión larga. La regla no es "correr menos comandos" ni "ver menos" — es no dejar que la SALIDA cruda entre sin filtrar cuando ya se sabe de antemano qué parte hace falta.
+
+- **Build/test/lint/instalación de dependencias** (`pnpm run build`, `pytest`, `uv sync`, `pnpm install`, etc.): siempre `| tail -N` (ajustar N a mano si hace falta ver algo específico más arriba, ej. el nombre exacto de un test que falló). El resumen final (verde/rojo, conteo de tests, lista de rutas) siempre queda en las últimas líneas.
+- **Buscar si algo existe/aparece** (¿un archivo tiene tal función, tal string, tal error?): `grep -n`/`grep -c`, nunca `cat` seguido de leer todo a ojo. `grep -n patrón -A N -B N` da contexto sin volcar el archivo entero.
+- **Diffs grandes** (`git diff`, `gh pr diff`): acotar a un archivo (`git diff -- ruta/archivo`) o filtrar con `grep`/`awk` a la sección que importa, salvo que el propósito explícito sea auditar el diff completo de punta a punta (ahí sí, sin recortar — recortar un diff que se está auditando es peor que el gasto de contexto).
+- **Leer un archivo completo para entenderlo/editarlo**: usar la herramienta `Read` (con `offset`/`limit` si el archivo es largo y solo hace falta una sección), nunca `cat`/`sed -n` por Bash — `Read` ya está optimizada por el harness para esto, un `cat` por Bash no.
+- **Nunca acotar** cuando el pedido es justo revisar algo de punta a punta (auditoría de un diff completo, lectura de un archivo entero para una tarea de diseño/arquitectura, un log de error real que hay que diagnosticar) — ahí la regla de arriba no aplica, la función es ver todo.
+
+La idea es "cortar antes de que el output entre", no "adivinar la respuesta sin mirar" — si un `tail -30` no alcanza para confirmar algo (ej. un error está más arriba), volver a correr con más líneas o un `grep` puntual, nunca quedarse con una verificación a medias por ahorrar contexto.
+
 ## CI/CD
 
 `.github/workflows/ci.yml` corre en cada push/PR a `master`/`develop`/`feature/**`: un job de backend (`ruff` + `pyright` + `pytest` sobre `packages/laser_toolkit`) y un job de frontend (`lint` + `typecheck` + `format:check` + `build` sobre `apps/web`). El deploy en sí no vive en GitHub Actions — lo maneja la integración nativa de Vercel con el repo (preview por rama, producción en push a `master`).
