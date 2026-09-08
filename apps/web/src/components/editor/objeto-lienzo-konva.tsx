@@ -18,7 +18,9 @@ interface ObjetoLienzoKonvaProps {
   /** Color del borde de selección -- por tipo de operación (#107), ver
    * `editor-colores.ts`. Solo se usa cuando `seleccionado` es true. */
   color: string;
-  onSeleccionar: () => void;
+  /** #149 -- `aditivo` es `true` cuando el click vino con Shift: el lienzo
+   * lo suma/saca de la selección múltiple en vez de reemplazarla. */
+  onSeleccionar: (aditivo: boolean) => void;
   onMover: (xMm: number, yMm: number) => void;
   /** Se llama al soltar un handle de resize/rotación del `Transformer` del
    * lienzo (#107) -- separado de `onMover` porque acá cambian también
@@ -121,8 +123,9 @@ export function ObjetoLienzoKonva({
       y={centro.y}
       rotation={objeto.rotacionDeg}
       draggable
-      onClick={onSeleccionar}
-      onTap={onSeleccionar}
+      onClick={(e) => onSeleccionar(e.evt.shiftKey)}
+      // El toque en pantallas táctiles no tiene Shift -- nunca es aditivo.
+      onTap={() => onSeleccionar(false)}
       onDragMove={(e) => {
         const { x, y } = e.target.position();
         onMover(x / pxPorMm, areaTrabajoAltoMm - y / pxPorMm);
