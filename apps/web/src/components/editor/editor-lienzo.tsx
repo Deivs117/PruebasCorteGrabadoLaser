@@ -8,6 +8,7 @@ import { Layer, Rect, Stage, Transformer } from "react-konva";
 import { clsx } from "clsx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
 import { iconButtonClasses } from "@/lib/button-styles";
 import { TrashCanAnimado } from "@/components/ui/icons/trash-can-animado";
@@ -18,7 +19,13 @@ import { LienzoReglas } from "@/components/editor/lienzo-reglas";
 import { BarraAccionesObjeto } from "@/components/editor/barra-acciones-objeto";
 import { PanelObjeto } from "@/components/editor/panel-objeto";
 import { SubirObjetoDropzone } from "@/components/editor/subir-objeto-dropzone";
-import { limitesDe, objetoExcedeArea } from "@/lib/editor-area";
+import {
+  cajasSeIntersectan,
+  limitesEnPx,
+  limitesUnionDe,
+  objetoExcedeArea,
+  type CajaPx,
+} from "@/lib/editor-area";
 import { colorSeleccionDe } from "@/lib/editor-colores";
 import { listarFichasCliente, type FichaCliente } from "@/lib/fichas-cliente";
 import {
@@ -100,6 +107,12 @@ function aObjetoProyecto(objeto: ObjetoLienzo): ObjetoProyecto {
     // esto, reabrir un proyecto guardado en Producción pierde el "candado"
     // aunque los números de velocidad/potencia se mantengan bien.
     materialProduccion: objeto.materialProduccion,
+    // #150 (posterior a #18 y a #108): vínculo con el objeto de origen, si
+    // lo hay -- ver la nota de diseño en `editor-tipos.ts`. Antes de #150
+    // no se persistía porque el campo no tenía ningún comportamiento real
+    // todavía; ahora sí, así que perderlo al reabrir un proyecto
+    // desincronizaría el contorno de su imagen en silencio.
+    objetoOrigenId: objeto.objetoOrigenId,
   };
   return objeto.tipo === "svg"
     ? {
@@ -150,6 +163,13 @@ const DESPLAZAMIENTO_DUPLICADO_MM = 10;
 const NUDGE_MM = 1;
 const NUDGE_FINO_MM = 0.1;
 
+/** Debajo de este desplazamiento (px de contenido, ver `limitesEnPx`) un
+ * mousedown+mouseup sobre área vacía del lienzo (#149) se trata como un
+ * click simple (deseleccionar), no como un marquee -- si no, cualquier click
+ * con un temblor mínimo del mouse dispararía selección por rectángulo en
+ * vez de limpiar la selección. */
+const UMBRAL_MARQUEE_PX = 4;
+
 /** El resto del `Transformer` de Konva vive en `handles` de las esquinas
  * únicamente (resize proporcional) más el de rotación -- nunca los del
  * medio de cada lado, que estirarían el objeto sin preservar proporción:
@@ -195,7 +215,12 @@ export function EditorLienzo({
   const [objetos, setObjetos] = useState<ObjetoLienzo[]>(
     () => proyectoInicial?.objetos ?? [],
   );
-  const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  // #149 -- selección múltiple: reemplaza el `seleccionadoId` único de #107
+  // por una lista de ids. Un solo id seleccionado sigue siendo el caso más
+  // común (`seleccionadoUnico` más abajo), así que el panel numérico y el
+  // resto de la UI de un solo objeto no cambiaron de forma, solo de dónde
+  // sacan el objeto.
+  const [seleccionadosIds, setSeleccionadosIds] = useState<string[]>([]);
   const [vistaToolpath, setVistaToolpath] = useState(false);
 
   // Modo Producción/Prueba (#17): GLOBAL a todo el lienzo -- es una
@@ -268,6 +293,23 @@ export function EditorLienzo({
   const nodosRef = useRef(new Map<string, Konva.Group>());
   const transformerRef = useRef<Konva.Transformer>(null);
 
+  // #149 -- marquee (rectángulo de selección) sobre área vacía del lienzo.
+  // El `Stage` ya usaba drag simple para pan (#107); un plain-drag no puede
+  // significar las dos cosas a la vez, así que el pan pasa a requerir
+  // mantener espacio apretado (patrón Figma/Photoshop) y el drag suelto
+  // sobre área vacía queda libre para el marquee. Arrastrar un objeto en sí
+  // sigue funcionando igual que siempre (cada objeto tiene su propio
+  // `draggable`, independiente del `draggable` del `Stage`).
+  const [espacioPresionado, setEspacioPresionado] = useState(false);
+  const [marquee, setMarquee] = useState<{
+    inicioXPx: number;
+    inicioYPx: number;
+    actualXPx: number;
+    actualYPx: number;
+    aditivo: boolean;
+  } | null>(null);
+  const marqueeRef = useRef<typeof marquee>(null);
+
   // Konva dibuja sobre un <canvas> real -- montarlo durante el render de
   // servidor rompería el SSR (no hay canvas ahí). No se puede derivar de un
   // valor existente durante el render, por eso el flag vive en un efecto,
@@ -301,7 +343,23 @@ export function EditorLienzo({
     [pxPorMm, zoom, panX, panY, areaTrabajoAltoMm],
   );
 
-  const seleccionado = objetos.find((o) => o.id === seleccionadoId) ?? null;
+  const seleccionados = useMemo(
+    () => objetos.filter((o) => seleccionadosIds.includes(o.id)),
+    [objetos, seleccionadosIds],
+  );
+  // El panel numérico (`PanelObjeto`) y sus campos de posición/rotación/
+  // velocidad/potencia solo tienen sentido para UN objeto a la vez -- con
+  // varios seleccionados se muestra el resumen de conteo + acciones en lote
+  // en su lugar (ver el bloque a la derecha del lienzo, más abajo).
+  const seleccionadoUnico =
+    seleccionados.length === 1 ? seleccionados[0] : null;
+  // Bounding box combinado de la selección (#149) -- posiciona
+  // `BarraAccionesObjeto`, ver más abajo; `null` sin selección (no hay barra
+  // que mostrar).
+  const limitesSeleccion = useMemo(
+    () => limitesUnionDe(seleccionados),
+    [seleccionados],
+  );
 
   const objetosFueraDeArea = useMemo(
     () =>
@@ -311,23 +369,36 @@ export function EditorLienzo({
     [objetos, areaTrabajoAnchoMm, areaTrabajoAltoMm],
   );
 
-  // Engancha (o desengancha) el Transformer al nodo Konva del objeto
-  // seleccionado -- el Transformer es uno solo por lienzo, compartido, y se
-  // reapunta cada vez que cambia la selección.
+  // Engancha (o desengancha) el Transformer a los nodos Konva de TODOS los
+  // objetos seleccionados (#149) -- el Transformer es uno solo por lienzo,
+  // compartido, y se reapunta cada vez que cambia la selección. Con más de
+  // un nodo, Konva arma solo el bounding box combinado y aplica cualquier
+  // mover/rotar/escalar como transformación rígida a cada nodo individual
+  // -- cada uno sigue reportando su propio resultado final por
+  // `onTransformEnd` (`alTerminarTransformar` en `objeto-lienzo-konva.tsx`),
+  // así que no hace falta ninguna lógica extra acá para que la selección
+  // múltiple se mueva/rote/escale como unidad.
   useEffect(() => {
     const transformer = transformerRef.current;
     if (!transformer) return;
-    const nodo = seleccionadoId ? nodosRef.current.get(seleccionadoId) : null;
-    transformer.nodes(nodo ? [nodo] : []);
+    const nodos = seleccionadosIds
+      .map((id) => nodosRef.current.get(id))
+      .filter((nodo): nodo is Konva.Group => nodo !== undefined);
+    transformer.nodes(nodos);
     transformer.getLayer()?.batchDraw();
-  }, [seleccionadoId, objetos]);
+  }, [seleccionadosIds, objetos]);
 
-  // Nudge por teclado (#107): flechas mueven el objeto seleccionado 1mm,
-  // 0.1mm con Shift. Se ignora mientras el foco está en un campo de texto
-  // (ej. escribiendo en el panel numérico) para no pelear con el cursor.
+  // Nudge por teclado (#107, extendido por #149 a toda la selección):
+  // flechas mueven TODOS los objetos seleccionados 1mm, 0.1mm con Shift, sin
+  // cambiar sus posiciones relativas entre sí. Se ignora mientras el foco
+  // está en un campo de texto (ej. escribiendo en el panel numérico) para no
+  // pelear con el cursor.
   useEffect(() => {
     function alPresionarTecla(evento: KeyboardEvent) {
-      if (!seleccionadoId || elementoEsCampoDeTexto(document.activeElement)) {
+      if (
+        seleccionadosIds.length === 0 ||
+        elementoEsCampoDeTexto(document.activeElement)
+      ) {
         return;
       }
       const paso = evento.shiftKey ? NUDGE_FINO_MM : NUDGE_MM;
@@ -350,15 +421,56 @@ export function EditorLienzo({
           return;
       }
       evento.preventDefault();
-      actualizarObjeto(seleccionadoId, (o) => ({
-        ...o,
-        xMm: o.xMm + deltaXMm,
-        yMm: o.yMm + deltaYMm,
-      }));
+      // Cualquier miembro de la selección sirve como representante: como
+      // `propagarAlGrupo` está en `true`, el delta se aplica a todo
+      // `seleccionadosIds` por igual (unidad rígida), no solo al primero.
+      // El chequeo de `.length === 0` de arriba ya garantiza que hay al
+      // menos uno -- este `if` es solo para que TypeScript lo vea también
+      // (`noUncheckedIndexedAccess` tipa `arr[0]` como `T | undefined`).
+      const idRepresentante = seleccionadosIds[0];
+      if (idRepresentante === undefined) return;
+      moverOTransformarObjeto(
+        idRepresentante,
+        (o) => ({
+          xMm: o.xMm + deltaXMm,
+          yMm: o.yMm + deltaYMm,
+        }),
+        { propagarAlGrupo: true },
+      );
     }
     window.addEventListener("keydown", alPresionarTecla);
     return () => window.removeEventListener("keydown", alPresionarTecla);
-  }, [seleccionadoId]);
+    // `moverOTransformarObjeto` no entra a la lista: se redefine en cada
+    // render y siempre cierra sobre el mismo `seleccionadosIds` de ESE
+    // render -- como el efecto ya se vuelve a correr cuando
+    // `seleccionadosIds` cambia, captura la versión fresca igual, sin
+    // necesidad de re-registrar el listener en cada render de más.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seleccionadosIds]);
+
+  // Pan con espacio apretado (#149, ver nota en la declaración de `marquee`
+  // más arriba) -- mismo criterio de "ignorar mientras se escribe" que el
+  // nudge, para no capturar la barra espaciadora dentro de un campo de
+  // texto.
+  useEffect(() => {
+    function alApretar(evento: KeyboardEvent) {
+      if (
+        evento.code === "Space" &&
+        !elementoEsCampoDeTexto(document.activeElement)
+      ) {
+        setEspacioPresionado(true);
+      }
+    }
+    function alSoltar(evento: KeyboardEvent) {
+      if (evento.code === "Space") setEspacioPresionado(false);
+    }
+    window.addEventListener("keydown", alApretar);
+    window.addEventListener("keyup", alSoltar);
+    return () => {
+      window.removeEventListener("keydown", alApretar);
+      window.removeEventListener("keyup", alSoltar);
+    };
+  }, []);
 
   function siguientePosicion() {
     const indice = objetos.length;
@@ -371,7 +483,20 @@ export function EditorLienzo({
 
   function agregarObjeto(objeto: ObjetoLienzo) {
     setObjetos((anteriores) => [...anteriores, objeto]);
-    setSeleccionadoId(objeto.id);
+    setSeleccionadosIds([objeto.id]);
+  }
+
+  /** #149 -- click sobre un objeto individual. `aditivo` viene de Shift: sin
+   * Shift, reemplaza la selección entera por este objeto (comportamiento
+   * pre-#149); con Shift, lo suma o lo saca de la selección múltiple sin
+   * tocar el resto. */
+  function seleccionarObjeto(id: string, aditivo: boolean) {
+    setSeleccionadosIds((anteriores) => {
+      if (!aditivo) return [id];
+      return anteriores.includes(id)
+        ? anteriores.filter((actual) => actual !== id)
+        : [...anteriores, id];
+    });
   }
 
   /** Recibe una función en vez de un objeto parcial: `ObjetoLienzo` es una
@@ -388,17 +513,97 @@ export function EditorLienzo({
     );
   }
 
-  function actualizarCampos(
+  /** Actualiza cambios (posición/rotación/tamaño u otro campo común a
+   * ambas variantes de `ObjetoLienzo`) y además propaga el mismo delta de
+   * posición/rotación/escala al objeto vinculado (#150, `objetoOrigenId` de
+   * #108) si lo hay -- se usa en cualquier punto que mueva/rote/escale un
+   * objeto (drag, handles del `Transformer`,
+   * nudge por teclado, panel numérico), para que el contorno de corte
+   * generado automáticamente siga a su imagen de origen en vez de quedar
+   * atrás cuando se ajusta la imagen después de generarlo.
+   *
+   * Recibe una función (no un objeto de cambios ya resuelto) porque el
+   * nudge por teclado necesita partir del valor actual (`o.xMm + delta`),
+   * mismo motivo que `actualizarObjeto`. Como el contorno nace centrado
+   * exactamente en el mismo punto que la imagen (`generarContornoCorte`),
+   * aplicarle el mismo delta absoluto (traslación, rotación, factor de
+   * escala) alcanza para mantenerlo coincidente -- no hace falta pivotear
+   * alrededor de un centro distinto. Los campos no geométricos de `cambios`
+   * (`operaciones`, `parametros`, etc.) nunca se propagan: cada objeto
+   * vinculado sigue teniendo sus propias operaciones/material, el vínculo
+   * es solo geométrico. Solo se propaga hacia adelante (origen → vinculado)
+   * -- mover el contorno solo, a mano, no desincroniza la imagen.
+   *
+   * `propagarAlGrupo` (#149): cuando `id` integra la selección múltiple
+   * actual, el mismo delta de TRASLACIÓN (nunca rotación/escala -- un
+   * drag simple no rota ni escala) se replica al resto de `seleccionadosIds`
+   * como unidad rígida. Default `false` a propósito: los handles del
+   * `Transformer` (resize/rotación) ya reportan, nodo por nodo, el estado
+   * final de CADA objeto seleccionado (Konva arma y deshace el bounding box
+   * combinado solo) -- volver a aplicarles el delta acá los movería doble.
+   * Solo el drag simple (`onMover`, sin `Transformer` de por medio) y el
+   * nudge por teclado necesitan este parámetro en `true`. Cualquier objeto
+   * vinculado (`objetoOrigenId`) a ALGÚN miembro del grupo que se mueve
+   * -- no solo a `id` -- también se arrastra con el mismo delta. */
+  function moverOTransformarObjeto(
     id: string,
-    cambios: Omit<Partial<ObjetoLienzo>, "tipo">,
+    calcularCambios: (
+      objeto: ObjetoLienzo,
+    ) => Omit<Partial<ObjetoLienzo>, "tipo">,
+    opciones: { propagarAlGrupo?: boolean } = {},
   ) {
-    actualizarObjeto(id, (o) => ({ ...o, ...cambios }));
+    const { propagarAlGrupo = false } = opciones;
+    setObjetos((anteriores) => {
+      const original = anteriores.find((o) => o.id === id);
+      if (!original) return anteriores;
+      const cambios = calcularCambios(original);
+      const actualizado = { ...original, ...cambios } as ObjetoLienzo;
+
+      const deltaXMm = actualizado.xMm - original.xMm;
+      const deltaYMm = actualizado.yMm - original.yMm;
+      const deltaRotacionDeg = actualizado.rotacionDeg - original.rotacionDeg;
+      const escalaAncho =
+        original.anchoMm !== 0 ? actualizado.anchoMm / original.anchoMm : 1;
+      const escalaAlto =
+        original.altoMm !== 0 ? actualizado.altoMm / original.altoMm : 1;
+
+      if (
+        deltaXMm === 0 &&
+        deltaYMm === 0 &&
+        deltaRotacionDeg === 0 &&
+        escalaAncho === 1 &&
+        escalaAlto === 1
+      ) {
+        return anteriores.map((o) => (o.id === id ? actualizado : o));
+      }
+
+      const grupo =
+        propagarAlGrupo && seleccionadosIds.includes(id)
+          ? new Set(seleccionadosIds)
+          : new Set([id]);
+
+      return anteriores.map((o) => {
+        if (o.id === id) return actualizado;
+        if (grupo.has(o.id)) {
+          return { ...o, xMm: o.xMm + deltaXMm, yMm: o.yMm + deltaYMm };
+        }
+        if (!o.objetoOrigenId || !grupo.has(o.objetoOrigenId)) return o;
+        return {
+          ...o,
+          xMm: o.xMm + deltaXMm,
+          yMm: o.yMm + deltaYMm,
+          rotacionDeg: (((o.rotacionDeg + deltaRotacionDeg) % 360) + 360) % 360,
+          anchoMm: o.anchoMm * escalaAncho,
+          altoMm: o.altoMm * escalaAlto,
+        };
+      });
+    });
   }
 
   /** #109 -- `preprocesamiento` es exclusivo de los objetos raster, así que
    * (mismo motivo que `toolpath`, ver el comentario de `actualizarObjeto`)
    * necesita narrowear al tipo concreto en vez de pasar por
-   * `actualizarCampos`/`Partial<ObjetoLienzo>` genérico. */
+   * `moverOTransformarObjeto`/`Partial<ObjetoLienzo>` genérico. */
   function cambiarPreprocesamiento(
     id: string,
     preprocesamiento: PreprocesamientoRaster,
@@ -408,35 +613,98 @@ export function EditorLienzo({
     );
   }
 
-  function eliminarObjeto(id: string) {
-    setObjetos((anteriores) => anteriores.filter((o) => o.id !== id));
-    setSeleccionadoId((actual) => (actual === id ? null : actual));
-  }
+  /** Eliminar un objeto que tiene un contorno vinculado (#150,
+   * `objetoOrigenId`) es el caso de riesgo real que motivó ese ticket: si
+   * el contorno queda huérfano, el operario puede no notar que ya no
+   * corresponde a ninguna imagen y exportar igual -- el G-code corta un
+   * contorno que ya no representa nada. En vez de dejarlo huérfano en
+   * silencio, se pide confirmación explícita para borrar ambos juntos;
+   * cancelar aborta la eliminación completa. Generalizado a lista de ids
+   * (#149, `eliminarObjetos`): `vinculados` junta los contornos de
+   * CUALQUIER objeto de la lista que no esté ya incluido él mismo. */
+  const [pendienteEliminar, setPendienteEliminar] = useState<{
+    ids: string[];
+    vinculados: ObjetoLienzo[];
+  } | null>(null);
 
-  /** Clona el objeto seleccionado con un id nuevo, corrido unos mm para que
-   * se note que hay dos (#107). El toolpath cacheado no se copia: quedó
-   * calculado para la posición/tamaño del original y este es un objeto
-   * distinto que el usuario puede terminar redimensionando aparte. */
-  function duplicarObjeto(id: string) {
-    const objeto = objetos.find((o) => o.id === id);
-    if (!objeto) return;
-    const posicion = {
-      id: crypto.randomUUID(),
-      xMm: objeto.xMm + DESPLAZAMIENTO_DUPLICADO_MM,
-      yMm: objeto.yMm - DESPLAZAMIENTO_DUPLICADO_MM,
-    };
-    agregarObjeto(
-      objeto.tipo === "svg"
-        ? { ...objeto, ...posicion, toolpath: {} }
-        : { ...objeto, ...posicion },
+  function eliminarObjetosInmediato(ids: Set<string>) {
+    setObjetos((anteriores) => anteriores.filter((o) => !ids.has(o.id)));
+    setSeleccionadosIds((anteriores) =>
+      anteriores.filter((id) => !ids.has(id)),
     );
   }
 
-  function espejarObjeto(id: string, eje: "horizontal" | "vertical") {
-    actualizarObjeto(id, (o) =>
-      eje === "horizontal"
-        ? { ...o, espejadoH: !o.espejadoH }
-        : { ...o, espejadoV: !o.espejadoV },
+  /** #149 -- eliminar acepta una lista de ids: `[id]` cubre el caso de un
+   * solo objeto (panel numérico, chip de la lista de objetos) y una lista
+   * más larga cubre "eliminar selección" desde `BarraAccionesObjeto`. */
+  function eliminarObjetos(ids: string[]) {
+    const idsAEliminar = new Set(ids);
+    const vinculados = objetos.filter(
+      (o) =>
+        o.objetoOrigenId &&
+        idsAEliminar.has(o.objetoOrigenId) &&
+        !idsAEliminar.has(o.id),
+    );
+    if (vinculados.length > 0) {
+      setPendienteEliminar({ ids, vinculados });
+      return;
+    }
+    eliminarObjetosInmediato(idsAEliminar);
+  }
+
+  function confirmarEliminarConVinculados() {
+    if (!pendienteEliminar) return;
+    eliminarObjetosInmediato(
+      new Set([
+        ...pendienteEliminar.ids,
+        ...pendienteEliminar.vinculados.map((v) => v.id),
+      ]),
+    );
+    setPendienteEliminar(null);
+  }
+
+  /** Clona cada objeto de `ids` con un id nuevo, corrido unos mm para que se
+   * note que hay uno de más (#107, extendido a lote por #149). El toolpath
+   * cacheado no se copia: quedó calculado para la posición/tamaño del
+   * original y estos son objetos distintos que el usuario puede terminar
+   * redimensionando aparte. Los duplicados quedan seleccionados al terminar
+   * -- mismo criterio que ya tenía el duplicado de un solo objeto. */
+  function duplicarObjetos(ids: string[]) {
+    const duplicados = ids.flatMap((id) => {
+      const objeto = objetos.find((o) => o.id === id);
+      if (!objeto) return [];
+      const posicion = {
+        id: crypto.randomUUID(),
+        xMm: objeto.xMm + DESPLAZAMIENTO_DUPLICADO_MM,
+        yMm: objeto.yMm - DESPLAZAMIENTO_DUPLICADO_MM,
+      };
+      return [
+        objeto.tipo === "svg"
+          ? { ...objeto, ...posicion, toolpath: {} }
+          : { ...objeto, ...posicion },
+      ];
+    });
+    if (duplicados.length === 0) return;
+    setObjetos((anteriores) => [...anteriores, ...duplicados]);
+    setSeleccionadosIds(duplicados.map((o) => o.id));
+  }
+
+  /** #149 -- "espejar" en lote es la MISMA acción de #107 (toggle del flag
+   * `espejadoH`/`espejadoV` de cada objeto) aplicada a cada objeto de `ids`
+   * por separado, no un espejo de la disposición del grupo como conjunto
+   * (que además invertiría las posiciones relativas entre objetos, algo que
+   * el ticket no pidió y que complicaría bastante el cálculo) -- decisión
+   * de alcance documentada acá porque "espejar" es ambiguo con selección
+   * múltiple. */
+  function espejarObjetos(ids: string[], eje: "horizontal" | "vertical") {
+    const idsAEspejar = new Set(ids);
+    setObjetos((anteriores) =>
+      anteriores.map((o) => {
+        if (!idsAEspejar.has(o.id)) return o;
+        return eje === "horizontal"
+          ? { ...o, espejadoH: !o.espejadoH }
+          : { ...o, espejadoV: !o.espejadoV };
+      }),
     );
   }
 
@@ -668,6 +936,101 @@ export function EditorLienzo({
     setPanY(MARGEN_REGLA_PX);
   }
 
+  /** #149 -- convierte coordenadas de pantalla (`clientX`/`clientY` de un
+   * evento nativo del mouse) a "px de contenido" (mm × pxPorMm, SIN zoom/pan
+   * del `Stage`) -- mismo espacio de coordenadas que usan los hijos del
+   * `Layer` y que `limitesEnPx` en `editor-area.ts`. Reusa `pantallaAMm`
+   * (ya pensada para coordenadas relativas al contenedor del lienzo, ver
+   * `alHacerScroll`) como paso intermedio. */
+  function posicionEnPxDeContenido(
+    clientX: number,
+    clientY: number,
+  ): { x: number; y: number } | null {
+    const rect = contenedorRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    const mundo = pantallaAMm(clientX - rect.left, clientY - rect.top, vista);
+    return {
+      x: mundo.xMm * pxPorMm,
+      y: (areaTrabajoAltoMm - mundo.yMm) * pxPorMm,
+    };
+  }
+
+  /** #149 -- mousedown sobre área vacía del lienzo (nunca sobre un objeto,
+   * eso lo maneja `ObjetoLienzoKonva` aparte): arranca el marquee y
+   * engancha listeners de `window` (no solo del `Stage`) para que el
+   * arrastre se siga registrando aunque el mouse salga del canvas antes de
+   * soltar el botón. */
+  function iniciarMarquee(evento: KonvaEventObject<MouseEvent>) {
+    if (espacioPresionado) return; // ese drag lo maneja el pan del Stage
+    if (evento.target !== evento.target.getStage()) return;
+    const pos = posicionEnPxDeContenido(evento.evt.clientX, evento.evt.clientY);
+    if (!pos) return;
+    const inicial = {
+      inicioXPx: pos.x,
+      inicioYPx: pos.y,
+      actualXPx: pos.x,
+      actualYPx: pos.y,
+      aditivo: evento.evt.shiftKey,
+    };
+    marqueeRef.current = inicial;
+    setMarquee(inicial);
+
+    function mover(e: MouseEvent) {
+      const actual = posicionEnPxDeContenido(e.clientX, e.clientY);
+      if (!actual || !marqueeRef.current) return;
+      const siguiente = {
+        ...marqueeRef.current,
+        actualXPx: actual.x,
+        actualYPx: actual.y,
+      };
+      marqueeRef.current = siguiente;
+      setMarquee(siguiente);
+    }
+    function soltar() {
+      finalizarMarquee(marqueeRef.current);
+      marqueeRef.current = null;
+      setMarquee(null);
+      window.removeEventListener("mousemove", mover);
+      window.removeEventListener("mouseup", soltar);
+    }
+    window.addEventListener("mousemove", mover);
+    window.addEventListener("mouseup", soltar);
+  }
+
+  /** #149 -- al soltar el mouse: si el arrastre fue mínimo (`UMBRAL_MARQUEE_PX`)
+   * se trata como un click simple sobre área vacía (limpia la selección,
+   * salvo que sea un Shift+click sobre vacío, que no hace nada); si hubo
+   * arrastre real, selecciona todos los objetos cuya caja se toque con el
+   * rectángulo -- suma a la selección existente con Shift, la reemplaza sin
+   * Shift, mismo criterio que el click individual (`seleccionarObjeto`). */
+  function finalizarMarquee(m: typeof marquee) {
+    if (!m) return;
+    const distancia = Math.hypot(
+      m.actualXPx - m.inicioXPx,
+      m.actualYPx - m.inicioYPx,
+    );
+    if (distancia < UMBRAL_MARQUEE_PX) {
+      if (!m.aditivo) setSeleccionadosIds([]);
+      return;
+    }
+    const caja: CajaPx = {
+      minX: Math.min(m.inicioXPx, m.actualXPx),
+      maxX: Math.max(m.inicioXPx, m.actualXPx),
+      minY: Math.min(m.inicioYPx, m.actualYPx),
+      maxY: Math.max(m.inicioYPx, m.actualYPx),
+    };
+    const idsEnCaja = objetos
+      .filter((o) =>
+        cajasSeIntersectan(caja, limitesEnPx(o, pxPorMm, areaTrabajoAltoMm)),
+      )
+      .map((o) => o.id);
+    setSeleccionadosIds((anteriores) =>
+      m.aditivo
+        ? Array.from(new Set([...anteriores, ...idsEnCaja]))
+        : idsEnCaja,
+    );
+  }
+
   const noSeExportaPor =
     objetos.length === 0
       ? "Agregá al menos un objeto al lienzo antes de exportar."
@@ -682,11 +1045,20 @@ export function EditorLienzo({
         ? "Ingresá un nombre para el proyecto."
         : null;
 
-  const colorTransformer = seleccionado
-    ? objetosFueraDeArea.includes(seleccionado)
-      ? "#dc2626"
-      : colorSeleccionDe(seleccionado)
-    : "#246bce";
+  // #149 -- con selección múltiple no hay "una" categoría de operación que
+  // mande (podrían ser corte + grabado sólido + grabado fotorrealista a la
+  // vez): si algún seleccionado excede el área se prioriza el rojo de
+  // advertencia igual que antes, con exactamente un objeto se conserva el
+  // color por categoría (#107), y con varios se usa el mismo azul neutro que
+  // ya era el color por defecto sin selección.
+  const algunSeleccionadoExcedeArea = seleccionados.some((o) =>
+    objetosFueraDeArea.includes(o),
+  );
+  const colorTransformer = algunSeleccionadoExcedeArea
+    ? "#dc2626"
+    : seleccionadoUnico
+      ? colorSeleccionDe(seleccionadoUnico)
+      : "#246bce";
 
   /** "Guardar como proyecto"/"Guardar cambios" (#18) -- crea el proyecto la
    * primera vez (`proyectoId` todavía `null`) y a partir de ahí actualiza la
@@ -813,18 +1185,21 @@ export function EditorLienzo({
                   y={panY}
                   scaleX={zoom}
                   scaleY={zoom}
-                  draggable
+                  // #149 -- el pan por drag simple (#107) pasa a requerir
+                  // espacio apretado: un plain-drag sobre área vacía ahora
+                  // es el marquee de selección (ver `iniciarMarquee`), y
+                  // arrastrar un objeto sigue funcionando igual porque cada
+                  // uno tiene su propio `draggable`, independiente del
+                  // `Stage`.
+                  draggable={espacioPresionado}
+                  style={{ cursor: espacioPresionado ? "grab" : "default" }}
                   onWheel={alHacerScroll}
                   onDragMove={(e) => {
                     if (e.target.getStage() !== e.target) return;
                     setPanX(e.target.x());
                     setPanY(e.target.y());
                   }}
-                  onMouseDown={(e) => {
-                    if (e.target === e.target.getStage()) {
-                      setSeleccionadoId(null);
-                    }
-                  }}
+                  onMouseDown={iniciarMarquee}
                 >
                   <Layer>
                     <Rect
@@ -847,7 +1222,7 @@ export function EditorLienzo({
                         objeto={objeto}
                         pxPorMm={pxPorMm}
                         areaTrabajoAltoMm={areaTrabajoAltoMm}
-                        seleccionado={objeto.id === seleccionadoId}
+                        seleccionado={seleccionadosIds.includes(objeto.id)}
                         excedeArea={objetoExcedeArea(
                           objeto,
                           areaTrabajoAnchoMm,
@@ -855,12 +1230,18 @@ export function EditorLienzo({
                         )}
                         vistaToolpath={vistaToolpath}
                         color={colorSeleccionDe(objeto)}
-                        onSeleccionar={() => setSeleccionadoId(objeto.id)}
+                        onSeleccionar={(aditivo) =>
+                          seleccionarObjeto(objeto.id, aditivo)
+                        }
                         onMover={(xMm, yMm) =>
-                          actualizarCampos(objeto.id, { xMm, yMm })
+                          moverOTransformarObjeto(
+                            objeto.id,
+                            () => ({ xMm, yMm }),
+                            { propagarAlGrupo: true },
+                          )
                         }
                         onTransformar={(cambios) =>
-                          actualizarCampos(objeto.id, cambios)
+                          moverOTransformarObjeto(objeto.id, () => cambios)
                         }
                         registrarNodo={(nodo) => {
                           if (nodo) nodosRef.current.set(objeto.id, nodo);
@@ -868,6 +1249,19 @@ export function EditorLienzo({
                         }}
                       />
                     ))}
+                    {marquee ? (
+                      <Rect
+                        x={Math.min(marquee.inicioXPx, marquee.actualXPx)}
+                        y={Math.min(marquee.inicioYPx, marquee.actualYPx)}
+                        width={Math.abs(marquee.actualXPx - marquee.inicioXPx)}
+                        height={Math.abs(marquee.actualYPx - marquee.inicioYPx)}
+                        fill="rgba(36,107,206,0.08)"
+                        stroke="#246bce"
+                        strokeWidth={1}
+                        dash={[4, 4]}
+                        listening={false}
+                      />
+                    ) : null}
                     <Transformer
                       ref={transformerRef}
                       enabledAnchors={ANCLAS_TRANSFORMER}
@@ -895,22 +1289,22 @@ export function EditorLienzo({
                   />
                 </Stage>
 
-                {seleccionado
+                {limitesSeleccion
                   ? (() => {
-                      const limites = limitesDe(seleccionado);
+                      const limites = limitesSeleccion;
                       const centroXMm = (limites.minXMm + limites.maxXMm) / 2;
                       return (
                         <BarraAccionesObjeto
                           xPx={xMmAPantalla(centroXMm, vista)}
                           yPx={yMmAPantalla(limites.maxYMm, vista) - 8}
                           onEspejarHorizontal={() =>
-                            espejarObjeto(seleccionado.id, "horizontal")
+                            espejarObjetos(seleccionadosIds, "horizontal")
                           }
                           onEspejarVertical={() =>
-                            espejarObjeto(seleccionado.id, "vertical")
+                            espejarObjetos(seleccionadosIds, "vertical")
                           }
-                          onDuplicar={() => duplicarObjeto(seleccionado.id)}
-                          onEliminar={() => eliminarObjeto(seleccionado.id)}
+                          onDuplicar={() => duplicarObjetos(seleccionadosIds)}
+                          onEliminar={() => eliminarObjetos(seleccionadosIds)}
                         />
                       );
                     })()
@@ -956,6 +1350,13 @@ export function EditorLienzo({
               >
                 Restablecer vista
               </button>
+              {/* #149 -- el drag simple sobre área vacía pasa a ser el
+               * marquee de selección; mantener espacio apretado es la forma
+               * de desplazar el lienzo ahora. */}
+              <span className="text-text-muted hidden px-1.5 text-xs sm:inline">
+                Mantené <kbd className="font-mono">espacio</kbd> y arrastrá para
+                desplazar el lienzo.
+              </span>
             </div>
 
             <label className="flex items-center gap-2 text-sm">
@@ -979,7 +1380,7 @@ export function EditorLienzo({
                   key={objeto.id}
                   className={clsx(
                     "flex items-center gap-1 rounded-full border pl-2.5 text-xs font-medium",
-                    objeto.id === seleccionadoId
+                    seleccionadosIds.includes(objeto.id)
                       ? "border-blue bg-blue-soft text-navy"
                       : "border-border text-text-muted",
                     objetoExcedeArea(
@@ -991,16 +1392,17 @@ export function EditorLienzo({
                 >
                   <button
                     type="button"
-                    onClick={() => setSeleccionadoId(objeto.id)}
-                    aria-pressed={objeto.id === seleccionadoId}
+                    onClick={(e) => seleccionarObjeto(objeto.id, e.shiftKey)}
+                    aria-pressed={seleccionadosIds.includes(objeto.id)}
                     className="py-1 hover:underline"
+                    title="Click para seleccionar, Shift+click para sumar/sacar de la selección"
                   >
                     {objeto.nombre}
                   </button>
                   <button
                     type="button"
                     aria-label={`Eliminar ${objeto.nombre}`}
-                    onClick={() => eliminarObjeto(objeto.id)}
+                    onClick={() => eliminarObjetos([objeto.id])}
                     className={iconButtonClasses("danger", "size-6")}
                   >
                     <TrashCanAnimado className="size-3" strokeWidth={2} />
@@ -1100,23 +1502,23 @@ export function EditorLienzo({
         </div>
 
         <Card className="h-fit p-4">
-          {seleccionado ? (
+          {seleccionadoUnico ? (
             <PanelObjeto
-              objeto={seleccionado}
+              objeto={seleccionadoUnico}
               excedeArea={objetoExcedeArea(
-                seleccionado,
+                seleccionadoUnico,
                 areaTrabajoAnchoMm,
                 areaTrabajoAltoMm,
               )}
               onCambiar={(cambios) =>
-                actualizarCampos(seleccionado.id, cambios)
+                moverOTransformarObjeto(seleccionadoUnico.id, () => cambios)
               }
-              onEliminar={() => eliminarObjeto(seleccionado.id)}
+              onEliminar={() => eliminarObjetos([seleccionadoUnico.id])}
               onGenerarToolpath={(operacion) =>
-                generarToolpath(seleccionado.id, operacion)
+                generarToolpath(seleccionadoUnico.id, operacion)
               }
               onCambiarPreprocesamiento={(preprocesamiento) =>
-                cambiarPreprocesamiento(seleccionado.id, preprocesamiento)
+                cambiarPreprocesamiento(seleccionadoUnico.id, preprocesamiento)
               }
               modoProduccion={modoProduccion}
               onSalirDeProduccion={() => setModoProduccion(false)}
@@ -1124,11 +1526,71 @@ export function EditorLienzo({
               cargandoFichas={cargandoFichas}
               errorFichas={errorFichas}
               onGenerarContorno={(margenMm) =>
-                generarContornoCorte(seleccionado.id, margenMm)
+                generarContornoCorte(seleccionadoUnico.id, margenMm)
               }
               generandoContorno={generandoContorno}
               errorContorno={errorContorno}
             />
+          ) : seleccionados.length > 1 ? (
+            // #149 -- selección múltiple: el panel numérico de un solo
+            // objeto (posición/rotación/velocidad/potencia/Fichas) no tiene
+            // un significado obvio cuando hay varios con valores distintos
+            // -- se muestra solo el conteo y las mismas acciones en lote que
+            // ya ofrece `BarraAccionesObjeto` flotante sobre el lienzo,
+            // decisión documentada en el ticket. Mover/rotar/escalar el
+            // grupo sigue disponible con el mouse vía el Transformer.
+            <div className="flex flex-col gap-4">
+              <p className="text-navy text-sm font-semibold">
+                {seleccionados.length} objetos seleccionados
+              </p>
+              <p className="text-text-muted text-xs">
+                Seleccioná uno solo (click sin Shift) para editar su posición,
+                rotación o parámetros de velocidad/potencia.
+              </p>
+              <ul className="flex flex-col gap-1">
+                {seleccionados.map((o) => (
+                  <li
+                    key={o.id}
+                    className="text-navy truncate text-xs"
+                    title={o.nombre}
+                  >
+                    {o.nombre}
+                  </li>
+                ))}
+              </ul>
+              <div className="border-border flex flex-col gap-1.5 border-t pt-3">
+                <Button
+                  variant="outline"
+                  onClick={() => duplicarObjetos(seleccionadosIds)}
+                >
+                  Duplicar selección
+                </Button>
+                <div className="flex gap-1.5">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() =>
+                      espejarObjetos(seleccionadosIds, "horizontal")
+                    }
+                  >
+                    Espejar horizontal
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => espejarObjetos(seleccionadosIds, "vertical")}
+                  >
+                    Espejar vertical
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => eliminarObjetos(seleccionadosIds)}
+                >
+                  Eliminar selección
+                </Button>
+              </div>
+            </div>
           ) : (
             <p className="text-text-muted text-sm">
               Subí un objeto o seleccioná uno del lienzo para editar su
@@ -1137,6 +1599,23 @@ export function EditorLienzo({
           )}
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={pendienteEliminar !== null}
+        title="Eliminar también el contorno vinculado"
+        description={
+          pendienteEliminar
+            ? `${
+                pendienteEliminar.ids.length === 1
+                  ? `"${objetos.find((o) => o.id === pendienteEliminar.ids[0])?.nombre ?? ""}" tiene`
+                  : "Lo que estás por eliminar tiene"
+              } ${pendienteEliminar.vinculados.length === 1 ? "un contorno de corte generado a partir de una imagen" : `${pendienteEliminar.vinculados.length} contornos de corte generados a partir de una imagen`}. Si lo eliminás sin borrar también el contorno, va a quedar suelto en el lienzo sin corresponder a ninguna imagen -- riesgo real de exportar un G-code que corta en el lugar equivocado.`
+            : ""
+        }
+        confirmLabel="Eliminar ambos"
+        onConfirm={confirmarEliminarConVinculados}
+        onCancel={() => setPendienteEliminar(null)}
+      />
     </div>
   );
 }

@@ -598,6 +598,14 @@ class ObjetoProyectoBody(BaseModel):
     # #17: material+espesor elegido en modo Producción -- mismo criterio que
     # espejadoH/V de arriba, sin declararlo acá se pierde en silencio.
     materialProduccion: MaterialProduccionBody | None = None
+    # #150 (posterior a #108): `id` del objeto raster de origen cuando este
+    # objeto es un contorno de corte generado automáticamente -- ahora tiene
+    # comportamiento real (mover/rotar/escalar la imagen arrastra el
+    # contorno) así que vale la pena persistirlo; antes de #150 no se
+    # persistía a propósito porque no había ningún vínculo real que
+    # preservar. `None` para SVG/raster subidos a mano (nunca tuvieron
+    # origen) y para proyectos guardados antes de #150.
+    objetoOrigenId: str | None = None
     # Solo para tipo="svg":
     nombreArchivoSvg: str | None = None
     contenidoSvg: str | None = None
