@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { clsx } from "clsx";
 import { Button } from "@/components/ui/button";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
@@ -16,6 +17,7 @@ import {
   materialesConFichaOficial,
   type FichaCliente,
 } from "@/lib/fichas-cliente";
+import { MARGEN_CONTORNO_MM_POR_DEFECTO } from "@/lib/editor-contorno-schema";
 import type {
   ObjetoLienzo,
   Operacion,
@@ -38,6 +40,10 @@ interface PanelObjetoProps {
   fichas: FichaCliente[];
   cargandoFichas: boolean;
   errorFichas: string | null;
+  /** Issue #108: solo aplica a objetos `tipo="raster"`. */
+  onGenerarContorno: (margenMm: number) => void;
+  generandoContorno: boolean;
+  errorContorno: string | null;
 }
 
 const OPERACIONES: { valor: Operacion; etiqueta: string }[] = [
@@ -68,8 +74,14 @@ export function PanelObjeto({
   fichas,
   cargandoFichas,
   errorFichas,
+  onGenerarContorno,
+  generandoContorno,
+  errorContorno,
 }: PanelObjetoProps) {
   const proporcionOriginal = objeto.anchoMm / objeto.altoMm;
+  const [margenContornoMm, setMargenContornoMm] = useState(
+    MARGEN_CONTORNO_MM_POR_DEFECTO,
+  );
 
   function alternarOperacion(operacion: Operacion) {
     const tiene = objeto.operaciones.includes(operacion);
@@ -733,6 +745,53 @@ export function PanelObjeto({
           </div>
         );
       })}
+
+      {objeto.tipo === "raster" ? (
+        <div className="border-border flex flex-col gap-2 border-t pt-3">
+          <p className="text-navy text-xs font-semibold uppercase">
+            Contorno de corte automático
+          </p>
+          <p className="text-text-muted text-xs">
+            Traza la silueta real de la imagen (o su rectángulo si no tiene
+            transparencia) y la agrega al lienzo como un objeto de corte nuevo,
+            separado de esta imagen.
+          </p>
+          <div className="flex items-end gap-2">
+            <Field label="Margen (mm)">
+              {(id) => (
+                <input
+                  id={id}
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.5"
+                  value={margenContornoMm}
+                  onChange={(e) =>
+                    setMargenContornoMm(
+                      numeroODefault(e.target.value, margenContornoMm),
+                    )
+                  }
+                  className={clsx(INPUT_CLASSES, "font-mono")}
+                />
+              )}
+            </Field>
+            <Button
+              variant="outline"
+              size="sm"
+              loading={generandoContorno}
+              disabled={margenContornoMm < 0}
+              onClick={() => onGenerarContorno(margenContornoMm)}
+            >
+              {generandoContorno ? "Generando…" : "Generar contorno de corte"}
+            </Button>
+          </div>
+          {errorContorno ? (
+            <p role="alert" className="text-danger text-xs">
+              {errorContorno}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

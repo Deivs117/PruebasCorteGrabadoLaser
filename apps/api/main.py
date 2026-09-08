@@ -524,6 +524,26 @@ def exportar_gcode_editor(body: ExportarGcodeBody) -> dict:
             raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+class ContornoCorteBody(BaseModel):
+    """Issue #108: entrada del botón "Generar contorno de corte" del panel
+    del objeto raster -- la imagen (mismo data URI que ya guarda el objeto
+    `tipo="raster"`) más el tamaño en mm al que está puesta hoy en el
+    lienzo y el margen que hay que dejar hacia afuera de su silueta."""
+
+    dataUri: str
+    anchoMm: float
+    altoMm: float
+    margenMm: float = 2.0
+
+
+@app.post("/editor/contorno-corte")
+def generar_contorno_corte(body: ContornoCorteBody) -> dict:
+    try:
+        return editor.calcular_contorno_corte(body.dataUri, body.anchoMm, body.altoMm, body.margenMm)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 # ============================================================
 # Proyectos de diseño reutilizables del Editor (issue #18)
 # ============================================================

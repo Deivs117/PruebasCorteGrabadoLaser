@@ -90,6 +90,16 @@ interface ObjetoLienzoBase {
    * trabajo ("¿esto es una prueba de parámetros o una pieza real?"), no una
    * propiedad de un objeto puntual. `null` = todavía sin elegir. */
   materialProduccion: { material: string; espesorMm: number | null } | null;
+  /** Issue #108: cuando este objeto es el contorno de corte generado
+   * automáticamente a partir de una imagen raster, guarda el `id` de esa
+   * imagen -- referencia mínima, todavía sin ningún comportamiento de
+   * "mover/rotar/escalar juntos" cableado en el lienzo (no existe una
+   * mecánica genérica de agrupación de objetos todavía, ver discusión de
+   * alcance en el PR de #108). Sirve como base para esa mejora futura sin
+   * fingir una funcionalidad que hoy no está. No se persiste todavía en
+   * `/api/proyectos` (#18) ni en la exportación de G-code -- vive solo en
+   * el estado del lienzo mientras dura la sesión. */
+  objetoOrigenId?: string;
 }
 
 export interface ObjetoSvgLienzo extends ObjetoLienzoBase {

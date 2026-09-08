@@ -33,10 +33,11 @@ import {
 import type { ObjetoExportar } from "@/lib/editor-export-schema";
 import type { ObjetoProyecto } from "@/lib/proyecto-schema";
 import { conversionSvgSchema, type ModoGrabadoSvg } from "@/lib/svg-schema";
-import type {
-  EstadoToolpath,
-  ObjetoLienzo,
-  Operacion,
+import {
+  PARAMETROS_POR_DEFECTO,
+  type EstadoToolpath,
+  type ObjetoLienzo,
+  type Operacion,
 } from "@/lib/editor-tipos";
 
 /** Recorta un `ObjetoLienzo` (estado del cliente, con `id`/`nombre`/
@@ -223,6 +224,12 @@ export function EditorLienzo({
   const [anchoContenedorPx, setAnchoContenedorPx] = useState(600);
   const [exportando, setExportando] = useState(false);
   const [errorExportar, setErrorExportar] = useState<string | null>(null);
+
+  // Contorno de corte automático (#108) -- estado de un único pedido a la
+  // vez, igual criterio que `exportando`/`errorExportar`: solo el objeto
+  // seleccionado puede disparar la acción desde `PanelObjeto`.
+  const [generandoContorno, setGenerandoContorno] = useState(false);
+  const [errorContorno, setErrorContorno] = useState<string | null>(null);
 
   // "Guardar como proyecto" (#18): `proyectoId` pasa a tener valor apenas se
   // guarda por primera vez -- de ahí en más "Guardar" actualiza la misma
@@ -468,6 +475,89 @@ export function EditorLienzo({
         estado: "error",
         mensaje: "No se pudo conectar con el taller.",
       });
+    }
+  }
+
+  /**
+   * Issue #108: genera el vector de corte alrededor de una imagen raster y
+   * lo agrega como objeto SVG independiente, centrado exactamente sobre
+   * ella (mismo `xMm`/`yMm`/`rotacionDeg`/espejado que la imagen en el
+   * momento de generarlo). No hay una mecánica de agrupación de objetos en
+   * el editor todavía (ver `objetoOrigenId` en `editor-tipos.ts`) -- mover,
+   * rotar o escalar la imagen después NO arrastra a este contorno; el
+   * usuario los reposiciona a mano si hace falta, o vuelve a generar el
+   * contorno una vez que termine de ajustar la imagen.
+   */
+  async function generarContornoCorte(id: string, margenMm: number) {
+    const objeto = objetos.find((o) => o.id === id);
+    if (!objeto || objeto.tipo !== "raster") return;
+
+    setGenerandoContorno(true);
+    setErrorContorno(null);
+    try {
+      const respuesta = await fetch("/api/editor/contorno-corte", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dataUri: objeto.dataUri,
+          anchoMm: objeto.anchoMm,
+          altoMm: objeto.altoMm,
+          margenMm,
+        }),
+      });
+      const cuerpo = (await respuesta.json()) as {
+        ok: boolean;
+        contenidoSvg?: string;
+        anchoMm?: number;
+        altoMm?: number;
+        error?: string;
+      };
+      if (
+        !cuerpo.ok ||
+        !cuerpo.contenidoSvg ||
+        cuerpo.anchoMm === undefined ||
+        cuerpo.altoMm === undefined
+      ) {
+        throw new Error(
+          cuerpo.error ?? "No se pudo generar el contorno de corte.",
+        );
+      }
+      agregarObjeto({
+        id: crypto.randomUUID(),
+        tipo: "svg",
+        nombre: `Contorno de ${objeto.nombre}`,
+        // No hay un nombre real en la biblioteca de SVG (`/api/svgs`) para
+        // este contorno generado -- "Ver toolpath" (pensado para SVG subidos
+        // a mano) no va a poder convertirlo hasta que #108 persista también
+        // el contorno ahí, fuera de alcance de este ticket.
+        nombreArchivoSvg: `contorno-${objeto.id}`,
+        contenidoSvg: cuerpo.contenidoSvg,
+        xMm: objeto.xMm,
+        yMm: objeto.yMm,
+        anchoMm: cuerpo.anchoMm,
+        altoMm: cuerpo.altoMm,
+        rotacionDeg: objeto.rotacionDeg,
+        operaciones: ["corte"],
+        parametros: PARAMETROS_POR_DEFECTO,
+        mantenerProporcion: true,
+        espejadoH: objeto.espejadoH,
+        espejadoV: objeto.espejadoV,
+        // #17 se integró después de que esto se escribió (#108): el
+        // contorno nace en modo Prueba, sin Ficha elegida todavía -- igual
+        // que cualquier objeto nuevo del lienzo.
+        materialProduccion: null,
+        resolucionRellenoMm: 0.3,
+        toolpath: {},
+        objetoOrigenId: objeto.id,
+      });
+    } catch (error) {
+      setErrorContorno(
+        error instanceof Error
+          ? error.message
+          : "No se pudo generar el contorno de corte.",
+      );
+    } finally {
+      setGenerandoContorno(false);
     }
   }
 
@@ -1003,6 +1093,11 @@ export function EditorLienzo({
               fichas={fichas}
               cargandoFichas={cargandoFichas}
               errorFichas={errorFichas}
+              onGenerarContorno={(margenMm) =>
+                generarContornoCorte(seleccionado.id, margenMm)
+              }
+              generandoContorno={generandoContorno}
+              errorContorno={errorContorno}
             />
           ) : (
             <p className="text-text-muted text-sm">
