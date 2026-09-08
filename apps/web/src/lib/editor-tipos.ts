@@ -1,3 +1,5 @@
+import type { PreprocesamientoRaster } from "@/lib/raster-preprocesamiento";
+
 /** Mismo vocabulario que `fs-data.ts` (`Operacion`) — redefinido acá en vez
  * de importado porque ese módulo es `server-only` y este archivo lo
  * consumen componentes de cliente. */
@@ -114,7 +116,20 @@ export interface ObjetoSvgLienzo extends ObjetoLienzoBase {
   toolpath: Partial<Record<Operacion, EstadoToolpath>>;
 }
 
-export interface ObjetoRasterLienzo extends ObjetoLienzoBase {
+/** `extends ... PreprocesamientoRaster`: los campos de canal/gamma/
+ * invertir/posterizado (#109) quedan planos sobre el objeto (no anidados
+ * bajo una clave `preprocesamiento`) para calzar 1 a 1 con el body plano
+ * que esperan `ObjetoExportarBody`/`ObjetoProyectoBody` en `apps/api/
+ * main.py` -- sin esto haría falta una transformación aparte (anidar/
+ * desanidar) en cada punto donde el objeto viaja hacia o desde el
+ * servidor (exportar, guardar proyecto, reabrir proyecto). Se fijan al
+ * confirmar el modal de preprocesamiento de imagen y no se recalculan
+ * durante el resto de la manipulación del objeto (mover, rotar,
+ * redimensionar) -- solo se usan para el preview fijado en el lienzo y
+ * viajan tal cual al exportar, para que la `ConfiguracionRaster` real del
+ * servidor se arme con estos mismos valores en vez de sus defaults. */
+export interface ObjetoRasterLienzo
+  extends ObjetoLienzoBase, PreprocesamientoRaster {
   tipo: "raster";
   /** Sin persistencia en el backend todavía (#15 no existe) — vive solo en
    * el navegador como data URI mientras dure la sesión del lienzo. */

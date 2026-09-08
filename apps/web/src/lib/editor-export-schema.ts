@@ -46,10 +46,26 @@ const objetoSvgExportarSchema = z.object({
   ...camposComunes,
 });
 
+/** Espejo de `PreprocesamientoRaster` (`raster-preprocesamiento.ts`) /
+ * `ConfiguracionRaster` (`laser_toolkit.raster.config`, issue #15) --
+ * campos de canal/gamma/invertir/posterizado del preprocesamiento de
+ * imagen (#109), siempre presentes en un objeto raster nuevo (el modal fija
+ * un valor, nunca deja el campo sin definir). */
+const preprocesamientoRasterSchema = {
+  canal: z.enum(["luminancia", "rojo", "verde", "azul", "mezcla"]),
+  pesoRojo: z.number().min(0).max(1),
+  pesoVerde: z.number().min(0).max(1),
+  pesoAzul: z.number().min(0).max(1),
+  gamma: z.number().gt(0),
+  invertir: z.boolean(),
+  nivelesPosterizado: z.number().int().min(2).max(256).nullable(),
+};
+
 const objetoRasterExportarSchema = z.object({
   tipo: z.literal("raster"),
   dataUri: z.string().min(1),
   ...camposComunes,
+  ...preprocesamientoRasterSchema,
 });
 
 /** Espejo de `ObjetoExportarBody`/`ExportarGcodeBody` en `apps/api/main.py`

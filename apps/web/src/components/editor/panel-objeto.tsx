@@ -11,6 +11,11 @@ import {
   CLASES_ACTIVAS_POR_CATEGORIA,
   categoriaDeOperacion,
 } from "@/lib/editor-colores";
+import { ModalPreprocesamientoImagen } from "@/components/editor/modal-preprocesamiento-imagen";
+import type {
+  CanalRaster,
+  PreprocesamientoRaster,
+} from "@/lib/raster-preprocesamiento";
 import {
   espesoresConFichaOficial,
   fichasOficialesDe,
@@ -24,12 +29,29 @@ import type {
   ParametrosOperacion,
 } from "@/lib/editor-tipos";
 
+/** Espejo de las etiquetas de `OPCIONES_CANAL` en
+ * `modal-preprocesamiento-imagen.tsx` -- versión corta para el resumen de
+ * una línea que se muestra sin abrir el modal (#109). */
+const ETIQUETA_CANAL_CORTA: Record<CanalRaster, string> = {
+  luminancia: "Luminancia",
+  rojo: "Rojo",
+  verde: "Verde",
+  azul: "Azul",
+  mezcla: "Mezcla",
+};
+
 interface PanelObjetoProps {
   objeto: ObjetoLienzo;
   excedeArea: boolean;
   onCambiar: (cambios: Partial<ObjetoLienzo>) => void;
   onEliminar: () => void;
   onGenerarToolpath: (operacion: Operacion) => void;
+  /** #109 -- aparte de `onCambiar` (que solo admite los campos comunes a
+   * ambas variantes de `ObjetoLienzo`, ver el comentario de
+   * `actualizarCampos` en `editor-lienzo.tsx`): `preprocesamiento` es
+   * exclusivo de los objetos raster, así que necesita su propio callback ya
+   * narrowado al tipo concreto en vez de forzarlo por `Partial<ObjetoLienzo>`. */
+  onCambiarPreprocesamiento: (preprocesamiento: PreprocesamientoRaster) => void;
   /** Modo Producción/Prueba (#17) -- estado GLOBAL del editor, ver la nota
    * de diseño en `editor-tipos.ts` (`materialProduccion` sí es por-objeto,
    * el modo en sí no). */
@@ -69,6 +91,7 @@ export function PanelObjeto({
   onCambiar,
   onEliminar,
   onGenerarToolpath,
+  onCambiarPreprocesamiento,
   modoProduccion,
   onSalirDeProduccion,
   fichas,
@@ -79,6 +102,11 @@ export function PanelObjeto({
   errorContorno,
 }: PanelObjetoProps) {
   const proporcionOriginal = objeto.anchoMm / objeto.altoMm;
+  // #109 -- estado propio del modal de preprocesamiento de imagen, sección
+  // delimitada a continuación (ver el bloque "Preprocesamiento de imagen"
+  // más abajo); no interactúa con el resto del estado del panel.
+  const [modalPreprocesamientoAbierto, setModalPreprocesamientoAbierto] =
+    useState(false);
   const [margenContornoMm, setMargenContornoMm] = useState(
     MARGEN_CONTORNO_MM_POR_DEFECTO,
   );
@@ -209,6 +237,49 @@ export function PanelObjeto({
           <TrashCanAnimado className="size-4" strokeWidth={1.75} />
         </button>
       </div>
+
+      {/* === #109: preprocesamiento de imagen (solo objetos raster) ===
+          Sección propia y delimitada -- no depende de ni interfiere con
+          otros cambios en este archivo (modo Producción, contorno de corte
+          para raster). */}
+      {objeto.tipo === "raster" ? (
+        <div className="border-border bg-navy-soft flex items-center justify-between gap-2 rounded-[var(--radius-sm)] border p-2.5">
+          <div className="min-w-0">
+            <p className="text-navy text-sm font-medium">
+              Preprocesamiento de imagen
+            </p>
+            <p className="text-text-muted truncate text-xs">
+              {ETIQUETA_CANAL_CORTA[objeto.canal]}
+              {objeto.gamma !== 1 ? ` · gamma ${objeto.gamma.toFixed(1)}` : ""}
+              {objeto.invertir ? " · invertido" : ""}
+              {objeto.nivelesPosterizado !== null
+                ? ` · ${objeto.nivelesPosterizado} niveles`
+                : ""}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setModalPreprocesamientoAbierto(true)}
+          >
+            Editar
+          </Button>
+          <ModalPreprocesamientoImagen
+            abierto={modalPreprocesamientoAbierto}
+            dataUri={objeto.dataUri}
+            anchoMm={objeto.anchoMm}
+            altoMm={objeto.altoMm}
+            valorInicial={objeto}
+            confirmarLabel="Aplicar cambios"
+            onConfirmar={(preprocesamiento) => {
+              onCambiarPreprocesamiento(preprocesamiento);
+              setModalPreprocesamientoAbierto(false);
+            }}
+            onCancelar={() => setModalPreprocesamientoAbierto(false)}
+          />
+        </div>
+      ) : null}
+      {/* === fin #109 === */}
 
       {excedeArea ? (
         <div className="border-orange/30 bg-orange-soft flex items-start gap-2 rounded-[var(--radius-sm)] border p-2.5">

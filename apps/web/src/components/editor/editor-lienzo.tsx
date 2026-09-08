@@ -32,6 +32,10 @@ import {
 } from "@/lib/editor-vista";
 import type { ObjetoExportar } from "@/lib/editor-export-schema";
 import type { ObjetoProyecto } from "@/lib/proyecto-schema";
+import {
+  preprocesamientoDe,
+  type PreprocesamientoRaster,
+} from "@/lib/raster-preprocesamiento";
 import { conversionSvgSchema, type ModoGrabadoSvg } from "@/lib/svg-schema";
 import {
   PARAMETROS_POR_DEFECTO,
@@ -62,7 +66,12 @@ function aObjetoExportar(objeto: ObjetoLienzo): ObjetoExportar {
         contenidoSvg: objeto.contenidoSvg,
         resolucionRellenoMm: objeto.resolucionRellenoMm,
       }
-    : { tipo: "raster", ...comunes, dataUri: objeto.dataUri };
+    : {
+        tipo: "raster",
+        ...comunes,
+        dataUri: objeto.dataUri,
+        ...preprocesamientoDe(objeto),
+      };
 }
 
 /** Recorta un `ObjetoLienzo` a la forma que espera `POST`/`PUT /api/
@@ -100,7 +109,12 @@ function aObjetoProyecto(objeto: ObjetoLienzo): ObjetoProyecto {
         contenidoSvg: objeto.contenidoSvg,
         resolucionRellenoMm: objeto.resolucionRellenoMm,
       }
-    : { tipo: "raster", ...comunes, dataUri: objeto.dataUri };
+    : {
+        tipo: "raster",
+        ...comunes,
+        dataUri: objeto.dataUri,
+        ...preprocesamientoDe(objeto),
+      };
 }
 
 /** Estado del lienzo cuando se abre desde un proyecto guardado (#18, vía
@@ -379,6 +393,19 @@ export function EditorLienzo({
     cambios: Omit<Partial<ObjetoLienzo>, "tipo">,
   ) {
     actualizarObjeto(id, (o) => ({ ...o, ...cambios }));
+  }
+
+  /** #109 -- `preprocesamiento` es exclusivo de los objetos raster, así que
+   * (mismo motivo que `toolpath`, ver el comentario de `actualizarObjeto`)
+   * necesita narrowear al tipo concreto en vez de pasar por
+   * `actualizarCampos`/`Partial<ObjetoLienzo>` genérico. */
+  function cambiarPreprocesamiento(
+    id: string,
+    preprocesamiento: PreprocesamientoRaster,
+  ) {
+    actualizarObjeto(id, (o) =>
+      o.tipo === "raster" ? { ...o, ...preprocesamiento } : o,
+    );
   }
 
   function eliminarObjeto(id: string) {
@@ -1087,6 +1114,9 @@ export function EditorLienzo({
               onEliminar={() => eliminarObjeto(seleccionado.id)}
               onGenerarToolpath={(operacion) =>
                 generarToolpath(seleccionado.id, operacion)
+              }
+              onCambiarPreprocesamiento={(preprocesamiento) =>
+                cambiarPreprocesamiento(seleccionado.id, preprocesamiento)
               }
               modoProduccion={modoProduccion}
               onSalirDeProduccion={() => setModoProduccion(false)}

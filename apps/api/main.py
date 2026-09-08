@@ -505,6 +505,22 @@ class ObjetoExportarBody(BaseModel):
     resolucionRellenoMm: float | None = None
     # Solo para tipo="raster":
     dataUri: str | None = None
+    # Preprocesamiento de imagen (issue #109), solo para tipo="raster" --
+    # espejo plano de `PreprocesamientoRaster`/`ObjetoRasterLienzo` en
+    # `raster-preprocesamiento.ts`/`editor-tipos.ts` (que también quedan
+    # planos ahí, calzando 1 a 1 con este body) y de `ConfiguracionRaster`
+    # (`laser_toolkit.raster.config`, issue #15). Se valida contra el modelo
+    # real al construir `ConfiguracionRaster` en
+    # `editor._configuracion_raster_de_objeto`, no acá -- estos campos son
+    # opcionales para que un objeto legacy sin ellos siga usando los
+    # defaults de `ConfiguracionRaster()` de siempre.
+    canal: str | None = None
+    pesoRojo: float | None = None
+    pesoVerde: float | None = None
+    pesoAzul: float | None = None
+    gamma: float | None = None
+    invertir: bool | None = None
+    nivelesPosterizado: int | None = None
 
 
 class ExportarGcodeBody(BaseModel):
@@ -588,6 +604,15 @@ class ObjetoProyectoBody(BaseModel):
     resolucionRellenoMm: float | None = None
     # Solo para tipo="raster":
     dataUri: str | None = None
+    # Preprocesamiento de imagen (issue #109) -- ver el comentario en
+    # `ObjetoExportarBody`, mismo criterio (espejo plano, opcional).
+    canal: str | None = None
+    pesoRojo: float | None = None
+    pesoVerde: float | None = None
+    pesoAzul: float | None = None
+    gamma: float | None = None
+    invertir: bool | None = None
+    nivelesPosterizado: int | None = None
 
 
 class GuardarProyectoBody(BaseModel):
