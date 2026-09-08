@@ -18,10 +18,11 @@ import proyectos
 from laser_toolkit.config import MachineConfig
 from laser_toolkit.db.repo_negocio import construir_machine_config
 from laser_toolkit.gcode.writer import encabezado, pie
-from laser_toolkit.raster.api import generar_gcode_corte_y_grabado
+from laser_toolkit.raster.api import calcular_contorno_imagen_con_margen, generar_gcode_corte_y_grabado
 from laser_toolkit.raster.config import ConfiguracionRaster
 from laser_toolkit.storage.operaciones import BUCKET_GCODE, subir_gcode, url_firmada
 from laser_toolkit.svg.api import convertir_svg_texto_a_gcode
+from laser_toolkit.svg.geometry import Subpath
 from sqlalchemy.orm import Session
 from supabase import Client
 
@@ -72,6 +73,27 @@ def _rango_potencia_grabado(grabado: dict | None) -> tuple[int | None, int | Non
     return None, None
 
 
+def _configuracion_raster_de_objeto(objeto: dict) -> ConfiguracionRaster:
+    """Arma la `ConfiguracionRaster` real a partir de los campos opcionales
+    de preprocesamiento de imagen de un objeto raster (issue #109: canal,
+    pesos de mezcla, gamma, invertir, niveles de posterizado -- ver
+    `ObjetoExportarBody`/`ObjetoProyectoBody` en `main.py`). Un objeto
+    guardado antes de #109 no trae estos campos (todos `None`) -- se
+    filtran antes de construir, para que `ConfiguracionRaster()` aplique sus
+    propios defaults exactamente como antes de #109 (comportamiento
+    idéntico, sin regresión para proyectos viejos)."""
+    campos = {
+        "canal": objeto.get("canal"),
+        "peso_rojo": objeto.get("pesoRojo"),
+        "peso_verde": objeto.get("pesoVerde"),
+        "peso_azul": objeto.get("pesoAzul"),
+        "gamma": objeto.get("gamma"),
+        "invertir": objeto.get("invertir"),
+        "niveles_posterizado": objeto.get("nivelesPosterizado"),
+    }
+    return ConfiguracionRaster(**{k: v for k, v in campos.items() if v is not None})
+
+
 def _gcode_de_objeto(objeto: dict, machine: MachineConfig) -> list[str]:
     ancho_mm: float = objeto["anchoMm"]
     alto_mm: float = objeto["altoMm"]
@@ -115,7 +137,7 @@ def _gcode_de_objeto(objeto: dict, machine: MachineConfig) -> list[str]:
         grabado_velocidad_mm_min=grabado["velocidadMmMin"] if grabado else None,
         grabado_potencia_baja_pct=grabado_potencia_baja_pct,
         grabado_potencia_alta_pct=grabado_potencia_alta_pct,
-        grabado_config=ConfiguracionRaster(),
+        grabado_config=_configuracion_raster_de_objeto(objeto),
         corte_velocidad_mm_min=corte["velocidadMmMin"] if corte else None,
         corte_potencia_pct=corte["potenciaPct"] if corte else None,
         x_offset_mm=x_offset_mm,
@@ -156,4 +178,52 @@ def exportar_gcode_combinado(
     return {"ok": True, "gcodeStorageKey": key, "url": url}
 
 
-__all__ = ["exportar_gcode_combinado"]
+def _svg_desde_subpaths(subpaths: list[Subpath], ancho_mm: float, alto_mm: float) -> str:
+    """Serializa `subpaths` (convención Y-arriba de `laser_toolkit.svg`,
+    ver `raster.contorno`) como un SVG con `viewBox="0 0 anchoMm altoMm"`.
+
+    Vuelve a invertir el eje Y (Y-arriba -> Y-abajo, nativo de SVG) para que
+    `cargar_subpaths_svg_texto`/`svg.transform` (que sí esperan SVG nativo y
+    aplican su propio flip) reconstruyan exactamente los mismos puntos --
+    ida y vuelta sin distorsión, con escala 1:1 porque el viewBox coincide
+    con el tamaño real en mm."""
+    partes_d: list[str] = []
+    for subpath in subpaths:
+        puntos = [(x, alto_mm - y) for x, y in subpath.puntos]
+        if not puntos:
+            continue
+        comandos = [f"M {puntos[0][0]:.4f},{puntos[0][1]:.4f}"]
+        comandos += [f"L {x:.4f},{y:.4f}" for x, y in puntos[1:]]
+        if subpath.cerrado:
+            comandos.append("Z")
+        partes_d.append(" ".join(comandos))
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {ancho_mm:.4f} {alto_mm:.4f}">'
+        f'<path d="{" ".join(partes_d)}" /></svg>'
+    )
+
+
+def calcular_contorno_corte(data_uri: str, ancho_mm: float, alto_mm: float, margen_mm: float) -> dict:
+    """Issue #108: silueta de corte automática alrededor de una imagen del
+    editor (silueta alfa real, o rectángulo si la imagen no tiene
+    transparencia -- ver `raster.contorno`), expandida `margen_mm` hacia
+    afuera para que el corte no quede pegado al borde exacto del diseño.
+
+    Devuelve el contorno ya serializado como SVG (`contenidoSvg`, misma
+    forma que un objeto `tipo="svg"` del lienzo, ver `editor-tipos.ts`)
+    junto con el ancho/alto en mm que ocupa -- crece respecto de
+    `ancho_mm`/`alto_mm` según el margen, así el caller puede centrar el
+    nuevo objeto exactamente sobre la imagen original."""
+    datos = _decodificar_data_uri(data_uri)
+    subpaths, ancho_contorno_mm, alto_contorno_mm = calcular_contorno_imagen_con_margen(
+        datos, ancho_mm, alto_mm, margen_mm
+    )
+    contenido_svg = _svg_desde_subpaths(subpaths, ancho_contorno_mm, alto_contorno_mm)
+    return {
+        "contenidoSvg": contenido_svg,
+        "anchoMm": ancho_contorno_mm,
+        "altoMm": alto_contorno_mm,
+    }
+
+
+__all__ = ["calcular_contorno_corte", "exportar_gcode_combinado"]

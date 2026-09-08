@@ -9,7 +9,7 @@ from __future__ import annotations
 from laser_toolkit.config import MachineConfig
 from laser_toolkit.raster.canal import calcular_matriz_intensidad
 from laser_toolkit.raster.config import ConfiguracionRaster
-from laser_toolkit.raster.contorno import extraer_contorno
+from laser_toolkit.raster.contorno import extraer_contorno, extraer_contorno_con_margen
 from laser_toolkit.raster.gcode import gcode_grabado_raster
 from laser_toolkit.raster.imagen import decodificar_imagen
 from laser_toolkit.svg.gcode import gcode_contorno
@@ -18,6 +18,7 @@ from laser_toolkit.svg.transform import Punto, rotar_punto
 
 __all__ = [
     "calcular_contorno_imagen",
+    "calcular_contorno_imagen_con_margen",
     "convertir_imagen_a_gcode_grabado",
     "generar_gcode_corte_y_grabado",
 ]
@@ -39,6 +40,17 @@ def calcular_contorno_imagen(datos: bytes, ancho_mm: float, alto_mm: float) -> l
     (rotando antes si hace falta, ver `generar_gcode_corte_y_grabado`)."""
     imagen = decodificar_imagen(datos)
     return extraer_contorno(imagen, ancho_mm, alto_mm)
+
+
+def calcular_contorno_imagen_con_margen(
+    datos: bytes, ancho_mm: float, alto_mm: float, margen_mm: float
+) -> tuple[list[Subpath], float, float]:
+    """Igual que `calcular_contorno_imagen`, pero expande el contorno
+    `margen_mm` hacia afuera en cada direccion (issue #108, boton "Generar
+    contorno de corte" del editor). Devuelve tambien el nuevo ancho/alto en
+    mm que ocupa el contorno -- ver `raster.contorno.extraer_contorno_con_margen`."""
+    imagen = decodificar_imagen(datos)
+    return extraer_contorno_con_margen(imagen, ancho_mm, alto_mm, margen_mm)
 
 
 def convertir_imagen_a_gcode_grabado(

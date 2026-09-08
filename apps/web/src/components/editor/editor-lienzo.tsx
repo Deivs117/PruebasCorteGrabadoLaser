@@ -20,6 +20,7 @@ import { PanelObjeto } from "@/components/editor/panel-objeto";
 import { SubirObjetoDropzone } from "@/components/editor/subir-objeto-dropzone";
 import { limitesDe, objetoExcedeArea } from "@/lib/editor-area";
 import { colorSeleccionDe } from "@/lib/editor-colores";
+import { listarFichasCliente, type FichaCliente } from "@/lib/fichas-cliente";
 import {
   MARGEN_REGLA_PX,
   ZOOM_PASO,
@@ -31,11 +32,16 @@ import {
 } from "@/lib/editor-vista";
 import type { ObjetoExportar } from "@/lib/editor-export-schema";
 import type { ObjetoProyecto } from "@/lib/proyecto-schema";
+import {
+  preprocesamientoDe,
+  type PreprocesamientoRaster,
+} from "@/lib/raster-preprocesamiento";
 import { conversionSvgSchema, type ModoGrabadoSvg } from "@/lib/svg-schema";
-import type {
-  EstadoToolpath,
-  ObjetoLienzo,
-  Operacion,
+import {
+  PARAMETROS_POR_DEFECTO,
+  type EstadoToolpath,
+  type ObjetoLienzo,
+  type Operacion,
 } from "@/lib/editor-tipos";
 
 /** Recorta un `ObjetoLienzo` (estado del cliente, con `id`/`nombre`/
@@ -60,7 +66,12 @@ function aObjetoExportar(objeto: ObjetoLienzo): ObjetoExportar {
         contenidoSvg: objeto.contenidoSvg,
         resolucionRellenoMm: objeto.resolucionRellenoMm,
       }
-    : { tipo: "raster", ...comunes, dataUri: objeto.dataUri };
+    : {
+        tipo: "raster",
+        ...comunes,
+        dataUri: objeto.dataUri,
+        ...preprocesamientoDe(objeto),
+      };
 }
 
 /** Recorta un `ObjetoLienzo` a la forma que espera `POST`/`PUT /api/
@@ -85,6 +96,10 @@ function aObjetoProyecto(objeto: ObjetoLienzo): ObjetoProyecto {
     // al reabrir el proyecto.
     espejadoH: objeto.espejadoH,
     espejadoV: objeto.espejadoV,
+    // #17 (posterior a #18): material+espesor de modo Producción -- sin
+    // esto, reabrir un proyecto guardado en Producción pierde el "candado"
+    // aunque los números de velocidad/potencia se mantengan bien.
+    materialProduccion: objeto.materialProduccion,
   };
   return objeto.tipo === "svg"
     ? {
@@ -94,7 +109,12 @@ function aObjetoProyecto(objeto: ObjetoLienzo): ObjetoProyecto {
         contenidoSvg: objeto.contenidoSvg,
         resolucionRellenoMm: objeto.resolucionRellenoMm,
       }
-    : { tipo: "raster", ...comunes, dataUri: objeto.dataUri };
+    : {
+        tipo: "raster",
+        ...comunes,
+        dataUri: objeto.dataUri,
+        ...preprocesamientoDe(objeto),
+      };
 }
 
 /** Estado del lienzo cuando se abre desde un proyecto guardado (#18, vía
@@ -177,10 +197,53 @@ export function EditorLienzo({
   );
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [vistaToolpath, setVistaToolpath] = useState(false);
+
+  // Modo Producción/Prueba (#17): GLOBAL a todo el lienzo -- es una
+  // intención de todo el trabajo en curso ("¿esto es una prueba de
+  // parámetros o una pieza real?"), no una propiedad de un objeto puntual
+  // (a diferencia de `materialProduccion`/las Fichas elegidas, que sí son
+  // por-objeto, ver nota en `editor-tipos.ts`). No se persiste en el
+  // proyecto guardado (#18) a propósito: no cambia el G-code exportado
+  // (eso ya quedó fijado en `parametros` de cada objeto), así que reabrir
+  // un proyecto siempre arranca en Prueba, con los mismos números.
+  const [modoProduccion, setModoProduccion] = useState(false);
+  const [fichas, setFichas] = useState<FichaCliente[]>([]);
+  const [cargandoFichas, setCargandoFichas] = useState(false);
+  const [errorFichas, setErrorFichas] = useState<string | null>(null);
+
+  // Las Fichas se cargan recién al entrar a Producción por primera vez, no
+  // en cada carga del editor -- la mayoría de las sesiones son de Prueba y
+  // no necesitan este round-trip.
+  useEffect(() => {
+    if (!modoProduccion || fichas.length > 0 || cargandoFichas) return;
+    // Fetch de datos externos (Fichas de Parámetro) al entrar a Producción
+    // -- mismo patrón justificado que `setMontado` más arriba en este
+    // archivo, no hay forma de derivarlo durante el render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCargandoFichas(true);
+    setErrorFichas(null);
+    listarFichasCliente()
+      .then(setFichas)
+      .catch((error: unknown) =>
+        setErrorFichas(
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar las Fichas de Parámetro.",
+        ),
+      )
+      .finally(() => setCargandoFichas(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modoProduccion]);
   const contenedorRef = useRef<HTMLDivElement>(null);
   const [anchoContenedorPx, setAnchoContenedorPx] = useState(600);
   const [exportando, setExportando] = useState(false);
   const [errorExportar, setErrorExportar] = useState<string | null>(null);
+
+  // Contorno de corte automático (#108) -- estado de un único pedido a la
+  // vez, igual criterio que `exportando`/`errorExportar`: solo el objeto
+  // seleccionado puede disparar la acción desde `PanelObjeto`.
+  const [generandoContorno, setGenerandoContorno] = useState(false);
+  const [errorContorno, setErrorContorno] = useState<string | null>(null);
 
   // "Guardar como proyecto" (#18): `proyectoId` pasa a tener valor apenas se
   // guarda por primera vez -- de ahí en más "Guardar" actualiza la misma
@@ -332,6 +395,19 @@ export function EditorLienzo({
     actualizarObjeto(id, (o) => ({ ...o, ...cambios }));
   }
 
+  /** #109 -- `preprocesamiento` es exclusivo de los objetos raster, así que
+   * (mismo motivo que `toolpath`, ver el comentario de `actualizarObjeto`)
+   * necesita narrowear al tipo concreto en vez de pasar por
+   * `actualizarCampos`/`Partial<ObjetoLienzo>` genérico. */
+  function cambiarPreprocesamiento(
+    id: string,
+    preprocesamiento: PreprocesamientoRaster,
+  ) {
+    actualizarObjeto(id, (o) =>
+      o.tipo === "raster" ? { ...o, ...preprocesamiento } : o,
+    );
+  }
+
   function eliminarObjeto(id: string) {
     setObjetos((anteriores) => anteriores.filter((o) => o.id !== id));
     setSeleccionadoId((actual) => (actual === id ? null : actual));
@@ -426,6 +502,89 @@ export function EditorLienzo({
         estado: "error",
         mensaje: "No se pudo conectar con el taller.",
       });
+    }
+  }
+
+  /**
+   * Issue #108: genera el vector de corte alrededor de una imagen raster y
+   * lo agrega como objeto SVG independiente, centrado exactamente sobre
+   * ella (mismo `xMm`/`yMm`/`rotacionDeg`/espejado que la imagen en el
+   * momento de generarlo). No hay una mecánica de agrupación de objetos en
+   * el editor todavía (ver `objetoOrigenId` en `editor-tipos.ts`) -- mover,
+   * rotar o escalar la imagen después NO arrastra a este contorno; el
+   * usuario los reposiciona a mano si hace falta, o vuelve a generar el
+   * contorno una vez que termine de ajustar la imagen.
+   */
+  async function generarContornoCorte(id: string, margenMm: number) {
+    const objeto = objetos.find((o) => o.id === id);
+    if (!objeto || objeto.tipo !== "raster") return;
+
+    setGenerandoContorno(true);
+    setErrorContorno(null);
+    try {
+      const respuesta = await fetch("/api/editor/contorno-corte", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dataUri: objeto.dataUri,
+          anchoMm: objeto.anchoMm,
+          altoMm: objeto.altoMm,
+          margenMm,
+        }),
+      });
+      const cuerpo = (await respuesta.json()) as {
+        ok: boolean;
+        contenidoSvg?: string;
+        anchoMm?: number;
+        altoMm?: number;
+        error?: string;
+      };
+      if (
+        !cuerpo.ok ||
+        !cuerpo.contenidoSvg ||
+        cuerpo.anchoMm === undefined ||
+        cuerpo.altoMm === undefined
+      ) {
+        throw new Error(
+          cuerpo.error ?? "No se pudo generar el contorno de corte.",
+        );
+      }
+      agregarObjeto({
+        id: crypto.randomUUID(),
+        tipo: "svg",
+        nombre: `Contorno de ${objeto.nombre}`,
+        // No hay un nombre real en la biblioteca de SVG (`/api/svgs`) para
+        // este contorno generado -- "Ver toolpath" (pensado para SVG subidos
+        // a mano) no va a poder convertirlo hasta que #108 persista también
+        // el contorno ahí, fuera de alcance de este ticket.
+        nombreArchivoSvg: `contorno-${objeto.id}`,
+        contenidoSvg: cuerpo.contenidoSvg,
+        xMm: objeto.xMm,
+        yMm: objeto.yMm,
+        anchoMm: cuerpo.anchoMm,
+        altoMm: cuerpo.altoMm,
+        rotacionDeg: objeto.rotacionDeg,
+        operaciones: ["corte"],
+        parametros: PARAMETROS_POR_DEFECTO,
+        mantenerProporcion: true,
+        espejadoH: objeto.espejadoH,
+        espejadoV: objeto.espejadoV,
+        // #17 se integró después de que esto se escribió (#108): el
+        // contorno nace en modo Prueba, sin Ficha elegida todavía -- igual
+        // que cualquier objeto nuevo del lienzo.
+        materialProduccion: null,
+        resolucionRellenoMm: 0.3,
+        toolpath: {},
+        objetoOrigenId: objeto.id,
+      });
+    } catch (error) {
+      setErrorContorno(
+        error instanceof Error
+          ? error.message
+          : "No se pudo generar el contorno de corte.",
+      );
+    } finally {
+      setGenerandoContorno(false);
     }
   }
 
@@ -573,6 +732,49 @@ export function EditorLienzo({
 
   return (
     <div className="flex flex-col gap-4">
+      <Card className="flex flex-wrap items-center gap-3 p-3">
+        <span className="text-navy text-sm font-semibold">
+          Modo del editor:
+        </span>
+        <div
+          role="group"
+          aria-label="Modo Producción o Prueba"
+          className="border-border flex gap-1 rounded-full border p-0.5"
+        >
+          <button
+            type="button"
+            aria-pressed={!modoProduccion}
+            onClick={() => setModoProduccion(false)}
+            className={clsx(
+              "rounded-full px-3 py-1 text-sm font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+              !modoProduccion
+                ? "bg-blue-soft text-blue"
+                : "text-text-muted hover:bg-navy-soft",
+            )}
+          >
+            Prueba
+          </button>
+          <button
+            type="button"
+            aria-pressed={modoProduccion}
+            onClick={() => setModoProduccion(true)}
+            className={clsx(
+              "rounded-full px-3 py-1 text-sm font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+              modoProduccion
+                ? "bg-teal-soft text-teal"
+                : "text-text-muted hover:bg-navy-soft",
+            )}
+          >
+            Producción
+          </button>
+        </div>
+        <p className="text-text-muted flex-1 text-xs">
+          {modoProduccion
+            ? "Velocidad y potencia quedan bloqueadas a la Ficha de Parámetro aprobada de cada objeto — no se pueden tocar sin querer."
+            : "Velocidad y potencia son libres, para explorar parámetros de materiales sin Ficha todavía."}
+        </p>
+      </Card>
+
       <SubirObjetoDropzone
         onAgregar={agregarObjeto}
         siguientePosicion={siguientePosicion}
@@ -913,6 +1115,19 @@ export function EditorLienzo({
               onGenerarToolpath={(operacion) =>
                 generarToolpath(seleccionado.id, operacion)
               }
+              onCambiarPreprocesamiento={(preprocesamiento) =>
+                cambiarPreprocesamiento(seleccionado.id, preprocesamiento)
+              }
+              modoProduccion={modoProduccion}
+              onSalirDeProduccion={() => setModoProduccion(false)}
+              fichas={fichas}
+              cargandoFichas={cargandoFichas}
+              errorFichas={errorFichas}
+              onGenerarContorno={(margenMm) =>
+                generarContornoCorte(seleccionado.id, margenMm)
+              }
+              generandoContorno={generandoContorno}
+              errorContorno={errorContorno}
             />
           ) : (
             <p className="text-text-muted text-sm">

@@ -481,6 +481,14 @@ class ParametrosOperacionBody(BaseModel):
     potenciaPct: int | None = None
     potenciaBajaPct: int | None = None
     potenciaAltaPct: int | None = None
+    # Referencia a la Ficha de Parámetro que bloqueó estos valores en modo
+    # Producción (#17) -- puramente informativa (de dónde salió el número),
+    # nunca se usa para generar G-code (eso sigue viniendo de los campos
+    # numéricos de arriba). Sin declararla acá, Pydantic la descarta en
+    # silencio al guardar un proyecto (#18) y reabrirlo perdería el "candado".
+    fichaGrupoId: str | None = None
+    fichaBajaGrupoId: str | None = None
+    fichaAltaGrupoId: str | None = None
 
 
 class ObjetoExportarBody(BaseModel):
@@ -497,6 +505,22 @@ class ObjetoExportarBody(BaseModel):
     resolucionRellenoMm: float | None = None
     # Solo para tipo="raster":
     dataUri: str | None = None
+    # Preprocesamiento de imagen (issue #109), solo para tipo="raster" --
+    # espejo plano de `PreprocesamientoRaster`/`ObjetoRasterLienzo` en
+    # `raster-preprocesamiento.ts`/`editor-tipos.ts` (que también quedan
+    # planos ahí, calzando 1 a 1 con este body) y de `ConfiguracionRaster`
+    # (`laser_toolkit.raster.config`, issue #15). Se valida contra el modelo
+    # real al construir `ConfiguracionRaster` en
+    # `editor._configuracion_raster_de_objeto`, no acá -- estos campos son
+    # opcionales para que un objeto legacy sin ellos siga usando los
+    # defaults de `ConfiguracionRaster()` de siempre.
+    canal: str | None = None
+    pesoRojo: float | None = None
+    pesoVerde: float | None = None
+    pesoAzul: float | None = None
+    gamma: float | None = None
+    invertir: bool | None = None
+    nivelesPosterizado: int | None = None
 
 
 class ExportarGcodeBody(BaseModel):
@@ -516,9 +540,37 @@ def exportar_gcode_editor(body: ExportarGcodeBody) -> dict:
             raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+class ContornoCorteBody(BaseModel):
+    """Issue #108: entrada del botón "Generar contorno de corte" del panel
+    del objeto raster -- la imagen (mismo data URI que ya guarda el objeto
+    `tipo="raster"`) más el tamaño en mm al que está puesta hoy en el
+    lienzo y el margen que hay que dejar hacia afuera de su silueta."""
+
+    dataUri: str
+    anchoMm: float
+    altoMm: float
+    margenMm: float = 2.0
+
+
+@app.post("/editor/contorno-corte")
+def generar_contorno_corte(body: ContornoCorteBody) -> dict:
+    try:
+        return editor.calcular_contorno_corte(body.dataUri, body.anchoMm, body.altoMm, body.margenMm)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 # ============================================================
 # Proyectos de diseño reutilizables del Editor (issue #18)
 # ============================================================
+
+
+class MaterialProduccionBody(BaseModel):
+    """Material+espesor elegido para modo Producción (#17) -- por objeto, no
+    por proyecto (ver nota de diseño en `editor-tipos.ts`)."""
+
+    material: str
+    espesorMm: float | None = None
 
 
 class ObjetoProyectoBody(BaseModel):
@@ -543,12 +595,24 @@ class ObjetoProyectoBody(BaseModel):
     # body y un objeto espejado se guardaría "derecho".
     espejadoH: bool = False
     espejadoV: bool = False
+    # #17: material+espesor elegido en modo Producción -- mismo criterio que
+    # espejadoH/V de arriba, sin declararlo acá se pierde en silencio.
+    materialProduccion: MaterialProduccionBody | None = None
     # Solo para tipo="svg":
     nombreArchivoSvg: str | None = None
     contenidoSvg: str | None = None
     resolucionRellenoMm: float | None = None
     # Solo para tipo="raster":
     dataUri: str | None = None
+    # Preprocesamiento de imagen (issue #109) -- ver el comentario en
+    # `ObjetoExportarBody`, mismo criterio (espejo plano, opcional).
+    canal: str | None = None
+    pesoRojo: float | None = None
+    pesoVerde: float | None = None
+    pesoAzul: float | None = None
+    gamma: float | None = None
+    invertir: bool | None = None
+    nivelesPosterizado: int | None = None
 
 
 class GuardarProyectoBody(BaseModel):

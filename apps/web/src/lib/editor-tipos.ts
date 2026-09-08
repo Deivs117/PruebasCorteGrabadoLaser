@@ -1,3 +1,5 @@
+import type { PreprocesamientoRaster } from "@/lib/raster-preprocesamiento";
+
 /** Mismo vocabulario que `fs-data.ts` (`Operacion`) — redefinido acá en vez
  * de importado porque ese módulo es `server-only` y este archivo lo
  * consumen componentes de cliente. */
@@ -15,9 +17,31 @@ export type Operacion = "corte" | "grabado";
  * array normal en todos lados. */
 export type Operaciones = Operacion[];
 
+/** Referencia a la Ficha de Parámetro Estándar que bloqueó estos valores en
+ * modo Producción (#17) -- puramente informativa para la UI (mostrar de
+ * dónde salió el número, permitir "cambiar de Ficha"): el G-code exportado
+ * se sigue armando a partir de `velocidadMmMin`/`potenciaPct` (o
+ * `potenciaBajaPct`/`potenciaAltaPct`), nunca de este id, así que no hace
+ * falta que viaje a `editor-export-schema.ts`. Si viaja o no a un proyecto
+ * guardado (#18) es decisión de cada schema que lo declare.
+ *
+ * `svg` (o un objeto raster en `corte`) usa una sola Ficha (`fichaGrupoId`).
+ * Un objeto raster en `grabado` (#17, ampliación de #95) necesita DOS
+ * Fichas GRABADO del mismo material+espesor como extremos del rango de
+ * intensidad -- `fichaBajaGrupoId`/`fichaAltaGrupoId`, cuyos
+ * `potenciaPct` calibrados llenan `potenciaBajaPct`/`potenciaAltaPct`. */
 export interface ParametrosOperacion {
   velocidadMmMin: number;
   potenciaPct: number;
+  /** Rango real de potencia calibrado para grabado raster (#95/#17) -- se
+   * usa EN VEZ de `potenciaPct` cuando está presente (ver
+   * `_rango_potencia_grabado` en `apps/api/editor.py`); `potenciaPct` queda
+   * igual para no romper el toolpath de un solo valor de SVG/Prueba. */
+  potenciaBajaPct?: number;
+  potenciaAltaPct?: number;
+  fichaGrupoId?: string;
+  fichaBajaGrupoId?: string;
+  fichaAltaGrupoId?: string;
 }
 
 /** Estado de la conversión a G-code de una operación puntual de un objeto —
@@ -58,6 +82,26 @@ interface ObjetoLienzoBase {
    * en `editor-lienzo.tsx`, fuera del alcance de #107). */
   espejadoH: boolean;
   espejadoV: boolean;
+  /** Material+espesor elegido para modo Producción (#17) -- decisión: POR
+   * OBJETO, no global del lienzo, mismo criterio que `operaciones`/
+   * `parametros` (ya modelados por objeto): un mismo diseño puede combinar
+   * piezas de materiales distintos (ej. una base de MDF con un detalle de
+   * acrílico), así que atarlo al lienzo entero habría sido más restrictivo
+   * de lo que el modelo actual ya permite. El toggle Producción/Prueba en sí
+   * SÍ es global (`EditorLienzo`, no acá): es una intención de todo el
+   * trabajo ("¿esto es una prueba de parámetros o una pieza real?"), no una
+   * propiedad de un objeto puntual. `null` = todavía sin elegir. */
+  materialProduccion: { material: string; espesorMm: number | null } | null;
+  /** Issue #108: cuando este objeto es el contorno de corte generado
+   * automáticamente a partir de una imagen raster, guarda el `id` de esa
+   * imagen -- referencia mínima, todavía sin ningún comportamiento de
+   * "mover/rotar/escalar juntos" cableado en el lienzo (no existe una
+   * mecánica genérica de agrupación de objetos todavía, ver discusión de
+   * alcance en el PR de #108). Sirve como base para esa mejora futura sin
+   * fingir una funcionalidad que hoy no está. No se persiste todavía en
+   * `/api/proyectos` (#18) ni en la exportación de G-code -- vive solo en
+   * el estado del lienzo mientras dura la sesión. */
+  objetoOrigenId?: string;
 }
 
 export interface ObjetoSvgLienzo extends ObjetoLienzoBase {
@@ -72,7 +116,20 @@ export interface ObjetoSvgLienzo extends ObjetoLienzoBase {
   toolpath: Partial<Record<Operacion, EstadoToolpath>>;
 }
 
-export interface ObjetoRasterLienzo extends ObjetoLienzoBase {
+/** `extends ... PreprocesamientoRaster`: los campos de canal/gamma/
+ * invertir/posterizado (#109) quedan planos sobre el objeto (no anidados
+ * bajo una clave `preprocesamiento`) para calzar 1 a 1 con el body plano
+ * que esperan `ObjetoExportarBody`/`ObjetoProyectoBody` en `apps/api/
+ * main.py` -- sin esto haría falta una transformación aparte (anidar/
+ * desanidar) en cada punto donde el objeto viaja hacia o desde el
+ * servidor (exportar, guardar proyecto, reabrir proyecto). Se fijan al
+ * confirmar el modal de preprocesamiento de imagen y no se recalculan
+ * durante el resto de la manipulación del objeto (mover, rotar,
+ * redimensionar) -- solo se usan para el preview fijado en el lienzo y
+ * viajan tal cual al exportar, para que la `ConfiguracionRaster` real del
+ * servidor se arme con estos mismos valores en vez de sus defaults. */
+export interface ObjetoRasterLienzo
+  extends ObjetoLienzoBase, PreprocesamientoRaster {
   tipo: "raster";
   /** Sin persistencia en el backend todavía (#15 no existe) — vive solo en
    * el navegador como data URI mientras dure la sesión del lienzo. */

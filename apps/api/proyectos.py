@@ -85,6 +85,23 @@ def listar(sesion: Session) -> list[dict]:
     return [_resumen(p) for p in listar_proyectos(sesion)]
 
 
+# Defaults de `PreprocesamientoRaster` (`raster-preprocesamiento.ts`) /
+# `ConfiguracionRaster` (issue #15) -- un objeto raster guardado ANTES de
+# #109 no tiene estos campos en absoluto; `ObjetoLienzo` en el cliente
+# (`editor-tipos.ts`) espera `preprocesamiento` siempre presente, así que se
+# completan acá al reconstruir el objeto, igual que ya hace `espejadoH`/
+# `espejadoV` (#107) en `ObjetoProyectoBody` del lado de Pydantic.
+_DEFAULTS_PREPROCESAMIENTO_RASTER = {
+    "canal": "luminancia",
+    "pesoRojo": 1 / 3,
+    "pesoVerde": 1 / 3,
+    "pesoAzul": 1 / 3,
+    "gamma": 1.0,
+    "invertir": False,
+    "nivelesPosterizado": None,
+}
+
+
 def _objeto_con_contenido(cliente: Client, objeto: dict) -> dict:
     """Descarga el asset de Storage de un objeto guardado y lo vuelve a
     inyectar como `contenidoSvg`/`dataUri` -- la forma que espera
@@ -97,6 +114,7 @@ def _objeto_con_contenido(cliente: Client, objeto: dict) -> dict:
         key = objeto.pop("imagenStorageKey", None)
         content_type = objeto.pop("imagenContentType", "application/octet-stream")
         objeto["dataUri"] = _data_uri_desde(descargar(cliente, BUCKET_PROYECTOS, key), content_type) if key else ""
+        objeto = {**_DEFAULTS_PREPROCESAMIENTO_RASTER, **objeto}
     return objeto
 
 
