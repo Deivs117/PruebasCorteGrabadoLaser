@@ -19,6 +19,7 @@ from supabase import Client
 
 from laser_toolkit.storage.rutas import (
     PREFIJO_BIBLIOTECA_SVG,
+    ruta_asset_proyecto,
     ruta_foto,
     ruta_gcode,
     ruta_svg,
@@ -28,6 +29,7 @@ from laser_toolkit.storage.rutas import (
 BUCKET_GCODE = "gcode"
 BUCKET_SVG = "svg"
 BUCKET_FOTOS = "fotos"
+BUCKET_PROYECTOS = "proyectos"
 
 
 def _opciones(content_type: str) -> FileOptions:
@@ -88,6 +90,37 @@ def subir_foto(
     key = ruta_foto(material, corrida_id, id_prueba, extension)
     cliente.storage.from_(BUCKET_FOTOS).upload(key, contenido, file_options=_opciones(content_type))
     return key
+
+
+def subir_asset_proyecto(
+    cliente: Client, proyecto_id: int, objeto_id: str, contenido: bytes, content_type: str, extension: str
+) -> str:
+    """Sube el SVG/imagen propio de un objeto del lienzo de un proyecto de
+    diseño (issue #18). Devuelve la key -- va en `svgStorageKey`/
+    `imagenStorageKey` dentro de `ProyectoDiseno.objetos`."""
+    key = ruta_asset_proyecto(proyecto_id, objeto_id, extension)
+    cliente.storage.from_(BUCKET_PROYECTOS).upload(key, contenido, file_options=_opciones(content_type))
+    return key
+
+
+def eliminar_carpeta_proyecto(cliente: Client, proyecto_id: int) -> None:
+    """Borra todos los assets de un proyecto de diseño de una sola vez, al
+    eliminarlo -- mismo criterio que borrar el `.gcode`/fotos de una corrida
+    al eliminar un `Registro`."""
+    archivos = cliente.storage.from_(BUCKET_PROYECTOS).list(str(proyecto_id))
+    if not archivos:
+        return
+    keys = [f"{proyecto_id}/{archivo['name']}" for archivo in archivos]
+    cliente.storage.from_(BUCKET_PROYECTOS).remove(keys)
+
+
+def eliminar_assets_proyecto(cliente: Client, keys: set[str] | list[str]) -> None:
+    """Borra un subconjunto puntual de assets del bucket `proyectos` --
+    usado para limpiar assets huérfanos al guardar cambios sobre un proyecto
+    existente (objetos que se borraron del lienzo)."""
+    if not keys:
+        return
+    cliente.storage.from_(BUCKET_PROYECTOS).remove(list(keys))
 
 
 def descargar(cliente: Client, bucket: str, key: str) -> bytes:

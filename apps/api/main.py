@@ -26,6 +26,7 @@ import escritura
 import final_run
 import generacion
 import lectura
+import proyectos
 import storage_endpoints
 import suites_admin
 import svgs
@@ -500,6 +501,9 @@ class ObjetoExportarBody(BaseModel):
 
 class ExportarGcodeBody(BaseModel):
     objetos: list[ObjetoExportarBody]
+    # Issue #18, opcional: si la exportación viene de un proyecto de diseño
+    # ya guardado, esta key también queda en su historial de exportaciones.
+    proyectoId: int | None = None
 
 
 @app.post("/editor/exportar")
@@ -507,9 +511,99 @@ def exportar_gcode_editor(body: ExportarGcodeBody) -> dict:
     with sesion() as s:
         try:
             objetos = [o.model_dump() for o in body.objetos]
-            return editor.exportar_gcode_combinado(s, cliente_storage, objetos)
+            return editor.exportar_gcode_combinado(s, cliente_storage, objetos, proyecto_id=body.proyectoId)
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+# ============================================================
+# Proyectos de diseño reutilizables del Editor (issue #18)
+# ============================================================
+
+
+class ObjetoProyectoBody(BaseModel):
+    """Espejo de `ObjetoLienzo` (`apps/web/src/lib/editor-tipos.ts`) -- a
+    diferencia de `ObjetoExportarBody`, acá viajan también `id`/`nombre`/
+    `mantenerProporcion` (hacen falta para reconstruir el estado exacto del
+    lienzo al reabrir el proyecto, no solo para generar G-code)."""
+
+    id: str
+    nombre: str
+    tipo: Literal["svg", "raster"]
+    xMm: float
+    yMm: float
+    anchoMm: float
+    altoMm: float
+    rotacionDeg: float = 0.0
+    operaciones: list[Literal["corte", "grabado"]]
+    parametros: dict[str, ParametrosOperacionBody]
+    mantenerProporcion: bool = True
+    # #107 (posterior a este endpoint, #18): espejado horizontal/vertical --
+    # sin declararlos acá, Pydantic los descarta en silencio al validar el
+    # body y un objeto espejado se guardaría "derecho".
+    espejadoH: bool = False
+    espejadoV: bool = False
+    # Solo para tipo="svg":
+    nombreArchivoSvg: str | None = None
+    contenidoSvg: str | None = None
+    resolucionRellenoMm: float | None = None
+    # Solo para tipo="raster":
+    dataUri: str | None = None
+
+
+class GuardarProyectoBody(BaseModel):
+    nombre: str
+    objetos: list[ObjetoProyectoBody]
+    materialNombre: str | None = None
+    materialFamilia: str | None = None
+    fichaParametroId: int | None = None
+
+
+@app.get("/proyectos")
+def listar_proyectos_diseno() -> list[dict]:
+    with sesion() as s:
+        return proyectos.listar(s)
+
+
+@app.get("/proyectos/{proyecto_id}")
+def obtener_proyecto_diseno(proyecto_id: int) -> dict:
+    with sesion() as s:
+        try:
+            return proyectos.detalle(s, cliente_storage, proyecto_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.post("/proyectos")
+def crear_proyecto_diseno(body: GuardarProyectoBody) -> dict:
+    with sesion() as s:
+        try:
+            payload = body.model_dump()
+            payload["objetos"] = [o.model_dump() for o in body.objetos]
+            return proyectos.crear(s, cliente_storage, payload)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.put("/proyectos/{proyecto_id}")
+def actualizar_proyecto_diseno(proyecto_id: int, body: GuardarProyectoBody) -> dict:
+    with sesion() as s:
+        try:
+            payload = body.model_dump()
+            payload["objetos"] = [o.model_dump() for o in body.objetos]
+            return proyectos.actualizar(s, cliente_storage, proyecto_id, payload)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.delete("/proyectos/{proyecto_id}")
+def eliminar_proyecto_diseno(proyecto_id: int) -> dict:
+    with sesion() as s:
+        try:
+            proyectos.eliminar(s, cliente_storage, proyecto_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        return {"ok": True}
 
 
 @app.get("/svgs")
