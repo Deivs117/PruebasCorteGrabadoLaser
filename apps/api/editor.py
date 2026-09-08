@@ -1,10 +1,11 @@
 """Exportación de G-code combinado del Editor de Diseño (#3, cierre de
 #15/#16): el lienzo (#16) posiciona varios objetos (SVG y/o raster) sobre el
 área de trabajo real de la máquina; esta función los convierte, en el orden
-en que llegan, a un único G-code -- sin persistencia todavía (#18 no existe,
-la exportación es efímera). Nunca se devuelve inline (límite ~4.5MB de
+en que llegan, a un único G-code. Nunca se devuelve inline (límite ~4.5MB de
 Vercel, decisión de #2/#3): se sube a Storage y se devuelve un link de
-descarga firmado, mismo patrón que `generacion.generar`.
+descarga firmado, mismo patrón que `generacion.generar`. Si la exportación
+viene de un proyecto de diseño guardado (issue #18), la key también se
+registra en su historial de exportaciones.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import base64
 import math
 import uuid
 
+import proyectos
 from laser_toolkit.config import MachineConfig
 from laser_toolkit.db.repo_negocio import construir_machine_config
 from laser_toolkit.gcode.writer import encabezado, pie
@@ -96,11 +98,18 @@ def _gcode_de_objeto(objeto: dict, machine: MachineConfig) -> list[str]:
     )
 
 
-def exportar_gcode_combinado(sesion: Session, cliente_storage: Client, objetos: list[dict]) -> dict:
+def exportar_gcode_combinado(
+    sesion: Session, cliente_storage: Client, objetos: list[dict], proyecto_id: int | None = None
+) -> dict:
     """Espejo de `exportarGcodeCombinado` en `editor-data.ts`. Usa la
     configuración de máquina real (#11) en vez de los defaults de
     `MachineConfig`, para que el S máximo/velocidad límite de la exportación
-    coincida con la máquina física de este taller."""
+    coincida con la máquina física de este taller.
+
+    `proyecto_id` (issue #18, opcional): cuando la exportación se pide desde
+    un proyecto de diseño ya guardado, esta key también queda en su
+    historial de exportaciones -- ver `proyectos.registrar_exportacion_de_proyecto`.
+    """
     if not objetos:
         raise ValueError("El lienzo no tiene ningún objeto para exportar.")
 
@@ -114,6 +123,10 @@ def exportar_gcode_combinado(sesion: Session, cliente_storage: Client, objetos: 
     corrida_id = f"editor-{uuid.uuid4().hex[:12]}"
     key = subir_gcode(cliente_storage, "editor", corrida_id, contenido)
     url = url_firmada(cliente_storage, BUCKET_GCODE, key)
+
+    if proyecto_id is not None:
+        proyectos.registrar_exportacion_de_proyecto(sesion, proyecto_id, key)
+
     return {"ok": True, "gcodeStorageKey": key, "url": url}
 
 

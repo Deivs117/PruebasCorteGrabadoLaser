@@ -17,11 +17,12 @@ export interface ResultadoExportarGcode {
  */
 export async function exportarGcodeCombinado(
   objetos: ObjetoExportar[],
+  proyectoId?: number | null,
 ): Promise<ResultadoExportarGcode> {
   try {
     const resultado = await pyPost<{ gcodeStorageKey: string; url: string }>(
       "editor/exportar",
-      { objetos },
+      { objetos, proyectoId: proyectoId ?? null },
     );
     return { ok: true, url: resultado.url };
   } catch (error) {
