@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from laser_toolkit.raster.api import (
     calcular_contorno_imagen,
+    calcular_contorno_imagen_con_margen,
     convertir_imagen_a_gcode_grabado,
     generar_gcode_corte_y_grabado,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "CanalRaster",
     "ConfiguracionRaster",
     "calcular_contorno_imagen",
+    "calcular_contorno_imagen_con_margen",
     "convertir_imagen_a_gcode_grabado",
     "generar_gcode_corte_y_grabado",
 ]
