@@ -8,6 +8,7 @@ import { Layer, Rect, Stage, Transformer } from "react-konva";
 import { clsx } from "clsx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Field, INPUT_CLASSES } from "@/components/ui/field";
 import { iconButtonClasses } from "@/lib/button-styles";
 import { TrashCanAnimado } from "@/components/ui/icons/trash-can-animado";
@@ -100,6 +101,12 @@ function aObjetoProyecto(objeto: ObjetoLienzo): ObjetoProyecto {
     // esto, reabrir un proyecto guardado en Producción pierde el "candado"
     // aunque los números de velocidad/potencia se mantengan bien.
     materialProduccion: objeto.materialProduccion,
+    // #150 (posterior a #18 y a #108): vínculo con el objeto de origen, si
+    // lo hay -- ver la nota de diseño en `editor-tipos.ts`. Antes de #150
+    // no se persistía porque el campo no tenía ningún comportamiento real
+    // todavía; ahora sí, así que perderlo al reabrir un proyecto
+    // desincronizaría el contorno de su imagen en silencio.
+    objetoOrigenId: objeto.objetoOrigenId,
   };
   return objeto.tipo === "svg"
     ? {
@@ -350,8 +357,7 @@ export function EditorLienzo({
           return;
       }
       evento.preventDefault();
-      actualizarObjeto(seleccionadoId, (o) => ({
-        ...o,
+      moverOTransformarObjeto(seleccionadoId, (o) => ({
         xMm: o.xMm + deltaXMm,
         yMm: o.yMm + deltaYMm,
       }));
@@ -388,17 +394,75 @@ export function EditorLienzo({
     );
   }
 
-  function actualizarCampos(
+  /** Actualiza cambios (posición/rotación/tamaño u otro campo común a
+   * ambas variantes de `ObjetoLienzo`) y además propaga el mismo delta de
+   * posición/rotación/escala al objeto vinculado (#150, `objetoOrigenId` de
+   * #108) si lo hay -- se usa en cualquier punto que mueva/rote/escale un
+   * objeto (drag, handles del `Transformer`,
+   * nudge por teclado, panel numérico), para que el contorno de corte
+   * generado automáticamente siga a su imagen de origen en vez de quedar
+   * atrás cuando se ajusta la imagen después de generarlo.
+   *
+   * Recibe una función (no un objeto de cambios ya resuelto) porque el
+   * nudge por teclado necesita partir del valor actual (`o.xMm + delta`),
+   * mismo motivo que `actualizarObjeto`. Como el contorno nace centrado
+   * exactamente en el mismo punto que la imagen (`generarContornoCorte`),
+   * aplicarle el mismo delta absoluto (traslación, rotación, factor de
+   * escala) alcanza para mantenerlo coincidente -- no hace falta pivotear
+   * alrededor de un centro distinto. Los campos no geométricos de `cambios`
+   * (`operaciones`, `parametros`, etc.) nunca se propagan: cada objeto
+   * vinculado sigue teniendo sus propias operaciones/material, el vínculo
+   * es solo geométrico. Solo se propaga hacia adelante (origen → vinculado)
+   * -- mover el contorno solo, a mano, no desincroniza la imagen. */
+  function moverOTransformarObjeto(
     id: string,
-    cambios: Omit<Partial<ObjetoLienzo>, "tipo">,
+    calcularCambios: (
+      objeto: ObjetoLienzo,
+    ) => Omit<Partial<ObjetoLienzo>, "tipo">,
   ) {
-    actualizarObjeto(id, (o) => ({ ...o, ...cambios }));
+    setObjetos((anteriores) => {
+      const original = anteriores.find((o) => o.id === id);
+      if (!original) return anteriores;
+      const cambios = calcularCambios(original);
+      const actualizado = { ...original, ...cambios } as ObjetoLienzo;
+
+      const deltaXMm = actualizado.xMm - original.xMm;
+      const deltaYMm = actualizado.yMm - original.yMm;
+      const deltaRotacionDeg = actualizado.rotacionDeg - original.rotacionDeg;
+      const escalaAncho =
+        original.anchoMm !== 0 ? actualizado.anchoMm / original.anchoMm : 1;
+      const escalaAlto =
+        original.altoMm !== 0 ? actualizado.altoMm / original.altoMm : 1;
+
+      if (
+        deltaXMm === 0 &&
+        deltaYMm === 0 &&
+        deltaRotacionDeg === 0 &&
+        escalaAncho === 1 &&
+        escalaAlto === 1
+      ) {
+        return anteriores.map((o) => (o.id === id ? actualizado : o));
+      }
+
+      return anteriores.map((o) => {
+        if (o.id === id) return actualizado;
+        if (o.objetoOrigenId !== id) return o;
+        return {
+          ...o,
+          xMm: o.xMm + deltaXMm,
+          yMm: o.yMm + deltaYMm,
+          rotacionDeg: (((o.rotacionDeg + deltaRotacionDeg) % 360) + 360) % 360,
+          anchoMm: o.anchoMm * escalaAncho,
+          altoMm: o.altoMm * escalaAlto,
+        };
+      });
+    });
   }
 
   /** #109 -- `preprocesamiento` es exclusivo de los objetos raster, así que
    * (mismo motivo que `toolpath`, ver el comentario de `actualizarObjeto`)
    * necesita narrowear al tipo concreto en vez de pasar por
-   * `actualizarCampos`/`Partial<ObjetoLienzo>` genérico. */
+   * `moverOTransformarObjeto`/`Partial<ObjetoLienzo>` genérico. */
   function cambiarPreprocesamiento(
     id: string,
     preprocesamiento: PreprocesamientoRaster,
@@ -408,9 +472,46 @@ export function EditorLienzo({
     );
   }
 
+  /** Eliminar un objeto que tiene un contorno vinculado (#150,
+   * `objetoOrigenId`) es el caso de riesgo real que motivó este ticket:
+   * si el contorno queda huérfano, el operario puede no notar que ya no
+   * corresponde a ninguna imagen y exportar igual -- el G-code corta un
+   * contorno que ya no representa nada. En vez de dejarlo huérfano en
+   * silencio (ni advertir y confiar en que se lea la advertencia), se pide
+   * confirmación explícita para borrar ambos juntos; cancelar aborta la
+   * eliminación completa en vez de ofrecer un tercer camino ("borrar solo
+   * la imagen, dejar el contorno suelto") -- si de verdad se quiere eso,
+   * conviene primero borrar el vínculo generando un contorno nuevo o
+   * borrando el contorno aparte, no como efecto secundario de un diálogo
+   * binario. */
+  const [pendienteEliminar, setPendienteEliminar] = useState<{
+    id: string;
+    vinculados: ObjetoLienzo[];
+  } | null>(null);
+
+  function eliminarObjetoInmediato(ids: Set<string>) {
+    setObjetos((anteriores) => anteriores.filter((o) => !ids.has(o.id)));
+    setSeleccionadoId((actual) => (actual && ids.has(actual) ? null : actual));
+  }
+
   function eliminarObjeto(id: string) {
-    setObjetos((anteriores) => anteriores.filter((o) => o.id !== id));
-    setSeleccionadoId((actual) => (actual === id ? null : actual));
+    const vinculados = objetos.filter((o) => o.objetoOrigenId === id);
+    if (vinculados.length > 0) {
+      setPendienteEliminar({ id, vinculados });
+      return;
+    }
+    eliminarObjetoInmediato(new Set([id]));
+  }
+
+  function confirmarEliminarConVinculados() {
+    if (!pendienteEliminar) return;
+    eliminarObjetoInmediato(
+      new Set([
+        pendienteEliminar.id,
+        ...pendienteEliminar.vinculados.map((v) => v.id),
+      ]),
+    );
+    setPendienteEliminar(null);
   }
 
   /** Clona el objeto seleccionado con un id nuevo, corrido unos mm para que
@@ -857,10 +958,13 @@ export function EditorLienzo({
                         color={colorSeleccionDe(objeto)}
                         onSeleccionar={() => setSeleccionadoId(objeto.id)}
                         onMover={(xMm, yMm) =>
-                          actualizarCampos(objeto.id, { xMm, yMm })
+                          moverOTransformarObjeto(objeto.id, () => ({
+                            xMm,
+                            yMm,
+                          }))
                         }
                         onTransformar={(cambios) =>
-                          actualizarCampos(objeto.id, cambios)
+                          moverOTransformarObjeto(objeto.id, () => cambios)
                         }
                         registrarNodo={(nodo) => {
                           if (nodo) nodosRef.current.set(objeto.id, nodo);
@@ -1109,7 +1213,7 @@ export function EditorLienzo({
                 areaTrabajoAltoMm,
               )}
               onCambiar={(cambios) =>
-                actualizarCampos(seleccionado.id, cambios)
+                moverOTransformarObjeto(seleccionado.id, () => cambios)
               }
               onEliminar={() => eliminarObjeto(seleccionado.id)}
               onGenerarToolpath={(operacion) =>
@@ -1137,6 +1241,19 @@ export function EditorLienzo({
           )}
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={pendienteEliminar !== null}
+        title="Eliminar también el contorno vinculado"
+        description={
+          pendienteEliminar
+            ? `"${objetos.find((o) => o.id === pendienteEliminar.id)?.nombre ?? ""}" tiene ${pendienteEliminar.vinculados.length === 1 ? "un contorno de corte generado a partir de esta imagen" : `${pendienteEliminar.vinculados.length} contornos de corte generados a partir de esta imagen`}. Si lo eliminás sin borrar también el contorno, va a quedar suelto en el lienzo sin corresponder a ninguna imagen -- riesgo real de exportar un G-code que corta en el lugar equivocado.`
+            : ""
+        }
+        confirmLabel="Eliminar ambos"
+        onConfirm={confirmarEliminarConVinculados}
+        onCancel={() => setPendienteEliminar(null)}
+      />
     </div>
   );
 }

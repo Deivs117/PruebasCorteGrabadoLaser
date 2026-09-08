@@ -61,6 +61,11 @@ const camposComunes = {
   // -- default `null` para que un proyecto guardado ANTES de #17 se siga
   // leyendo bien (nunca existió el campo, nunca hubo modo Producción).
   materialProduccion: materialProduccionSchema.default(null),
+  // #150, posterior a #108: `id` del objeto raster de origen cuando este
+  // objeto es un contorno de corte generado automáticamente -- opcional
+  // (ausente en objetos subidos a mano, y en cualquier objeto de un
+  // proyecto guardado antes de #150).
+  objetoOrigenId: z.string().min(1).optional(),
 };
 
 const objetoProyectoSvgSchema = z.object({

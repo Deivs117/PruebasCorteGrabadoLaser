@@ -94,13 +94,22 @@ interface ObjetoLienzoBase {
   materialProduccion: { material: string; espesorMm: number | null } | null;
   /** Issue #108: cuando este objeto es el contorno de corte generado
    * automáticamente a partir de una imagen raster, guarda el `id` de esa
-   * imagen -- referencia mínima, todavía sin ningún comportamiento de
-   * "mover/rotar/escalar juntos" cableado en el lienzo (no existe una
-   * mecánica genérica de agrupación de objetos todavía, ver discusión de
-   * alcance en el PR de #108). Sirve como base para esa mejora futura sin
-   * fingir una funcionalidad que hoy no está. No se persiste todavía en
-   * `/api/proyectos` (#18) ni en la exportación de G-code -- vive solo en
-   * el estado del lienzo mientras dura la sesión. */
+   * imagen. Desde #150 SÍ tiene comportamiento real cableado en
+   * `editor-lienzo.tsx` (`moverOTransformarObjeto`): mover, rotar o escalar
+   * el objeto de origen propaga el mismo delta al vinculado, y eliminar el
+   * origen ofrece eliminar también el vinculado (`eliminarObjeto`). Sigue
+   * sin ser una mecánica genérica de agrupación -- solo esta relación
+   * puntual imagen→contorno que genera `generarContornoCorte`, nunca
+   * grupos arbitrarios definidos a mano (#149 es selección múltiple, un
+   * caso distinto). SÍ se persiste en `/api/proyectos` (#18, `aObjetoProyecto`
+   * en `editor-lienzo.tsx`, `ObjetoProyectoBody` en `apps/api/main.py`) --
+   * antes de #150 no tenía sentido persistir una referencia sin
+   * comportamiento; ahora que el vínculo hace algo real, perderlo al
+   * reabrir un proyecto sería una regresión silenciosa (el contorno
+   * quedaría "suelto" apenas se toca la imagen). Sigue sin viajar a la
+   * exportación de G-code (`aObjetoExportar`) -- el backend exporta cada
+   * objeto por su geometría final ya resuelta, no necesita saber de dónde
+   * salió. */
   objetoOrigenId?: string;
 }
 
