@@ -6,11 +6,12 @@ import type Konva from "konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import { Layer, Rect, Stage, Transformer } from "react-konva";
 import { clsx } from "clsx";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button, LinkButton } from "@/components/ui/button";
+import { AyudaLink } from "@/components/ui/ayuda-link";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Field, INPUT_CLASSES } from "@/components/ui/field";
+import { INPUT_CLASSES } from "@/components/ui/field";
 import { iconButtonClasses } from "@/lib/button-styles";
+import { ArrowLeftAnimado } from "@/components/ui/icons/arrow-left-animado";
 import { TrashCanAnimado } from "@/components/ui/icons/trash-can-animado";
 import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
 import { ObjetoLienzoKonva } from "@/components/editor/objeto-lienzo-konva";
@@ -19,6 +20,10 @@ import { LienzoReglas } from "@/components/editor/lienzo-reglas";
 import { BarraAccionesObjeto } from "@/components/editor/barra-acciones-objeto";
 import { PanelObjeto } from "@/components/editor/panel-objeto";
 import { SubirObjetoDropzone } from "@/components/editor/subir-objeto-dropzone";
+import {
+  EditorSidebarRiel,
+  type PanelSidebarId,
+} from "@/components/editor/editor-sidebar-riel";
 import {
   cajasSeIntersectan,
   limitesEnPx,
@@ -261,6 +266,23 @@ export function EditorLienzo({
   }, [modoProduccion]);
   const contenedorRef = useRef<HTMLDivElement>(null);
   const [anchoContenedorPx, setAnchoContenedorPx] = useState(600);
+  // Issue #178: antes de este layout inmersivo, el contenedor del lienzo
+  // nunca tenía una altura propia (crecía en flujo normal de página según
+  // el ancho, ver `pxPorMm` más abajo) -- ahora que ocupa `flex-1` de un
+  // viewport bloqueado, si el `pxPorMm` siguiera derivándose solo del ancho
+  // el canvas podría quedar más alto que el espacio real disponible y
+  // recortarse. Se observa también la altura para que `pxPorMm` sea el
+  // mínimo entre "entra por ancho" y "entra por alto" (como `object-fit:
+  // contain`) -- nunca se agregó una envoltura de centrado aparte porque
+  // eso desalinearía `contenedorRef.getBoundingClientRect()` de la
+  // traducción px↔mm que ya usan `posicionEnPxDeContenido`/el marquee/los
+  // handles del `Transformer` (ver más abajo): el `Stage` sigue ocupando el
+  // contenedor entero (ancho Y alto), el sobrante queda como lienzo en
+  // blanco -- mismo patrón que ya existía para el ancho.
+  const [altoContenedorPx, setAltoContenedorPx] = useState(400);
+  // Issue #178: qué panel del riel de íconos (Subir/Capas) está desplegado
+  // -- overlay sobre el lienzo, nunca empuja (ver `EditorSidebarRiel`).
+  const [panelSidebar, setPanelSidebar] = useState<PanelSidebarId | null>(null);
   const [exportando, setExportando] = useState(false);
   const [errorExportar, setErrorExportar] = useState<string | null>(null);
 
@@ -321,22 +343,31 @@ export function EditorLienzo({
     const el = contenedorRef.current;
     if (!el) return;
     const observador = new ResizeObserver((entradas) => {
-      const ancho = entradas[0]?.contentRect.width;
-      if (ancho) setAnchoContenedorPx(ancho);
+      const rect = entradas[0]?.contentRect;
+      if (!rect) return;
+      setAnchoContenedorPx(rect.width);
+      setAltoContenedorPx(rect.height);
     });
     observador.observe(el);
     return () => observador.disconnect();
   }, []);
 
-  // El ancho disponible para el área de trabajo descuenta la banda fija de
-  // la regla izquierda (#107) -- el `Stage` completo (regla + contenido)
-  // sigue ocupando el ancho real del contenedor.
+  // El ancho/alto disponibles para el área de trabajo descuentan la banda
+  // fija de la regla (#107) -- el `Stage` completo (regla + contenido)
+  // sigue ocupando el contenedor entero. `pxPorMm` es el mínimo entre "entra
+  // por ancho" y "entra por alto" (issue #178, ver el comentario de
+  // `altoContenedorPx` más arriba) -- antes de este layout inmersivo el
+  // contenedor no tenía altura propia, así que solo hacía falta el ancho.
   const anchoDisponiblePx = Math.max(anchoContenedorPx - MARGEN_REGLA_PX, 50);
-  const pxPorMm = anchoDisponiblePx / areaTrabajoAnchoMm;
+  const altoDisponiblePx = Math.max(altoContenedorPx - MARGEN_REGLA_PX, 50);
+  const pxPorMm = Math.min(
+    anchoDisponiblePx / areaTrabajoAnchoMm,
+    altoDisponiblePx / areaTrabajoAltoMm,
+  );
   const anchoContenidoPx = areaTrabajoAnchoMm * pxPorMm;
   const altoContenidoPx = areaTrabajoAltoMm * pxPorMm;
   const anchoStagePx = anchoContenedorPx;
-  const altoStagePx = altoContenidoPx + MARGEN_REGLA_PX;
+  const altoStagePx = altoContenedorPx;
 
   const vista: VistaLienzo = useMemo(
     () => ({ pxPorMm, zoom, panX, panY, areaTrabajoAltoMm }),
@@ -1103,78 +1134,215 @@ export function EditorLienzo({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card className="flex flex-wrap items-center gap-3 p-3">
-        <span className="text-navy text-sm font-semibold">
-          Modo del editor:
-        </span>
-        <div
-          role="group"
-          aria-label="Modo Producción o Prueba"
-          className="border-border flex gap-1 rounded-full border p-0.5"
-        >
-          <button
-            type="button"
-            aria-pressed={!modoProduccion}
-            onClick={() => setModoProduccion(false)}
-            className={clsx(
-              "rounded-full px-3 py-1 text-sm font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
-              !modoProduccion
-                ? "bg-blue-soft text-blue"
-                : "text-text-muted hover:bg-navy-soft",
-            )}
-          >
-            Prueba
-          </button>
-          <button
-            type="button"
-            aria-pressed={modoProduccion}
-            onClick={() => setModoProduccion(true)}
-            className={clsx(
-              "rounded-full px-3 py-1 text-sm font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
-              modoProduccion
-                ? "bg-teal-soft text-teal"
-                : "text-text-muted hover:bg-navy-soft",
-            )}
-          >
-            Producción
-          </button>
+    <div className="bg-surface flex h-screen w-screen flex-col overflow-hidden">
+      <header className="border-border bg-surface z-30 flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2">
+        <div className="flex items-center gap-2">
+          <LinkButton href="/" variant="outline" size="sm">
+            <ArrowLeftAnimado className="size-4" strokeWidth={1.75} />
+            Salir
+          </LinkButton>
+          <LinkButton href="/editor/proyectos" variant="outline" size="sm">
+            Mis proyectos
+          </LinkButton>
+          <AyudaLink seccion="editor" />
         </div>
-        <p className="text-text-muted flex-1 text-xs">
-          {modoProduccion
-            ? "Velocidad y potencia quedan bloqueadas a la Ficha de Parámetro aprobada de cada objeto — no se pueden tocar sin querer."
-            : "Velocidad y potencia son libres, para explorar parámetros de materiales sin Ficha todavía."}
-        </p>
-      </Card>
 
-      <SubirObjetoDropzone
-        onAgregar={agregarObjeto}
-        siguientePosicion={siguientePosicion}
-      />
+        <div className="border-border h-6 border-l" />
 
-      {objetosFueraDeArea.length > 0 ? (
-        <div
-          role="alert"
-          className="border-orange/30 bg-orange-soft flex items-start gap-2 rounded-[var(--radius-sm)] border p-3"
+        <div className="flex min-w-0 items-center gap-2">
+          {editandoNombre ? (
+            <input
+              type="text"
+              value={nombreProyecto}
+              onChange={(e) => setNombreProyecto(e.target.value)}
+              placeholder="Ej. Logo del taller"
+              className={`${INPUT_CLASSES} h-8 w-44 text-sm`}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditandoNombre(true)}
+              title="Renombrar"
+              className="text-navy max-w-44 truncate text-sm font-medium hover:underline"
+            >
+              {nombreProyecto || "Sin nombre"}
+            </button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={guardarProyecto}
+            disabled={guardando || noSeGuardaPor !== null}
+            loading={guardando}
+            title={noSeGuardaPor ?? undefined}
+          >
+            {guardando
+              ? "Guardando…"
+              : proyectoId
+                ? "Guardar cambios"
+                : "Guardar proyecto"}
+          </Button>
+          {errorGuardar ? (
+            <span className="text-danger text-xs font-medium">
+              {errorGuardar}
+            </span>
+          ) : guardadoOk ? (
+            <span className="text-teal text-xs font-medium">Guardado.</span>
+          ) : null}
+        </div>
+
+        <div className="border-border h-6 border-l" />
+
+        {/* Modo Producción/Prueba (#17): switch compacto de dos estados --
+         * misma lógica/nombre de siempre (bloquea velocidad/potencia a la
+         * Ficha aprobada), solo cambia de posición y de forma visual (#178:
+         * un control que se toca una vez por sesión no debía competir por
+         * el centro del header con "Exportar", la única acción primaria). */}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={modoProduccion}
+          aria-label="Modo Producción o Prueba"
+          onClick={() => setModoProduccion(!modoProduccion)}
+          title={
+            modoProduccion
+              ? "Producción: velocidad y potencia quedan bloqueadas a la Ficha de Parámetro aprobada de cada objeto."
+              : "Prueba: velocidad y potencia son libres, para explorar parámetros sin Ficha todavía."
+          }
+          className="flex items-center gap-2"
         >
-          <TriangleAlertAnimado className="text-orange mt-0.5 size-4 shrink-0" />
-          <p className="text-navy text-sm">
-            {objetosFueraDeArea.length === 1
-              ? "Un objeto no cabe"
-              : `${objetosFueraDeArea.length} objetos no caben`}{" "}
-            en el área de trabajo real de la máquina ({areaTrabajoAnchoMm}×
-            {areaTrabajoAltoMm}mm) — movelo o achicalo antes de exportar.
-          </p>
+          <span
+            className={clsx(
+              "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+              modoProduccion ? "bg-teal" : "bg-border",
+            )}
+          >
+            <span
+              className={clsx(
+                "inline-block size-4 translate-x-0.5 rounded-full bg-white transition-transform duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+                modoProduccion && "translate-x-4",
+              )}
+            />
+          </span>
+          <span
+            className={clsx(
+              "text-xs font-medium",
+              modoProduccion ? "text-teal" : "text-navy",
+            )}
+          >
+            {modoProduccion ? "Producción" : "Prueba"}
+          </span>
+        </button>
+
+        <div className="flex-1" />
+
+        <Button
+          variant="primary"
+          onClick={exportarGcode}
+          disabled={exportando || noSeExportaPor !== null}
+          loading={exportando}
+          title={noSeExportaPor ?? undefined}
+        >
+          {exportando ? "Exportando…" : "Exportar G-code combinado"}
+        </Button>
+      </header>
+
+      {objetosFueraDeArea.length > 0 || errorExportar ? (
+        <div className="flex flex-col gap-1.5 px-4 py-2">
+          {objetosFueraDeArea.length > 0 ? (
+            <div
+              role="alert"
+              className="border-orange/30 bg-orange-soft flex items-start gap-2 rounded-[var(--radius-sm)] border p-3"
+            >
+              <TriangleAlertAnimado className="text-orange mt-0.5 size-4 shrink-0" />
+              <p className="text-navy text-sm">
+                {objetosFueraDeArea.length === 1
+                  ? "Un objeto no cabe"
+                  : `${objetosFueraDeArea.length} objetos no caben`}{" "}
+                en el área de trabajo real de la máquina ({areaTrabajoAnchoMm}×
+                {areaTrabajoAltoMm}mm) — movelo o achicalo antes de exportar.
+              </p>
+            </div>
+          ) : null}
+          {errorExportar ? (
+            <p role="alert" className="text-danger text-sm font-medium">
+              {errorExportar}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="flex flex-col gap-3">
+      <div className="flex min-h-0 flex-1">
+        <EditorSidebarRiel
+          panelAbierto={panelSidebar}
+          onCambiarPanel={setPanelSidebar}
+          contenidoSubir={
+            <SubirObjetoDropzone
+              onAgregar={agregarObjeto}
+              siguientePosicion={siguientePosicion}
+            />
+          }
+          contenidoCapas={
+            // Lista simple (nombre + seleccionar + eliminar), reubicada acá
+            // tal cual existía debajo del lienzo -- el panel de capas real
+            // (miniatura, reordenar, mostrar/ocultar) es el issue de
+            // seguimiento de #178; dejar esto vacío mientras tanto sería una
+            // regresión real (hoy es la única forma de ver/elegir/borrar un
+            // objeto por nombre sin tocarlo en el lienzo).
+            objetos.length > 0 ? (
+              <ul
+                className="flex flex-col gap-1.5"
+                aria-label="Objetos del lienzo"
+              >
+                {objetos.map((objeto) => (
+                  <li
+                    key={objeto.id}
+                    className={clsx(
+                      "flex items-center justify-between gap-1 rounded-full border py-1 pl-2.5 text-xs font-medium",
+                      seleccionadosIds.includes(objeto.id)
+                        ? "border-blue bg-blue-soft text-navy"
+                        : "border-border text-text-muted",
+                      objetoExcedeArea(
+                        objeto,
+                        areaTrabajoAnchoMm,
+                        areaTrabajoAltoMm,
+                      ) && "border-danger/40",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => seleccionarObjeto(objeto.id, e.shiftKey)}
+                      aria-pressed={seleccionadosIds.includes(objeto.id)}
+                      className="truncate py-1 hover:underline"
+                      title="Click para seleccionar, Shift+click para sumar/sacar de la selección"
+                    >
+                      {objeto.nombre}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Eliminar ${objeto.nombre}`}
+                      onClick={() => eliminarObjetos([objeto.id])}
+                      className={iconButtonClasses("danger", "size-6 shrink-0")}
+                    >
+                      <TrashCanAnimado className="size-3" strokeWidth={2} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-text-muted text-sm">
+                Todavía no hay ningún objeto en el lienzo.
+              </p>
+            )
+          }
+        />
+
+        <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           <div
             ref={contenedorRef}
             role="img"
             aria-label={`Lienzo de diseño, ${objetos.length} objeto(s) sobre un área de trabajo de ${areaTrabajoAnchoMm} por ${areaTrabajoAltoMm} milímetros`}
-            className="bg-surface border-border relative overflow-hidden rounded-[var(--radius-md)] border"
+            className="bg-surface relative min-h-0 flex-1 overflow-hidden"
           >
             {montado ? (
               <>
@@ -1311,18 +1479,13 @@ export function EditorLienzo({
                   : null}
               </>
             ) : (
-              <div
-                style={{
-                  aspectRatio: `${areaTrabajoAnchoMm} / ${areaTrabajoAltoMm}`,
-                }}
-                className="bg-navy-soft flex items-center justify-center text-sm"
-              >
+              <div className="bg-navy-soft flex h-full items-center justify-center text-sm">
                 Cargando lienzo…
               </div>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="border-border bg-surface flex flex-wrap items-center justify-between gap-3 border-t px-3 py-2">
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -1369,235 +1532,109 @@ export function EditorLienzo({
               <span className="text-navy">Ver toolpath generado</span>
             </label>
           </div>
-
-          {objetos.length > 0 ? (
-            <ul
-              className="flex flex-wrap gap-1.5"
-              aria-label="Objetos del lienzo"
-            >
-              {objetos.map((objeto) => (
-                <li
-                  key={objeto.id}
-                  className={clsx(
-                    "flex items-center gap-1 rounded-full border pl-2.5 text-xs font-medium",
-                    seleccionadosIds.includes(objeto.id)
-                      ? "border-blue bg-blue-soft text-navy"
-                      : "border-border text-text-muted",
-                    objetoExcedeArea(
-                      objeto,
-                      areaTrabajoAnchoMm,
-                      areaTrabajoAltoMm,
-                    ) && "border-danger/40",
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={(e) => seleccionarObjeto(objeto.id, e.shiftKey)}
-                    aria-pressed={seleccionadosIds.includes(objeto.id)}
-                    className="py-1 hover:underline"
-                    title="Click para seleccionar, Shift+click para sumar/sacar de la selección"
-                  >
-                    {objeto.nombre}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Eliminar ${objeto.nombre}`}
-                    onClick={() => eliminarObjetos([objeto.id])}
-                    className={iconButtonClasses("danger", "size-6")}
-                  >
-                    <TrashCanAnimado className="size-3" strokeWidth={2} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          <Card className="flex flex-col gap-1.5 p-4">
-            <Button
-              variant="primary"
-              onClick={exportarGcode}
-              disabled={exportando || noSeExportaPor !== null}
-              loading={exportando}
-              title={noSeExportaPor ?? undefined}
-            >
-              {exportando ? "Exportando…" : "Exportar G-code combinado"}
-            </Button>
-            {noSeExportaPor ? (
-              <p className="text-text-muted text-xs">{noSeExportaPor}</p>
-            ) : (
-              <p className="text-text-muted text-xs">
-                Genera un solo G-code con todos los objetos del lienzo, en su
-                posición y rotación actuales, y abre el link de descarga.
-              </p>
-            )}
-            {errorExportar ? (
-              <p role="alert" className="text-danger text-xs font-medium">
-                {errorExportar}
-              </p>
-            ) : null}
-          </Card>
-
-          <Card className="flex flex-col gap-2 p-4">
-            {editandoNombre ? (
-              <Field label="Nombre del proyecto">
-                {(id, describedBy) => (
-                  <input
-                    id={id}
-                    type="text"
-                    value={nombreProyecto}
-                    onChange={(e) => setNombreProyecto(e.target.value)}
-                    aria-describedby={describedBy}
-                    placeholder="Ej. Logo del taller"
-                    className={INPUT_CLASSES}
-                  />
-                )}
-              </Field>
-            ) : (
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-navy text-sm font-medium">
-                  {nombreProyecto}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setEditandoNombre(true)}
-                  className="text-blue text-xs font-medium hover:underline"
-                >
-                  Renombrar
-                </button>
-              </div>
-            )}
-            <Button
-              variant="outline"
-              onClick={guardarProyecto}
-              disabled={guardando || noSeGuardaPor !== null}
-              loading={guardando}
-              title={noSeGuardaPor ?? undefined}
-            >
-              {guardando
-                ? "Guardando…"
-                : proyectoId
-                  ? "Guardar cambios"
-                  : "Guardar como proyecto"}
-            </Button>
-            {noSeGuardaPor ? (
-              <p className="text-text-muted text-xs">{noSeGuardaPor}</p>
-            ) : (
-              <p className="text-text-muted text-xs">
-                {proyectoId
-                  ? "Actualiza este mismo proyecto guardado."
-                  : "Guarda la posición, rotación y parámetros de cada objeto para reabrirlos después, sin resubir nada."}
-              </p>
-            )}
-            {errorGuardar ? (
-              <p role="alert" className="text-danger text-xs font-medium">
-                {errorGuardar}
-              </p>
-            ) : null}
-            {guardadoOk && !errorGuardar ? (
-              <p className="text-teal text-xs font-medium">
-                Proyecto guardado.
-              </p>
-            ) : null}
-          </Card>
         </div>
 
-        <Card className="h-fit p-4">
-          {seleccionadoUnico ? (
-            <PanelObjeto
-              objeto={seleccionadoUnico}
-              excedeArea={objetoExcedeArea(
-                seleccionadoUnico,
-                areaTrabajoAnchoMm,
-                areaTrabajoAltoMm,
-              )}
-              onCambiar={(cambios) =>
-                moverOTransformarObjeto(seleccionadoUnico.id, () => cambios)
-              }
-              onEliminar={() => eliminarObjetos([seleccionadoUnico.id])}
-              onGenerarToolpath={(operacion) =>
-                generarToolpath(seleccionadoUnico.id, operacion)
-              }
-              onCambiarPreprocesamiento={(preprocesamiento) =>
-                cambiarPreprocesamiento(seleccionadoUnico.id, preprocesamiento)
-              }
-              modoProduccion={modoProduccion}
-              onSalirDeProduccion={() => setModoProduccion(false)}
-              fichas={fichas}
-              cargandoFichas={cargandoFichas}
-              errorFichas={errorFichas}
-              onGenerarContorno={(margenMm) =>
-                generarContornoCorte(seleccionadoUnico.id, margenMm)
-              }
-              generandoContorno={generandoContorno}
-              errorContorno={errorContorno}
-            />
-          ) : seleccionados.length > 1 ? (
-            // #149 -- selección múltiple: el panel numérico de un solo
-            // objeto (posición/rotación/velocidad/potencia/Fichas) no tiene
-            // un significado obvio cuando hay varios con valores distintos
-            // -- se muestra solo el conteo y las mismas acciones en lote que
-            // ya ofrece `BarraAccionesObjeto` flotante sobre el lienzo,
-            // decisión documentada en el ticket. Mover/rotar/escalar el
-            // grupo sigue disponible con el mouse vía el Transformer.
-            <div className="flex flex-col gap-4">
-              <p className="text-navy text-sm font-semibold">
-                {seleccionados.length} objetos seleccionados
-              </p>
-              <p className="text-text-muted text-xs">
-                Seleccioná uno solo (click sin Shift) para editar su posición,
-                rotación o parámetros de velocidad/potencia.
-              </p>
-              <ul className="flex flex-col gap-1">
-                {seleccionados.map((o) => (
-                  <li
-                    key={o.id}
-                    className="text-navy truncate text-xs"
-                    title={o.nombre}
-                  >
-                    {o.nombre}
-                  </li>
-                ))}
-              </ul>
-              <div className="border-border flex flex-col gap-1.5 border-t pt-3">
-                <Button
-                  variant="outline"
-                  onClick={() => duplicarObjetos(seleccionadosIds)}
-                >
-                  Duplicar selección
-                </Button>
-                <div className="flex gap-1.5">
+        {seleccionados.length > 0 ? (
+          <div className="border-border bg-surface w-80 shrink-0 overflow-y-auto border-l p-4">
+            {seleccionadoUnico ? (
+              <PanelObjeto
+                objeto={seleccionadoUnico}
+                excedeArea={objetoExcedeArea(
+                  seleccionadoUnico,
+                  areaTrabajoAnchoMm,
+                  areaTrabajoAltoMm,
+                )}
+                onCambiar={(cambios) =>
+                  moverOTransformarObjeto(seleccionadoUnico.id, () => cambios)
+                }
+                onEliminar={() => eliminarObjetos([seleccionadoUnico.id])}
+                onGenerarToolpath={(operacion) =>
+                  generarToolpath(seleccionadoUnico.id, operacion)
+                }
+                onCambiarPreprocesamiento={(preprocesamiento) =>
+                  cambiarPreprocesamiento(
+                    seleccionadoUnico.id,
+                    preprocesamiento,
+                  )
+                }
+                modoProduccion={modoProduccion}
+                onSalirDeProduccion={() => setModoProduccion(false)}
+                fichas={fichas}
+                cargandoFichas={cargandoFichas}
+                errorFichas={errorFichas}
+                onGenerarContorno={(margenMm) =>
+                  generarContornoCorte(seleccionadoUnico.id, margenMm)
+                }
+                generandoContorno={generandoContorno}
+                errorContorno={errorContorno}
+              />
+            ) : (
+              // #149 -- selección múltiple (siempre >1 acá: el wrapper de
+              // afuera ya garantiza seleccionados.length > 0, y este branch
+              // es "no seleccionadoUnico"). El panel numérico de un solo
+              // objeto (posición/rotación/velocidad/potencia/Fichas) no tiene
+              // un significado obvio cuando hay varios con valores distintos
+              // -- se muestra solo el conteo y las mismas acciones en lote que
+              // ya ofrece `BarraAccionesObjeto` flotante sobre el lienzo,
+              // decisión documentada en el ticket. Mover/rotar/escalar el
+              // grupo sigue disponible con el mouse vía el Transformer.
+              <div className="flex flex-col gap-4">
+                <p className="text-navy text-sm font-semibold">
+                  {seleccionados.length} objetos seleccionados
+                </p>
+                <p className="text-text-muted text-xs">
+                  Seleccioná uno solo (click sin Shift) para editar su posición,
+                  rotación o parámetros de velocidad/potencia.
+                </p>
+                <ul className="flex flex-col gap-1">
+                  {seleccionados.map((o) => (
+                    <li
+                      key={o.id}
+                      className="text-navy truncate text-xs"
+                      title={o.nombre}
+                    >
+                      {o.nombre}
+                    </li>
+                  ))}
+                </ul>
+                <div className="border-border flex flex-col gap-1.5 border-t pt-3">
                   <Button
                     variant="outline"
-                    className="flex-1"
-                    onClick={() =>
-                      espejarObjetos(seleccionadosIds, "horizontal")
-                    }
+                    onClick={() => duplicarObjetos(seleccionadosIds)}
                   >
-                    Espejar horizontal
+                    Duplicar selección
                   </Button>
+                  <div className="flex gap-1.5">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() =>
+                        espejarObjetos(seleccionadosIds, "horizontal")
+                      }
+                    >
+                      Espejar horizontal
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() =>
+                        espejarObjetos(seleccionadosIds, "vertical")
+                      }
+                    >
+                      Espejar vertical
+                    </Button>
+                  </div>
                   <Button
                     variant="outline"
-                    className="flex-1"
-                    onClick={() => espejarObjetos(seleccionadosIds, "vertical")}
+                    onClick={() => eliminarObjetos(seleccionadosIds)}
                   >
-                    Espejar vertical
+                    Eliminar selección
                   </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => eliminarObjetos(seleccionadosIds)}
-                >
-                  Eliminar selección
-                </Button>
               </div>
-            </div>
-          ) : (
-            <p className="text-text-muted text-sm">
-              Subí un objeto o seleccioná uno del lienzo para editar su
-              posición, rotación y parámetros.
-            </p>
-          )}
-        </Card>
+            )}
+          </div>
+        ) : null}
       </div>
 
       <ConfirmDialog
