@@ -12,14 +12,17 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { INPUT_CLASSES } from "@/components/ui/field";
 import { iconButtonClasses } from "@/lib/button-styles";
 import { ArrowLeftAnimado } from "@/components/ui/icons/arrow-left-animado";
-import { TrashCanAnimado } from "@/components/ui/icons/trash-can-animado";
 import { TriangleAlertAnimado } from "@/components/ui/icons/triangle-alert-animado";
 import { ObjetoLienzoKonva } from "@/components/editor/objeto-lienzo-konva";
 import { LienzoGrilla } from "@/components/editor/lienzo-grilla";
 import { LienzoReglas } from "@/components/editor/lienzo-reglas";
 import { BarraAccionesObjeto } from "@/components/editor/barra-acciones-objeto";
+import { EditorPanelCapas } from "@/components/editor/editor-panel-capas";
 import { PanelObjeto } from "@/components/editor/panel-objeto";
-import { SubirObjetoDropzone } from "@/components/editor/subir-objeto-dropzone";
+import {
+  SubirObjetoDropzone,
+  type SvgBibliotecaItem,
+} from "@/components/editor/subir-objeto-dropzone";
 import {
   EditorSidebarRiel,
   type PanelSidebarId,
@@ -118,6 +121,11 @@ function aObjetoProyecto(objeto: ObjetoLienzo): ObjetoProyecto {
     // todavía; ahora sí, así que perderlo al reabrir un proyecto
     // desincronizaría el contorno de su imagen en silencio.
     objetoOrigenId: objeto.objetoOrigenId,
+    // #179 (posterior a #150): grupo (mecanismo general) y visibilidad --
+    // sin esto, reabrir un proyecto con objetos agrupados u ocultos los
+    // desagruparía/mostraría todos de vuelta en silencio.
+    grupoId: objeto.grupoId,
+    visible: objeto.visible,
   };
   return objeto.tipo === "svg"
     ? {
@@ -148,6 +156,10 @@ interface EditorLienzoProps {
   areaTrabajoAnchoMm: number;
   areaTrabajoAltoMm: number;
   proyectoInicial?: ProyectoInicial | null;
+  /** Issue #183: SVGs ya subidos a la biblioteca compartida con "Grabado
+   * Vectorial" -- se pasan al panel "Subir" para poder reusar uno en vez
+   * de resubir el archivo. */
+  bibliotecaSvg: SvgBibliotecaItem[];
 }
 
 /** `corte` sigue el outline del diseño; `grabado` es el relleno detallado —
@@ -214,6 +226,7 @@ export function EditorLienzo({
   areaTrabajoAnchoMm,
   areaTrabajoAltoMm,
   proyectoInicial = null,
+  bibliotecaSvg,
 }: EditorLienzoProps) {
   const router = useRouter();
   const [montado, setMontado] = useState(false);
@@ -226,6 +239,17 @@ export function EditorLienzo({
   // resto de la UI de un solo objeto no cambiaron de forma, solo de dónde
   // sacan el objeto.
   const [seleccionadosIds, setSeleccionadosIds] = useState<string[]>([]);
+  // Issue #184: el toolpath combinado del lienzo ya no se puede tildar en
+  // cualquier momento -- solo existe DESPUÉS de exportar G-code al menos una
+  // vez (`gcodeExportadoDisponible`, se pone en `true` recién ahí, ver
+  // `exportarGcode`) y se oculta solo apenas se sigue editando el lienzo
+  // (el efecto de abajo, sobre `objetos`) para nunca mostrar un toolpath que
+  // ya no corresponde a la geometría/parámetros actuales. `vistaToolpath` es
+  // la preferencia del operario de mostrarlo u ocultarlo MIENTRAS esté
+  // disponible -- lo visible de verdad es `mostrarToolpath` (más abajo),
+  // el AND de ambos.
+  const [gcodeExportadoDisponible, setGcodeExportadoDisponible] =
+    useState(false);
   const [vistaToolpath, setVistaToolpath] = useState(false);
 
   // Modo Producción/Prueba (#17): GLOBAL a todo el lienzo -- es una
@@ -339,6 +363,14 @@ export function EditorLienzo({
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMontado(true), []);
 
+  // Issue #184: cualquier cambio a `objetos` (mover, rotar, escalar, cambiar
+  // parámetros, agregar/eliminar, incluso cachear un toolpath por-objeto vía
+  // `generarToolpath`) invalida el toolpath combinado ya exportado -- se
+  // corre en cada render donde `objetos` cambió de referencia, incluyendo el
+  // montaje inicial (no-op ahí, ya arranca en `false`).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setGcodeExportadoDisponible(false), [objetos]);
+
   useEffect(() => {
     const el = contenedorRef.current;
     if (!el) return;
@@ -392,10 +424,15 @@ export function EditorLienzo({
     [seleccionados],
   );
 
+  // Issue #179: un objeto oculto no se exporta -- si además no cabe en el
+  // área de trabajo, no vale la pena advertirlo (no va a terminar en el
+  // G-code de todos modos).
   const objetosFueraDeArea = useMemo(
     () =>
-      objetos.filter((o) =>
-        objetoExcedeArea(o, areaTrabajoAnchoMm, areaTrabajoAltoMm),
+      objetos.filter(
+        (o) =>
+          o.visible &&
+          objetoExcedeArea(o, areaTrabajoAnchoMm, areaTrabajoAltoMm),
       ),
     [objetos, areaTrabajoAnchoMm, areaTrabajoAltoMm],
   );
@@ -517,16 +554,38 @@ export function EditorLienzo({
     setSeleccionadosIds([objeto.id]);
   }
 
+  /** Issue #179: ids de TODO el grupo al que pertenece `id` -- `[id]` si no
+   * está agrupado. Clickear cualquier miembro de un grupo lo selecciona
+   * completo (mismo criterio que Illustrator/Figma) -- gracias a esto, el
+   * resto de la mecánica de "selección múltiple como unidad rígida" que ya
+   * existía para #149 (drag, `Transformer`, duplicar, espejar, eliminar)
+   * alcanza sola para mover/rotar/escalar un grupo junto, sin ninguna
+   * propagación de delta nueva en `moverOTransformarObjeto`. */
+  function idsDelGrupoDe(id: string): string[] {
+    const objeto = objetos.find((o) => o.id === id);
+    if (!objeto?.grupoId) return [id];
+    return objetos.filter((o) => o.grupoId === objeto.grupoId).map((o) => o.id);
+  }
+
   /** #149 -- click sobre un objeto individual. `aditivo` viene de Shift: sin
    * Shift, reemplaza la selección entera por este objeto (comportamiento
    * pre-#149); con Shift, lo suma o lo saca de la selección múltiple sin
-   * tocar el resto. */
+   * tocar el resto. Issue #179: "este objeto" pasa a ser "el grupo entero
+   * de este objeto" en ambos casos (`idsDelGrupoDe`, no-op si no está
+   * agrupado). */
   function seleccionarObjeto(id: string, aditivo: boolean) {
+    const idsGrupo = idsDelGrupoDe(id);
     setSeleccionadosIds((anteriores) => {
-      if (!aditivo) return [id];
-      return anteriores.includes(id)
-        ? anteriores.filter((actual) => actual !== id)
-        : [...anteriores, id];
+      if (!aditivo) return idsGrupo;
+      const yaSeleccionado = idsGrupo.some((idGrupo) =>
+        anteriores.includes(idGrupo),
+      );
+      return yaSeleccionado
+        ? anteriores.filter((actual) => !idsGrupo.includes(actual))
+        : [
+            ...anteriores,
+            ...idsGrupo.filter((idGrupo) => !anteriores.includes(idGrupo)),
+          ];
     });
   }
 
@@ -701,6 +760,11 @@ export function EditorLienzo({
    * redimensionando aparte. Los duplicados quedan seleccionados al terminar
    * -- mismo criterio que ya tenía el duplicado de un solo objeto. */
   function duplicarObjetos(ids: string[]) {
+    // Issue #179: si el original pertenecía a un grupo, el duplicado forma
+    // un grupo NUEVO propio con los demás duplicados de ese mismo grupo --
+    // nunca se une al grupo original (la selección ya garantiza que `ids`
+    // trae el grupo completo o ningún miembro de él, ver `seleccionarObjeto`).
+    const mapaGrupoNuevo = new Map<string, string>();
     const duplicados = ids.flatMap((id) => {
       const objeto = objetos.find((o) => o.id === id);
       if (!objeto) return [];
@@ -709,10 +773,18 @@ export function EditorLienzo({
         xMm: objeto.xMm + DESPLAZAMIENTO_DUPLICADO_MM,
         yMm: objeto.yMm - DESPLAZAMIENTO_DUPLICADO_MM,
       };
+      let grupoId: string | undefined;
+      if (objeto.grupoId) {
+        grupoId = mapaGrupoNuevo.get(objeto.grupoId);
+        if (!grupoId) {
+          grupoId = crypto.randomUUID();
+          mapaGrupoNuevo.set(objeto.grupoId, grupoId);
+        }
+      }
       return [
         objeto.tipo === "svg"
-          ? { ...objeto, ...posicion, toolpath: {} }
-          : { ...objeto, ...posicion },
+          ? { ...objeto, ...posicion, grupoId, toolpath: {} }
+          : { ...objeto, ...posicion, grupoId },
       ];
     });
     if (duplicados.length === 0) return;
@@ -737,6 +809,51 @@ export function EditorLienzo({
           : { ...o, espejadoV: !o.espejadoV };
       }),
     );
+  }
+
+  /** Issue #179: mecanismo general de agrupación -- une `ids` (ya sea que
+   * algunos vinieran de grupos distintos o sueltos) en un único grupo
+   * nuevo. Necesita 2+ ids para tener sentido (un "grupo" de uno no es
+   * nada). */
+  function agruparObjetos(ids: string[]) {
+    if (ids.length < 2) return;
+    const nuevoGrupoId = crypto.randomUUID();
+    const idsAGrupar = new Set(ids);
+    setObjetos((anteriores) =>
+      anteriores.map((o) =>
+        idsAGrupar.has(o.id) ? { ...o, grupoId: nuevoGrupoId } : o,
+      ),
+    );
+  }
+
+  /** Issue #179: `ids` vuelven a moverse/rotarse/escalarse por separado --
+   * incluye desagrupar la máscara de corte automática (#108) si el
+   * operario la necesita ajustar aparte de su imagen de origen. */
+  function desagruparObjetos(ids: string[]) {
+    const idsADesagrupar = new Set(ids);
+    setObjetos((anteriores) =>
+      anteriores.map((o) =>
+        idsADesagrupar.has(o.id) ? { ...o, grupoId: undefined } : o,
+      ),
+    );
+  }
+
+  /** Issue #179: `visible: false` saca al objeto del `Stage` de Konva Y del
+   * G-code exportado (`aObjetoExportar` filtra por `visible`, ver más
+   * abajo) -- ocultar de verdad significa "no quiero esto en esta pieza",
+   * no un simple recurso de organización visual. Si se oculta un objeto
+   * que estaba seleccionado, sale de la selección (ya no tiene sentido
+   * mostrarle sus controles si no se ve ni se va a exportar). */
+  function cambiarVisibilidadObjetos(ids: string[], visible: boolean) {
+    const idsASet = new Set(ids);
+    setObjetos((anteriores) =>
+      anteriores.map((o) => (idsASet.has(o.id) ? { ...o, visible } : o)),
+    );
+    if (!visible) {
+      setSeleccionadosIds((anteriores) =>
+        anteriores.filter((id) => !idsASet.has(id)),
+      );
+    }
   }
 
   function fijarToolpath(
@@ -788,8 +905,12 @@ export function EditorLienzo({
         error?: string;
       };
       if (cuerpo.ok && cuerpo.gcode) {
+        // Issue #184: ya no fuerza la vista combinada del toolpath -- esto
+        // es la conversión de UN objeto puntual (botón "Ver toolpath" de
+        // `PanelObjeto`), no un G-code combinado exportado de verdad. El
+        // resultado queda cacheado en `objeto.toolpath` igual (se ve si más
+        // adelante se exporta y la vista combinada se habilita).
         fijarToolpath(id, operacion, { estado: "ok", gcode: cuerpo.gcode });
-        setVistaToolpath(true);
       } else {
         fijarToolpath(id, operacion, {
           estado: "error",
@@ -808,11 +929,12 @@ export function EditorLienzo({
    * Issue #108: genera el vector de corte alrededor de una imagen raster y
    * lo agrega como objeto SVG independiente, centrado exactamente sobre
    * ella (mismo `xMm`/`yMm`/`rotacionDeg`/espejado que la imagen en el
-   * momento de generarlo). No hay una mecánica de agrupación de objetos en
-   * el editor todavía (ver `objetoOrigenId` en `editor-tipos.ts`) -- mover,
-   * rotar o escalar la imagen después NO arrastra a este contorno; el
-   * usuario los reposiciona a mano si hace falta, o vuelve a generar el
-   * contorno una vez que termine de ajustar la imagen.
+   * momento de generarlo). Issue #179: el contorno nace agrupado con su
+   * imagen de origen (mismo `grupoId`) -- mover/rotar/escalar cualquiera de
+   * los dos mueve al otro (ver `seleccionarObjeto`), sin ser una mecánica
+   * especial: reusa el mecanismo general de agrupación, así que el
+   * operario lo puede desagrupar como cualquier otro grupo si hace falta
+   * reposicionarlos por separado.
    */
   async function generarContornoCorte(id: string, margenMm: number) {
     const objeto = objetos.find((o) => o.id === id);
@@ -848,6 +970,13 @@ export function EditorLienzo({
           cuerpo.error ?? "No se pudo generar el contorno de corte.",
         );
       }
+      // Issue #179: si la imagen de origen ya pertenecía a un grupo, el
+      // contorno se suma a ESE grupo en vez de crear uno nuevo -- de lo
+      // contrario, ambos forman un grupo recién creado acá.
+      const grupoId = objeto.grupoId ?? crypto.randomUUID();
+      if (!objeto.grupoId) {
+        actualizarObjeto(objeto.id, (o) => ({ ...o, grupoId }));
+      }
       agregarObjeto({
         id: crypto.randomUUID(),
         tipo: "svg",
@@ -875,6 +1004,8 @@ export function EditorLienzo({
         resolucionRellenoMm: 0.3,
         toolpath: {},
         objetoOrigenId: objeto.id,
+        grupoId,
+        visible: true,
       });
     } catch (error) {
       setErrorContorno(
@@ -895,7 +1026,10 @@ export function EditorLienzo({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          objetos: objetos.map(aObjetoExportar),
+          // Issue #179: un objeto oculto se excluye del G-code -- "ocultar"
+          // es "no quiero esto en esta pieza", nunca se exporta algo que
+          // no se ve en el lienzo.
+          objetos: objetos.filter((o) => o.visible).map(aObjetoExportar),
           proyectoId,
         }),
       });
@@ -906,6 +1040,12 @@ export function EditorLienzo({
       };
       if (cuerpo.ok && cuerpo.url) {
         window.open(cuerpo.url, "_blank");
+        // Issue #184: recién acá (G-code combinado ya exportado, aunque sea
+        // una versión) tiene sentido mostrar el toolpath -- antes de esto,
+        // ningún click lo habilita. `vistaToolpath` en `true` de entrada:
+        // la primera vez que se habilita, se ve solo sin un click extra.
+        setGcodeExportadoDisponible(true);
+        setVistaToolpath(true);
       } else {
         setErrorExportar(cuerpo.error ?? "No se pudo exportar el G-code.");
       }
@@ -1050,11 +1190,20 @@ export function EditorLienzo({
       minY: Math.min(m.inicioYPx, m.actualYPx),
       maxY: Math.max(m.inicioYPx, m.actualYPx),
     };
-    const idsEnCaja = objetos
-      .filter((o) =>
-        cajasSeIntersectan(caja, limitesEnPx(o, pxPorMm, areaTrabajoAltoMm)),
-      )
-      .map((o) => o.id);
+    // Issue #179: si el marquee atrapa a UN miembro de un grupo, entra el
+    // grupo completo -- mismo criterio que el click individual.
+    const idsEnCaja = Array.from(
+      new Set(
+        objetos
+          .filter((o) =>
+            cajasSeIntersectan(
+              caja,
+              limitesEnPx(o, pxPorMm, areaTrabajoAltoMm),
+            ),
+          )
+          .flatMap((o) => idsDelGrupoDe(o.id)),
+      ),
+    );
     setSeleccionadosIds((anteriores) =>
       m.aditivo
         ? Array.from(new Set([...anteriores, ...idsEnCaja]))
@@ -1065,9 +1214,15 @@ export function EditorLienzo({
   const noSeExportaPor =
     objetos.length === 0
       ? "Agregá al menos un objeto al lienzo antes de exportar."
-      : objetosFueraDeArea.length > 0
-        ? "Movés o achicá los objetos que no caben en el área de trabajo antes de exportar."
-        : null;
+      : objetos.every((o) => !o.visible)
+        ? "Todos los objetos están ocultos -- mostrá al menos uno antes de exportar."
+        : objetosFueraDeArea.length > 0
+          ? "Movés o achicá los objetos que no caben en el área de trabajo antes de exportar."
+          : null;
+
+  // Issue #184: lo que de verdad se renderiza -- disponible (se exportó y
+  // no se editó nada después) Y el operario no lo ocultó con el toggle.
+  const mostrarToolpath = gcodeExportadoDisponible && vistaToolpath;
 
   const noSeGuardaPor =
     objetos.length === 0
@@ -1090,6 +1245,20 @@ export function EditorLienzo({
     : seleccionadoUnico
       ? colorSeleccionDe(seleccionadoUnico)
       : "#246bce";
+
+  // Issue #179: la selección YA es el grupo completo o ninguno de sus
+  // miembros (`seleccionarObjeto`/`finalizarMarquee` expanden siempre) --
+  // "es un grupo" simplemente significa que todos comparten el mismo
+  // `grupoId` no vacío.
+  const grupoIdDeLaSeleccion =
+    seleccionados.length > 1 &&
+    seleccionados.every(
+      (o) => o.grupoId && o.grupoId === seleccionados[0]?.grupoId,
+    )
+      ? seleccionados[0]?.grupoId
+      : undefined;
+  const puedeAgrupar = seleccionados.length > 1 && !grupoIdDeLaSeleccion;
+  const puedeDesagrupar = grupoIdDeLaSeleccion !== undefined;
 
   /** "Guardar como proyecto"/"Guardar cambios" (#18) -- crea el proyecto la
    * primera vez (`proyectoId` todavía `null`) y a partir de ahí actualiza la
@@ -1280,60 +1449,23 @@ export function EditorLienzo({
             <SubirObjetoDropzone
               onAgregar={agregarObjeto}
               siguientePosicion={siguientePosicion}
+              bibliotecaSvg={bibliotecaSvg}
             />
           }
           contenidoCapas={
-            // Lista simple (nombre + seleccionar + eliminar), reubicada acá
-            // tal cual existía debajo del lienzo -- el panel de capas real
-            // (miniatura, reordenar, mostrar/ocultar) es el issue de
-            // seguimiento de #178; dejar esto vacío mientras tanto sería una
-            // regresión real (hoy es la única forma de ver/elegir/borrar un
-            // objeto por nombre sin tocarlo en el lienzo).
-            objetos.length > 0 ? (
-              <ul
-                className="flex flex-col gap-1.5"
-                aria-label="Objetos del lienzo"
-              >
-                {objetos.map((objeto) => (
-                  <li
-                    key={objeto.id}
-                    className={clsx(
-                      "flex items-center justify-between gap-1 rounded-full border py-1 pl-2.5 text-xs font-medium",
-                      seleccionadosIds.includes(objeto.id)
-                        ? "border-blue bg-blue-soft text-navy"
-                        : "border-border text-text-muted",
-                      objetoExcedeArea(
-                        objeto,
-                        areaTrabajoAnchoMm,
-                        areaTrabajoAltoMm,
-                      ) && "border-danger/40",
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={(e) => seleccionarObjeto(objeto.id, e.shiftKey)}
-                      aria-pressed={seleccionadosIds.includes(objeto.id)}
-                      className="truncate py-1 hover:underline"
-                      title="Click para seleccionar, Shift+click para sumar/sacar de la selección"
-                    >
-                      {objeto.nombre}
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Eliminar ${objeto.nombre}`}
-                      onClick={() => eliminarObjetos([objeto.id])}
-                      className={iconButtonClasses("danger", "size-6 shrink-0")}
-                    >
-                      <TrashCanAnimado className="size-3" strokeWidth={2} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-text-muted text-sm">
-                Todavía no hay ningún objeto en el lienzo.
-              </p>
-            )
+            <EditorPanelCapas
+              objetos={objetos}
+              seleccionadosIds={seleccionadosIds}
+              areaTrabajoAnchoMm={areaTrabajoAnchoMm}
+              areaTrabajoAltoMm={areaTrabajoAltoMm}
+              excedeArea={(objeto) =>
+                objetoExcedeArea(objeto, areaTrabajoAnchoMm, areaTrabajoAltoMm)
+              }
+              onSeleccionar={seleccionarObjeto}
+              onEliminar={eliminarObjetos}
+              onCambiarVisibilidad={cambiarVisibilidadObjetos}
+              onReordenar={setObjetos}
+            />
           }
         />
 
@@ -1384,39 +1516,44 @@ export function EditorLienzo({
                       pxPorMm={pxPorMm}
                       zoom={zoom}
                     />
-                    {objetos.map((objeto) => (
-                      <ObjetoLienzoKonva
-                        key={objeto.id}
-                        objeto={objeto}
-                        pxPorMm={pxPorMm}
-                        areaTrabajoAltoMm={areaTrabajoAltoMm}
-                        seleccionado={seleccionadosIds.includes(objeto.id)}
-                        excedeArea={objetoExcedeArea(
-                          objeto,
-                          areaTrabajoAnchoMm,
-                          areaTrabajoAltoMm,
-                        )}
-                        vistaToolpath={vistaToolpath}
-                        color={colorSeleccionDe(objeto)}
-                        onSeleccionar={(aditivo) =>
-                          seleccionarObjeto(objeto.id, aditivo)
-                        }
-                        onMover={(xMm, yMm) =>
-                          moverOTransformarObjeto(
-                            objeto.id,
-                            () => ({ xMm, yMm }),
-                            { propagarAlGrupo: true },
-                          )
-                        }
-                        onTransformar={(cambios) =>
-                          moverOTransformarObjeto(objeto.id, () => cambios)
-                        }
-                        registrarNodo={(nodo) => {
-                          if (nodo) nodosRef.current.set(objeto.id, nodo);
-                          else nodosRef.current.delete(objeto.id);
-                        }}
-                      />
-                    ))}
+                    {/* Issue #179: un objeto oculto ni se dibuja -- no
+                     * solo se excluye del export, tampoco ocupa espacio en
+                     * el lienzo mientras esté oculto. */}
+                    {objetos
+                      .filter((objeto) => objeto.visible)
+                      .map((objeto) => (
+                        <ObjetoLienzoKonva
+                          key={objeto.id}
+                          objeto={objeto}
+                          pxPorMm={pxPorMm}
+                          areaTrabajoAltoMm={areaTrabajoAltoMm}
+                          seleccionado={seleccionadosIds.includes(objeto.id)}
+                          excedeArea={objetoExcedeArea(
+                            objeto,
+                            areaTrabajoAnchoMm,
+                            areaTrabajoAltoMm,
+                          )}
+                          vistaToolpath={mostrarToolpath}
+                          color={colorSeleccionDe(objeto)}
+                          onSeleccionar={(aditivo) =>
+                            seleccionarObjeto(objeto.id, aditivo)
+                          }
+                          onMover={(xMm, yMm) =>
+                            moverOTransformarObjeto(
+                              objeto.id,
+                              () => ({ xMm, yMm }),
+                              { propagarAlGrupo: true },
+                            )
+                          }
+                          onTransformar={(cambios) =>
+                            moverOTransformarObjeto(objeto.id, () => cambios)
+                          }
+                          registrarNodo={(nodo) => {
+                            if (nodo) nodosRef.current.set(objeto.id, nodo);
+                            else nodosRef.current.delete(objeto.id);
+                          }}
+                        />
+                      ))}
                     {marquee ? (
                       <Rect
                         x={Math.min(marquee.inicioXPx, marquee.actualXPx)}
@@ -1473,6 +1610,16 @@ export function EditorLienzo({
                           }
                           onDuplicar={() => duplicarObjetos(seleccionadosIds)}
                           onEliminar={() => eliminarObjetos(seleccionadosIds)}
+                          onAgrupar={
+                            puedeAgrupar
+                              ? () => agruparObjetos(seleccionadosIds)
+                              : undefined
+                          }
+                          onDesagrupar={
+                            puedeDesagrupar
+                              ? () => desagruparObjetos(seleccionadosIds)
+                              : undefined
+                          }
                         />
                       );
                     })()
@@ -1506,12 +1653,32 @@ export function EditorLienzo({
               >
                 +
               </button>
+              {/* Issue #183: antes era un link de texto -- ahora un ícono
+               * (lupa + cuadrado, patrón estándar de "encuadrar a la vista
+               * completa" en herramientas CAD/diseño), consistente con los
+               * botones de zoom de al lado (tampoco son texto). Misma
+               * `restablecerVista()`, sin cambios de lógica. */}
               <button
                 type="button"
                 onClick={restablecerVista}
-                className="text-text-muted hover:text-navy px-1.5 text-xs underline-offset-2 hover:underline"
+                aria-label="Restablecer vista"
+                title="Restablecer vista (encuadrar el área de trabajo completa)"
+                className={iconButtonClasses()}
               >
-                Restablecer vista
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.75}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="size-4"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="3" width="9" height="9" rx="1" />
+                  <circle cx="16" cy="16" r="5" />
+                  <line x1="19.5" y1="19.5" x2="22" y2="22" />
+                </svg>
               </button>
               {/* #149 -- el drag simple sobre área vacía pasa a ser el
                * marquee de selección; mantener espacio apretado es la forma
@@ -1522,15 +1689,45 @@ export function EditorLienzo({
               </span>
             </div>
 
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={vistaToolpath}
-                onChange={(e) => setVistaToolpath(e.target.checked)}
-                className="accent-blue size-4"
-              />
-              <span className="text-navy">Ver toolpath generado</span>
-            </label>
+            {/* Issue #184: antes era un checkbox que se podía tildar en
+             * cualquier momento y no renderizaba nada de forma confiable
+             * (dependía de "Ver toolpath" por-objeto, que solo existe para
+             * SVG) -- ahora este control ni existe hasta que haya un
+             * G-code combinado recién exportado (`gcodeExportadoDisponible`),
+             * y desaparece solo apenas se sigue editando el lienzo. */}
+            {gcodeExportadoDisponible ? (
+              <button
+                type="button"
+                onClick={() => setVistaToolpath((v) => !v)}
+                aria-pressed={vistaToolpath}
+                title={
+                  vistaToolpath
+                    ? "Ocultar el toolpath del último G-code exportado"
+                    : "Ver el toolpath del último G-code exportado"
+                }
+                className={clsx(
+                  "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+                  vistaToolpath
+                    ? "border-blue bg-blue-soft text-blue"
+                    : "border-border text-text-muted hover:bg-navy-soft",
+                )}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.75}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="size-4"
+                  aria-hidden="true"
+                >
+                  <path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z" />
+                  <circle cx="12" cy="12" r="2.5" />
+                </svg>
+                Toolpath
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -1624,6 +1821,26 @@ export function EditorLienzo({
                       Espejar vertical
                     </Button>
                   </div>
+                  {/* Issue #179: mismas acciones que la barra flotante
+                   * sobre el lienzo (BarraAccionesObjeto) -- acá también,
+                   * para quien esté mirando el panel numérico en vez del
+                   * lienzo. */}
+                  {puedeAgrupar ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => agruparObjetos(seleccionadosIds)}
+                    >
+                      Agrupar
+                    </Button>
+                  ) : null}
+                  {puedeDesagrupar ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => desagruparObjetos(seleccionadosIds)}
+                    >
+                      Desagrupar
+                    </Button>
+                  ) : null}
                   <Button
                     variant="outline"
                     onClick={() => eliminarObjetos(seleccionadosIds)}

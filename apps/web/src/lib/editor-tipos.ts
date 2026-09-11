@@ -94,23 +94,35 @@ interface ObjetoLienzoBase {
   materialProduccion: { material: string; espesorMm: number | null } | null;
   /** Issue #108: cuando este objeto es el contorno de corte generado
    * automáticamente a partir de una imagen raster, guarda el `id` de esa
-   * imagen. Desde #150 SÍ tiene comportamiento real cableado en
-   * `editor-lienzo.tsx` (`moverOTransformarObjeto`): mover, rotar o escalar
-   * el objeto de origen propaga el mismo delta al vinculado, y eliminar el
-   * origen ofrece eliminar también el vinculado (`eliminarObjeto`). Sigue
-   * sin ser una mecánica genérica de agrupación -- solo esta relación
-   * puntual imagen→contorno que genera `generarContornoCorte`, nunca
-   * grupos arbitrarios definidos a mano (#149 es selección múltiple, un
-   * caso distinto). SÍ se persiste en `/api/proyectos` (#18, `aObjetoProyecto`
-   * en `editor-lienzo.tsx`, `ObjetoProyectoBody` en `apps/api/main.py`) --
-   * antes de #150 no tenía sentido persistir una referencia sin
-   * comportamiento; ahora que el vínculo hace algo real, perderlo al
-   * reabrir un proyecto sería una regresión silenciosa (el contorno
-   * quedaría "suelto" apenas se toca la imagen). Sigue sin viajar a la
-   * exportación de G-code (`aObjetoExportar`) -- el backend exporta cada
-   * objeto por su geometría final ya resuelta, no necesita saber de dónde
-   * salió. */
+   * imagen -- puro linaje ("¿de qué imagen salió este contorno?"), ya NO es
+   * el mecanismo que mueve a ambos juntos (eso pasó a `grupoId`, issue #179,
+   * ver abajo). Sigue usándose para que "eliminar el origen" ofrezca
+   * eliminar también el vinculado (`eliminarObjeto`/`eliminarObjetos`). SÍ
+   * se persiste en `/api/proyectos` (#18, `aObjetoProyecto` en
+   * `editor-lienzo.tsx`, `ObjetoProyectoBody` en `apps/api/main.py`). Sigue
+   * sin viajar a la exportación de G-code (`aObjetoExportar`) -- el backend
+   * exporta cada objeto por su geometría final ya resuelta, no necesita
+   * saber de dónde salió. */
   objetoOrigenId?: string;
+  /** Issue #179: mecanismo GENERAL de agrupación -- todo objeto que
+   * comparte el mismo `grupoId` se selecciona, mueve, rota y escala como
+   * una sola unidad (ver `seleccionarObjeto`/`expandirGrupo` en
+   * `editor-lienzo.tsx`, que reusan tal cual la mecánica de selección
+   * múltiple rígida que ya existía para #149 -- clickear cualquier
+   * miembro selecciona el grupo entero, así que ni hace falta lógica nueva
+   * de propagación de delta). `generarContornoCorte` (#108) arma este
+   * campo automáticamente entre la imagen de origen y su contorno recién
+   * generado -- sigue siendo desagrupable a mano como cualquier otro
+   * grupo formado manualmente ("Agrupar"/"Desagrupar" en
+   * `BarraAccionesObjeto`). `undefined` = no pertenece a ningún grupo. Se
+   * persiste igual que `objetoOrigenId`. */
+  grupoId?: string;
+  /** Issue #179: capa oculta -- no se renderiza en el `Stage` de Konva ni
+   * se incluye en el G-code exportado (`aObjetoExportar` filtra antes de
+   * mapear en `editor-lienzo.tsx`). Default `true` para todo objeto nuevo
+   * (`PARAMETROS_POR_DEFECTO`/dropzone no la tocan explícito, pero
+   * `agregarObjeto` la asume presente). */
+  visible: boolean;
 }
 
 export interface ObjetoSvgLienzo extends ObjetoLienzoBase {

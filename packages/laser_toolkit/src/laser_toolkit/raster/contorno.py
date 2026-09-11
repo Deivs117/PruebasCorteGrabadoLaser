@@ -29,6 +29,31 @@ from laser_toolkit.svg.geometry import Punto, Subpath
 # Bajo este valor de alfa (0-255) un pixel se considera "fuera" de la pieza.
 UMBRAL_ALFA = 128
 
+# Issue #183: `_mascara_binaria`/`_trazar_bordes_mascara` recorren CADA pixel
+# en Python puro (sin numpy) -- para una imagen con transparencia real a
+# resolución de foto/celular (varios millones de píxeles) esto tarda minutos,
+# y en Vercel la función serverless muere por timeout sin responder nada
+# (el frontend se ve "colgado en Generando…" para siempre, no es un bug del
+# cliente). El trazado no reproduce la imagen, solo decide DÓNDE cortar
+# alrededor -- perder detalle fino del canal alfa a este lado del downscale
+# es aceptable, un margen de corte no necesita esa precisión.
+_LADO_MAXIMO_PX = 500
+
+
+def _limitar_resolucion(alfa: Image.Image) -> Image.Image:
+    """Reduce `alfa` si su lado más largo supera `_LADO_MAXIMO_PX`,
+    preservando la proporción -- no-op si ya es más chica. `LANCZOS` (en vez
+    de `NEAREST`) da un canal alfa suavizado antes de umbralizar
+    (`UMBRAL_ALFA`), silueta más limpia que un muestreo directo de píxeles
+    salteados."""
+    ancho_px, alto_px = alfa.size
+    lado_mayor_px = max(ancho_px, alto_px)
+    if lado_mayor_px <= _LADO_MAXIMO_PX:
+        return alfa
+    factor = _LADO_MAXIMO_PX / lado_mayor_px
+    nuevo_tamano = (max(1, round(ancho_px * factor)), max(1, round(alto_px * factor)))
+    return alfa.resize(nuevo_tamano, Image.Resampling.LANCZOS)
+
 
 def extraer_contorno(imagen: Image.Image, ancho_mm: float, alto_mm: float) -> list[Subpath]:
     """Punto de entrada unico: decide silueta alfa vs. rectangulo segun si
@@ -41,7 +66,7 @@ def extraer_contorno(imagen: Image.Image, ancho_mm: float, alto_mm: float) -> li
         # multi-banda, que acá no aplican.
         minimo, _maximo = cast("tuple[int, int]", alfa.getextrema())
         if minimo < 255:
-            return _extraer_contorno_alfa(alfa, ancho_mm, alto_mm)
+            return _extraer_contorno_alfa(_limitar_resolucion(alfa), ancho_mm, alto_mm)
     return [_contorno_rectangulo(ancho_mm, alto_mm)]
 
 
@@ -78,7 +103,12 @@ def extraer_contorno_con_margen(
         alfa = imagen.getchannel("A")
         minimo, _maximo = cast("tuple[int, int]", alfa.getextrema())
         if minimo < 255:
-            alfa_dilatada = _dilatar_mascara_alfa(alfa, ancho_mm, alto_mm, margen_mm)
+            # Downscale ANTES de dilatar (issue #183, ver `_limitar_resolucion`)
+            # -- así tanto el filtro de dilatación como el trazado de bordes
+            # corren sobre la resolución ya reducida, no solo el trazado.
+            alfa_dilatada = _dilatar_mascara_alfa(
+                _limitar_resolucion(alfa), ancho_mm, alto_mm, margen_mm
+            )
             contorno = _extraer_contorno_alfa(alfa_dilatada, ancho_total_mm, alto_total_mm)
             return contorno, ancho_total_mm, alto_total_mm
 

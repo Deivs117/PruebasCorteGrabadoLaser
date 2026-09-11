@@ -4,10 +4,20 @@ import { useRef, useState } from "react";
 import { clsx } from "clsx";
 import { UploadCloudAnimado } from "@/components/ui/icons/upload-cloud-animado";
 import { svgADataUri } from "@/lib/svg-data-uri";
+import { tiempoRelativo } from "@/lib/tiempo-relativo";
 import { PARAMETROS_POR_DEFECTO, type ObjetoLienzo } from "@/lib/editor-tipos";
 import { medirImagen } from "@/components/editor/usar-imagen-cargada";
 import { ModalPreprocesamientoImagen } from "@/components/editor/modal-preprocesamiento-imagen";
 import type { PreprocesamientoRaster } from "@/lib/raster-preprocesamiento";
+
+/** Espejo de `SvgConContenido` (`lib/svg-data.ts`) -- redefinido acá en vez
+ * de importado porque ese módulo es `server-only` y este componente es de
+ * cliente. */
+export interface SvgBibliotecaItem {
+  nombre: string;
+  contenido: string;
+  subidoEn: string;
+}
 
 interface SubirObjetoDropzoneProps {
   onAgregar: (objeto: ObjetoLienzo) => void;
@@ -15,6 +25,10 @@ interface SubirObjetoDropzoneProps {
    * la posición para que subir varios seguidos no los apile exactos uno
    * sobre otro. */
   siguientePosicion: () => { xMm: number; yMm: number };
+  /** Issue #183: SVGs ya subidos a la biblioteca (mismo storage que usa
+   * "Grabado Vectorial", `/grabado-svg`) -- permite reusar uno sin volver a
+   * subir el archivo (y sin acumular otro duplicado más en el bucket). */
+  bibliotecaSvg: SvgBibliotecaItem[];
 }
 
 /** Lado más largo del objeto recién subido, en mm — el operario ajusta el
@@ -49,6 +63,7 @@ function dimensionesIniciales(anchoPx: number, altoPx: number) {
 export function SubirObjetoDropzone({
   onAgregar,
   siguientePosicion,
+  bibliotecaSvg,
 }: SubirObjetoDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [sobreZona, setSobreZona] = useState(false);
@@ -103,7 +118,46 @@ export function SubirObjetoDropzone({
       materialProduccion: null,
       resolucionRellenoMm: 0.3,
       toolpath: {},
+      visible: true,
     });
+  }
+
+  /** Issue #183: agrega un SVG que YA está en la biblioteca (sin volver a
+   * subirlo) -- mismo armado de objeto que `agregarSvg`, salvo que
+   * `nombre`/`nombreArchivoSvg` salen del item elegido en vez de
+   * `archivo.name`/la respuesta de `POST /api/svgs`. */
+  async function agregarSvgDeBiblioteca(item: SvgBibliotecaItem) {
+    setError(undefined);
+    try {
+      const { anchoPx, altoPx } = await medirImagen(
+        svgADataUri(item.contenido),
+      );
+      const { xMm, yMm } = siguientePosicion();
+      onAgregar({
+        id: crypto.randomUUID(),
+        tipo: "svg",
+        nombre: item.nombre,
+        nombreArchivoSvg: item.nombre,
+        contenidoSvg: item.contenido,
+        xMm,
+        yMm,
+        ...dimensionesIniciales(anchoPx, altoPx),
+        rotacionDeg: 0,
+        operaciones: ["grabado"],
+        parametros: PARAMETROS_POR_DEFECTO,
+        mantenerProporcion: true,
+        espejadoH: false,
+        espejadoV: false,
+        materialProduccion: null,
+        resolucionRellenoMm: 0.3,
+        toolpath: {},
+        visible: true,
+      });
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "No se pudo agregar el SVG.",
+      );
+    }
   }
 
   async function agregarRaster(archivo: File) {
@@ -138,6 +192,7 @@ export function SubirObjetoDropzone({
       espejadoV: false,
       ...preprocesamiento,
       materialProduccion: null,
+      visible: true,
     });
     setRasterPendiente(null);
   }
@@ -226,6 +281,35 @@ export function SubirObjetoDropzone({
           onConfirmar={confirmarRaster}
           onCancelar={() => setRasterPendiente(null)}
         />
+      ) : null}
+
+      {bibliotecaSvg.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-navy text-xs font-semibold">SVGs ya subidos</p>
+          <div className="grid grid-cols-3 gap-2">
+            {bibliotecaSvg.map((item) => (
+              <button
+                key={item.nombre}
+                type="button"
+                onClick={() => void agregarSvgDeBiblioteca(item)}
+                title={item.nombre}
+                className="bg-navy-soft hover:bg-blue-soft flex flex-col gap-1 rounded-[var(--radius-sm)] p-1.5 transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]"
+              >
+                <div className="flex aspect-square items-center justify-center overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- miniatura de un SVG arbitrario, servida como data URI */}
+                  <img
+                    src={svgADataUri(item.contenido)}
+                    alt={`Miniatura de ${item.nombre}`}
+                    className="max-h-full max-w-full"
+                  />
+                </div>
+                <p className="text-text-muted truncate text-[10px]">
+                  {tiempoRelativo(item.subidoEn)}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
       ) : null}
     </div>
   );
