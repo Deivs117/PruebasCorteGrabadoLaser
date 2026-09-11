@@ -222,9 +222,14 @@ def test_recalcular_costos_ficha_corte_marca_material_pendiente_sin_tarifa(sesio
     ficha = recalcular_costos_ficha(sesion, grupo, TarifasConfig(tarifa_electrica_por_kwh=1.0))
     sesion.commit()
 
+    longitud_mm = 4 * 10.0 * final_run.pasadas
     assert ficha.material_costo_pendiente is True
-    assert ficha.costo_por_mm is None  # falta un componente -> costo_total() da None
+    # Bug real corregido: con costo_total() (todo-o-nada) acá, costo_por_mm
+    # quedaba en None apenas faltaba el material, aunque la energía sí
+    # tuviera tarifa cargada -- ahora suma lo disponible (solo energía en
+    # este test; tampoco hay tarifa_hora_maquina cargada) y avisa lo que
+    # falta con material_costo_pendiente, en vez de bloquear todo el número.
+    assert ficha.costo_por_mm == pytest.approx(round(0.05 / longitud_mm, 4))
     # El tiempo por mm no depende de tarifas, se calcula siempre que haya
     # al menos una ejecución medida.
-    longitud_mm = 4 * 10.0 * final_run.pasadas
     assert ficha.tiempo_por_mm_s == pytest.approx(60.0 / longitud_mm)

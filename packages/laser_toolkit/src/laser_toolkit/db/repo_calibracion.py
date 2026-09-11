@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from laser_toolkit.calibracion import ResumenCalibracion, resumir_calibracion
 from laser_toolkit.config import FinalRunConfig, Operacion
-from laser_toolkit.costos import costo_energia, costo_material, costo_tiempo_maquina, costo_total
+from laser_toolkit.costos import costo_energia, costo_material, costo_tiempo_maquina
 from laser_toolkit.db.models import EstadoFicha, FamiliaMaterial, FichaParametro, FinalRun, GrupoCalibracion
 from laser_toolkit.db.repo_materiales import obtener_o_crear_material
 from laser_toolkit.naming import id_grupo_calibracion
@@ -183,6 +183,21 @@ def crear_o_actualizar_ficha(
     return ficha
 
 
+def _suma_parcial(componentes: list[float | None]) -> float | None:
+    """A diferencia de `costos.costo_total` (todo-o-nada -- correcto para el
+    costo final por celda del barrido/Hoja de Registro, donde mostrar un
+    total que ignora un componente pendiente subestimaría el costo real sin
+    avisar), acá el objetivo es mostrar lo que SÍ está disponible (energía
+    y/o tiempo de máquina) aunque falte la tarifa de material -- para eso
+    existe `material_costo_pendiente`, que avisa justamente lo que falta en
+    vez de bloquear todo el número (bug real de #170: con `costo_total` acá,
+    el costo por mm/mm² quedaba en `None` apenas faltaba la tarifa de
+    material, aunque la tarifa eléctrica ya estuviera cargada). Devuelve
+    `None` solo si NINGÚN componente está disponible."""
+    disponibles = [c for c in componentes if c is not None]
+    return sum(disponibles) if disponibles else None
+
+
 def recalcular_costos_ficha(
     sesion: Session, grupo: GrupoCalibracion, tarifas: TarifasConfig
 ) -> FichaParametro:
@@ -236,7 +251,7 @@ def recalcular_costos_ficha(
         longitud_mm = 4 * tamano_celda_mm * pasadas
         area_material_mm2 = tamano_celda_mm**2
         c_material = costo_material(area_material_mm2, grupo.material.nombre, grupo.espesor_mm, tarifas)
-        costo_celda = costo_total([c_energia, c_material, c_tiempo_maquina])
+        costo_celda = _suma_parcial([c_energia, c_material, c_tiempo_maquina])
 
         ficha.material_costo_pendiente = c_material is None
         ficha.costo_por_mm = round(costo_celda / longitud_mm, 4) if costo_celda is not None else None
@@ -245,7 +260,7 @@ def recalcular_costos_ficha(
         ficha.tiempo_por_mm2_s = None
     else:  # GRABADO -- no consume material (costo_material ya da 0.0 con área <= 0)
         area_mm2 = tamano_celda_mm**2
-        costo_celda = costo_total([c_energia, c_tiempo_maquina])
+        costo_celda = _suma_parcial([c_energia, c_tiempo_maquina])
 
         ficha.material_costo_pendiente = False
         ficha.costo_por_mm = None
