@@ -23,6 +23,16 @@ function esRutaPublica(pathname: string): boolean {
   return pathname === "/login";
 }
 
+/** `/editor` (issue #178, workspace inmersivo tipo Canva) arma su propio
+ * header + layout de viewport bloqueado (`h-screen`) -- el sidebar/topbar
+ * globales y el padding de `<main>` le robarían espacio real al lienzo y
+ * generarían scroll doble. Sigue requiriendo sesión (el middleware ya
+ * protege la ruta antes de llegar acá) -- esto solo oculta el chrome
+ * visual, no es un escape de auth como `esRutaPublica`. */
+function esRutaInmersiva(pathname: string): boolean {
+  return pathname === "/editor";
+}
+
 const CLAVE_PREFERENCIA = "laser-toolkit:sidebar-abierto";
 const CONSULTA_ANGOSTO = "(max-width: 1023px)";
 
@@ -48,6 +58,7 @@ export function AppShell({
   const [sidebarAbierto, setSidebarAbierto] = useState(true);
   const pathname = usePathname();
   const rutaPublica = esRutaPublica(pathname);
+  const rutaInmersiva = esRutaInmersiva(pathname);
 
   // Antes del primer paint: aplicar la preferencia guardada, para no
   // mostrar el sidebar abierto un instante y recién después cerrarlo.
@@ -92,7 +103,7 @@ export function AppShell({
   // orden (regla de los Hooks) -- "cerrar sesión" navega de una página con
   // shell a /login sin desmontar este componente, así que el temprano
   // return no puede saltearse hooks condicionalmente.
-  if (rutaPublica) {
+  if (rutaPublica || rutaInmersiva) {
     return <>{children}</>;
   }
 
