@@ -66,6 +66,13 @@ const camposComunes = {
   // (ausente en objetos subidos a mano, y en cualquier objeto de un
   // proyecto guardado antes de #150).
   objetoOrigenId: z.string().min(1).optional(),
+  // #179, posterior a #150: mecanismo general de agrupación -- opcional
+  // (ausente en un objeto sin grupo, o en cualquier objeto de un proyecto
+  // guardado antes de #179).
+  grupoId: z.string().min(1).optional(),
+  // #179: default `true` para que un proyecto guardado ANTES de esta
+  // columna se siga leyendo bien (nunca existió el campo, todo era visible).
+  visible: z.boolean().default(true),
 };
 
 const objetoProyectoSvgSchema = z.object({

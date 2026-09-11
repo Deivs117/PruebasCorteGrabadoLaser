@@ -186,7 +186,15 @@ def _svg_desde_subpaths(subpaths: list[Subpath], ancho_mm: float, alto_mm: float
     `cargar_subpaths_svg_texto`/`svg.transform` (que sí esperan SVG nativo y
     aplican su propio flip) reconstruyan exactamente los mismos puntos --
     ida y vuelta sin distorsión, con escala 1:1 porque el viewBox coincide
-    con el tamaño real en mm."""
+    con el tamaño real en mm.
+
+    Issue #179: `fill="none"` + `stroke` -- sin esto, el navegador rellena
+    el `<path>` cerrado sólido en NEGRO por defecto (comportamiento estándar
+    de SVG, no una elección de este código), tapando por completo la
+    imagen de origen que este contorno se supone que solo debía bordear.
+    El grosor (`stroke-width`, en las mismas unidades del `viewBox` -- mm)
+    es deliberadamente chico pero visible a los tamaños típicos de un
+    objeto en el lienzo."""
     partes_d: list[str] = []
     for subpath in subpaths:
         puntos = [(x, alto_mm - y) for x, y in subpath.puntos]
@@ -199,7 +207,7 @@ def _svg_desde_subpaths(subpaths: list[Subpath], ancho_mm: float, alto_mm: float
         partes_d.append(" ".join(comandos))
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {ancho_mm:.4f} {alto_mm:.4f}">'
-        f'<path d="{" ".join(partes_d)}" /></svg>'
+        f'<path d="{" ".join(partes_d)}" fill="none" stroke="#246bce" stroke-width="0.3" /></svg>'
     )
 
 

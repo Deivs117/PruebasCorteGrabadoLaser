@@ -101,12 +101,21 @@ _DEFAULTS_PREPROCESAMIENTO_RASTER = {
     "nivelesPosterizado": None,
 }
 
+# Issue #179: un objeto guardado ANTES de esta columna no tiene `visible` en
+# absoluto -- `ObjetoLienzo` en el cliente lo espera siempre presente
+# (booleano, no opcional), así que se completa acá igual que
+# `_DEFAULTS_PREPROCESAMIENTO_RASTER` arriba. `grupoId` sí es opcional en el
+# cliente (`grupoId?: string`), no necesita default.
+_DEFAULTS_OBJETO_LIENZO = {
+    "visible": True,
+}
+
 
 def _objeto_con_contenido(cliente: Client, objeto: dict) -> dict:
     """Descarga el asset de Storage de un objeto guardado y lo vuelve a
     inyectar como `contenidoSvg`/`dataUri` -- la forma que espera
     `ObjetoLienzo` en el cliente."""
-    objeto = dict(objeto)
+    objeto = {**_DEFAULTS_OBJETO_LIENZO, **objeto}
     if objeto["tipo"] == "svg":
         key = objeto.pop("svgStorageKey", None)
         objeto["contenidoSvg"] = descargar(cliente, BUCKET_PROYECTOS, key).decode("utf-8") if key else ""
