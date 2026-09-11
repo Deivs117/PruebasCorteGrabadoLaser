@@ -13,14 +13,30 @@ interface ObjetoLienzoKonvaProps {
   pxPorMm: number;
   areaTrabajoAltoMm: number;
   seleccionado: boolean;
+  /** Issue #192: mientras se mantiene espacio apretado, el drag lo maneja
+   * el pan del `Stage` (ver `editor-lienzo.tsx`) -- si el objeto siguiera
+   * `draggable` fijo, un clic-y-arrastre que empieza encima de él movería
+   * el objeto en vez de panear, porque Konva le da prioridad al drag del
+   * nodo sobre el del `Stage`. */
+  espacioPresionado: boolean;
   excedeArea: boolean;
   vistaToolpath: boolean;
   /** Color del borde de selección -- por tipo de operación (#107), ver
    * `editor-colores.ts`. Solo se usa cuando `seleccionado` es true. */
   color: string;
   /** #149 -- `aditivo` es `true` cuando el click vino con Shift: el lienzo
-   * lo suma/saca de la selección múltiple en vez de reemplazarla. */
-  onSeleccionar: (aditivo: boolean) => void;
+   * lo suma/saca de la selección múltiple en vez de reemplazarla. Issue
+   * #192: `alt` es `true` cuando el click vino con Alt/Option -- el lienzo
+   * lo interpreta como "ciclar a lo que esté tapado debajo de este punto"
+   * en vez de seleccionar este objeto; `clientX`/`clientY` (coordenadas de
+   * pantalla, iguales a `MouseEvent.clientX/Y`) son las que necesita para
+   * ubicar ese punto en el lienzo. */
+  onSeleccionar: (
+    aditivo: boolean,
+    alt: boolean,
+    clientX: number,
+    clientY: number,
+  ) => void;
   onMover: (xMm: number, yMm: number) => void;
   /** Se llama al soltar un handle de resize/rotación del `Transformer` del
    * lienzo (#107) -- separado de `onMover` porque acá cambian también
@@ -64,6 +80,7 @@ export function ObjetoLienzoKonva({
   pxPorMm,
   areaTrabajoAltoMm,
   seleccionado,
+  espacioPresionado,
   excedeArea,
   vistaToolpath,
   color,
@@ -122,10 +139,18 @@ export function ObjetoLienzoKonva({
       x={centro.x}
       y={centro.y}
       rotation={objeto.rotacionDeg}
-      draggable
-      onClick={(e) => onSeleccionar(e.evt.shiftKey)}
-      // El toque en pantallas táctiles no tiene Shift -- nunca es aditivo.
-      onTap={() => onSeleccionar(false)}
+      draggable={!espacioPresionado}
+      onClick={(e) =>
+        onSeleccionar(
+          e.evt.shiftKey,
+          e.evt.altKey,
+          e.evt.clientX,
+          e.evt.clientY,
+        )
+      }
+      // El toque en pantallas táctiles no tiene Shift ni Alt -- nunca es
+      // aditivo ni cicla selección.
+      onTap={() => onSeleccionar(false, false, 0, 0)}
       onDragMove={(e) => {
         const { x, y } = e.target.position();
         onMover(x / pxPorMm, areaTrabajoAltoMm - y / pxPorMm);
