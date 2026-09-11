@@ -63,6 +63,12 @@ def run_migrations_online() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        # Mismo fix que `laser_toolkit.db.base.crear_engine` (ver ahí el
+        # porqué): sin esto, `--autogenerate`/`upgrade` contra el pooler de
+        # transacciones de Supabase falla intermitente con
+        # `DuplicatePreparedStatement` -- encontrado corriendo autogenerate
+        # para #170 contra la DB de dev real, no es hipotético.
+        connect_args={"prepare_threshold": None},
     )
 
     with connectable.connect() as connection:
