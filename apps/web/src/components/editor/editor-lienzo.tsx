@@ -567,6 +567,54 @@ export function EditorLienzo({
     return objetos.filter((o) => o.grupoId === objeto.grupoId).map((o) => o.id);
   }
 
+  /** Issue #192: ¿el punto (en "px de contenido", mismo espacio en el que
+   * `ObjetoLienzoKonva` centra su `Group`) cae dentro del rectángulo de
+   * `objeto`, deshaciendo su rotación? Aproximación por bounding box -- el
+   * contorno exacto de un SVG no importa acá, el propósito es solo ciclar
+   * la selección entre objetos superpuestos con Alt+click. */
+  function contienePunto(objeto: ObjetoLienzo, xPx: number, yPx: number) {
+    const centroXPx = objeto.xMm * pxPorMm;
+    const centroYPx = (areaTrabajoAltoMm - objeto.yMm) * pxPorMm;
+    const anchoPx = objeto.anchoMm * pxPorMm;
+    const altoPx = objeto.altoMm * pxPorMm;
+    const dx = xPx - centroXPx;
+    const dy = yPx - centroYPx;
+    // Deshace la rotación del `Group` (misma convención que Konva: ángulo
+    // positivo gira en sentido horario en el espacio px de pantalla).
+    const rad = (objeto.rotacionDeg * Math.PI) / 180;
+    const xLocal = dx * Math.cos(rad) + dy * Math.sin(rad);
+    const yLocal = -dx * Math.sin(rad) + dy * Math.cos(rad);
+    return Math.abs(xLocal) <= anchoPx / 2 && Math.abs(yLocal) <= altoPx / 2;
+  }
+
+  /** Issue #192: Alt+click cicla la selección hacia el/los objeto(s) debajo
+   * del que está clickeado en ese punto -- estándar de
+   * Illustrator/Figma/Photoshop para poder seleccionar algo tapado por
+   * otro objeto encima (ej. la imagen detrás de su máscara de corte
+   * generada). Sin estado extra: usa la selección ACTUAL como referencia
+   * para saber "un nivel más abajo de qué" hay que ir, así que Alt+click
+   * repetido en el mismo punto sigue bajando en la pila hasta volver a dar
+   * la vuelta al de más arriba. */
+  function seleccionarDetras(xPx: number, yPx: number) {
+    const candidatos = objetos.filter(
+      (o) => o.visible && contienePunto(o, xPx, yPx),
+    );
+    if (candidatos.length === 0) return;
+    const pilaDeArribaHaciaAbajo = [...candidatos].reverse();
+    const idActual = seleccionadosIds.length === 1 ? seleccionadosIds[0] : null;
+    const indiceActual = idActual
+      ? pilaDeArribaHaciaAbajo.findIndex((o) => o.id === idActual)
+      : -1;
+    // El `if` de arriba garantiza `pilaDeArribaHaciaAbajo.length >= 1`, así
+    // que el módulo siempre cae en un índice válido -- TS no lo puede
+    // inferir solo del length check, de ahí el `!`.
+    const siguiente =
+      pilaDeArribaHaciaAbajo[
+        (indiceActual + 1) % pilaDeArribaHaciaAbajo.length
+      ]!;
+    setSeleccionadosIds(idsDelGrupoDe(siguiente.id));
+  }
+
   /** #149 -- click sobre un objeto individual. `aditivo` viene de Shift: sin
    * Shift, reemplaza la selección entera por este objeto (comportamiento
    * pre-#149); con Shift, lo suma o lo saca de la selección múltiple sin
@@ -828,7 +876,13 @@ export function EditorLienzo({
 
   /** Issue #179: `ids` vuelven a moverse/rotarse/escalarse por separado --
    * incluye desagrupar la máscara de corte automática (#108) si el
-   * operario la necesita ajustar aparte de su imagen de origen. */
+   * operario la necesita ajustar aparte de su imagen de origen.
+   *
+   * Issue #192: además limpia la selección. Sin esto, `ids` (todo el
+   * antiguo grupo) seguía completo en `seleccionadosIds` después de
+   * desagrupar, y la mecánica de selección múltiple de #149 (movimiento
+   * rígido conjunto) seguía moviéndolos juntos -- indistinguible de seguir
+   * agrupados -- hasta deseleccionar y volver a clickear uno solo. */
   function desagruparObjetos(ids: string[]) {
     const idsADesagrupar = new Set(ids);
     setObjetos((anteriores) =>
@@ -836,6 +890,7 @@ export function EditorLienzo({
         idsADesagrupar.has(o.id) ? { ...o, grupoId: undefined } : o,
       ),
     );
+    setSeleccionadosIds([]);
   }
 
   /** Issue #179: `visible: false` saca al objeto del `Stage` de Konva Y del
@@ -977,8 +1032,9 @@ export function EditorLienzo({
       if (!objeto.grupoId) {
         actualizarObjeto(objeto.id, (o) => ({ ...o, grupoId }));
       }
+      const idContorno = crypto.randomUUID();
       agregarObjeto({
-        id: crypto.randomUUID(),
+        id: idContorno,
         tipo: "svg",
         nombre: `Contorno de ${objeto.nombre}`,
         // No hay un nombre real en la biblioteca de SVG (`/api/svgs`) para
@@ -1007,6 +1063,14 @@ export function EditorLienzo({
         grupoId,
         visible: true,
       });
+      // Issue #192: `agregarObjeto` deja seleccionado solo el objeto nuevo
+      // (comportamiento correcto para el caso general de "agregar un
+      // objeto suelto"), pero acá el contorno nace YA agrupado con su
+      // imagen de origen -- sin este ajuste, la selección queda en un solo
+      // objeto aunque el grupo ya exista en los datos, y el primer
+      // mover/redimensionar después de generar el contorno solo afecta a
+      // la máscara (recién se ve como grupo al volver a seleccionar).
+      setSeleccionadosIds([objeto.id, idContorno]);
     } catch (error) {
       setErrorContorno(
         error instanceof Error
@@ -1528,6 +1592,7 @@ export function EditorLienzo({
                           pxPorMm={pxPorMm}
                           areaTrabajoAltoMm={areaTrabajoAltoMm}
                           seleccionado={seleccionadosIds.includes(objeto.id)}
+                          espacioPresionado={espacioPresionado}
                           excedeArea={objetoExcedeArea(
                             objeto,
                             areaTrabajoAnchoMm,
@@ -1535,9 +1600,17 @@ export function EditorLienzo({
                           )}
                           vistaToolpath={mostrarToolpath}
                           color={colorSeleccionDe(objeto)}
-                          onSeleccionar={(aditivo) =>
-                            seleccionarObjeto(objeto.id, aditivo)
-                          }
+                          onSeleccionar={(aditivo, alt, clientX, clientY) => {
+                            if (alt) {
+                              const punto = posicionEnPxDeContenido(
+                                clientX,
+                                clientY,
+                              );
+                              if (punto) seleccionarDetras(punto.x, punto.y);
+                              return;
+                            }
+                            seleccionarObjeto(objeto.id, aditivo);
+                          }}
                           onMover={(xMm, yMm) =>
                             moverOTransformarObjeto(
                               objeto.id,
@@ -1685,7 +1758,8 @@ export function EditorLienzo({
                * de desplazar el lienzo ahora. */}
               <span className="text-text-muted hidden px-1.5 text-xs sm:inline">
                 Mantené <kbd className="font-mono">espacio</kbd> y arrastrá para
-                desplazar el lienzo.
+                desplazar el lienzo · <kbd className="font-mono">alt</kbd> +
+                click selecciona lo que esté tapado debajo.
               </span>
             </div>
 
