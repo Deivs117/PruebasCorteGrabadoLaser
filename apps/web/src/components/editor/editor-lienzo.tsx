@@ -19,7 +19,10 @@ import { LienzoGrilla } from "@/components/editor/lienzo-grilla";
 import { LienzoReglas } from "@/components/editor/lienzo-reglas";
 import { BarraAccionesObjeto } from "@/components/editor/barra-acciones-objeto";
 import { PanelObjeto } from "@/components/editor/panel-objeto";
-import { SubirObjetoDropzone } from "@/components/editor/subir-objeto-dropzone";
+import {
+  SubirObjetoDropzone,
+  type SvgBibliotecaItem,
+} from "@/components/editor/subir-objeto-dropzone";
 import {
   EditorSidebarRiel,
   type PanelSidebarId,
@@ -148,6 +151,10 @@ interface EditorLienzoProps {
   areaTrabajoAnchoMm: number;
   areaTrabajoAltoMm: number;
   proyectoInicial?: ProyectoInicial | null;
+  /** Issue #183: SVGs ya subidos a la biblioteca compartida con "Grabado
+   * Vectorial" -- se pasan al panel "Subir" para poder reusar uno en vez
+   * de resubir el archivo. */
+  bibliotecaSvg: SvgBibliotecaItem[];
 }
 
 /** `corte` sigue el outline del diseño; `grabado` es el relleno detallado —
@@ -214,6 +221,7 @@ export function EditorLienzo({
   areaTrabajoAnchoMm,
   areaTrabajoAltoMm,
   proyectoInicial = null,
+  bibliotecaSvg,
 }: EditorLienzoProps) {
   const router = useRouter();
   const [montado, setMontado] = useState(false);
@@ -1280,6 +1288,7 @@ export function EditorLienzo({
             <SubirObjetoDropzone
               onAgregar={agregarObjeto}
               siguientePosicion={siguientePosicion}
+              bibliotecaSvg={bibliotecaSvg}
             />
           }
           contenidoCapas={
@@ -1506,12 +1515,32 @@ export function EditorLienzo({
               >
                 +
               </button>
+              {/* Issue #183: antes era un link de texto -- ahora un ícono
+               * (lupa + cuadrado, patrón estándar de "encuadrar a la vista
+               * completa" en herramientas CAD/diseño), consistente con los
+               * botones de zoom de al lado (tampoco son texto). Misma
+               * `restablecerVista()`, sin cambios de lógica. */}
               <button
                 type="button"
                 onClick={restablecerVista}
-                className="text-text-muted hover:text-navy px-1.5 text-xs underline-offset-2 hover:underline"
+                aria-label="Restablecer vista"
+                title="Restablecer vista (encuadrar el área de trabajo completa)"
+                className={iconButtonClasses()}
               >
-                Restablecer vista
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.75}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="size-4"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="3" width="9" height="9" rx="1" />
+                  <circle cx="16" cy="16" r="5" />
+                  <line x1="19.5" y1="19.5" x2="22" y2="22" />
+                </svg>
               </button>
               {/* #149 -- el drag simple sobre área vacía pasa a ser el
                * marquee de selección; mantener espacio apretado es la forma

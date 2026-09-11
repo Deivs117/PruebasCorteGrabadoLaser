@@ -1,4 +1,6 @@
-from PIL import Image
+import time
+
+from PIL import Image, ImageDraw
 
 from laser_toolkit.raster.contorno import extraer_contorno, extraer_contorno_con_margen
 
@@ -89,6 +91,36 @@ def test_margen_en_rectangulo_agranda_ambas_dimensiones():
     assert (ancho, alto) == (14.0, 24.0)
     assert len(contornos) == 1
     assert set(contornos[0].puntos) == {(0.0, 0.0), (14.0, 0.0), (14.0, 24.0), (0.0, 24.0)}
+
+
+def test_imagen_grande_con_alfa_se_procesa_rapido_sin_colgarse():
+    """Regresión de un bug real (issue #183): sin límite de resolución,
+    `_mascara_binaria`/`_trazar_bordes_mascara` recorren cada pixel en
+    Python puro -- una imagen con transparencia real a resolución de foto
+    (millones de píxeles) tardaba minutos y colgaba la función serverless
+    (Vercel) sin responder nada. `_limitar_resolucion` la reduce antes de
+    ese trazado -- acá se confirma que una imagen bien más grande que el
+    límite (`_LADO_MAXIMO_PX`) se procesa en un tiempo razonable y da un
+    contorno coherente (con tolerancia: el downscale pierde precisión de
+    borde a propósito, no es para reproducir la imagen)."""
+    ancho_px, alto_px = 1200, 900
+    imagen = Image.new("RGBA", (ancho_px, alto_px), (0, 0, 0, 0))
+    ImageDraw.Draw(imagen).rectangle((100, 100, 1099, 799), fill=(0, 0, 0, 255))
+
+    inicio = time.monotonic()
+    contornos = extraer_contorno(imagen, ancho_mm=120.0, alto_mm=90.0)
+    duracion_s = time.monotonic() - inicio
+
+    assert duracion_s < 5.0
+    assert len(contornos) == 1
+    xs = [p[0] for p in contornos[0].puntos]
+    ys = [p[1] for p in contornos[0].puntos]
+    # El rectángulo real es (100,100)-(1100,800)px -> (10,10)-(110,80)mm.
+    # Tolerancia generosa: el trazado corre sobre una versión reducida.
+    assert 5.0 < min(xs) < 15.0
+    assert 105.0 < max(xs) < 115.0
+    assert 5.0 < min(ys) < 15.0
+    assert 75.0 < max(ys) < 85.0
 
 
 def test_margen_en_silueta_alfa_crece_la_silueta_hacia_afuera():

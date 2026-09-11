@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { EditorLienzo } from "@/components/editor/editor-lienzo";
 import { leerMaquina } from "@/lib/maquina-data";
 import { obtenerProyecto } from "@/lib/proyectos-data";
+import { listarSvgsConContenido } from "@/lib/svg-data";
 
 // El área de trabajo real se edita desde "Máquina" en cualquier momento, y
 // un proyecto guardado (#18) se puede abrir en cualquier momento vía
@@ -26,11 +27,15 @@ export default async function EditorDeDiseno({
       ? Number(proyectoIdParam)
       : undefined;
 
-  const [maquina, proyecto] = await Promise.all([
+  const [maquina, proyecto, bibliotecaSvg] = await Promise.all([
     leerMaquina(),
     proyectoId !== undefined
       ? obtenerProyecto(proyectoId)
       : Promise.resolve(null),
+    // Issue #183: biblioteca de SVGs ya subidos (mismo storage que
+    // "Grabado Vectorial") -- se muestra en el panel "Subir" para poder
+    // reusar uno sin volver a subir el archivo.
+    listarSvgsConContenido(),
   ]);
 
   if (proyectoId !== undefined && !proyecto) {
@@ -50,6 +55,7 @@ export default async function EditorDeDiseno({
             }
           : null
       }
+      bibliotecaSvg={bibliotecaSvg}
     />
   );
 }
