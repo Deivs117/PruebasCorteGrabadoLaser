@@ -17,6 +17,7 @@ from laser_toolkit.db.models import (
     EstadoFicha,
     FamiliaMaterial,
     FichaParametro,
+    FinalRun,
     GrupoCalibracion,
     Material,
     Medicion,
@@ -32,7 +33,22 @@ from laser_toolkit.db.repo_materiales import listar_materiales
 from laser_toolkit.db.repo_negocio import obtener_configuracion_maquina, obtener_tarifas_vigentes
 from laser_toolkit.db.repo_pruebas import listar_candidatos
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
+
+# Ver docs/backend-db-performance.md ("eager loading por defecto"): estos dos
+# helpers centralizan las cadenas de `joinedload`/`selectinload` que necesita
+# cualquier query que recorra Registro o GrupoCalibracion fila por fila --
+# sin esto, cada función repetía (o directamente se olvidaba de) la misma
+# cadena de opciones, que era exactamente el N+1 real de #165.
+_OPCIONES_REGISTRO = (
+    joinedload(Registro.suite).joinedload(Suite.material),
+    joinedload(Registro.final_run).joinedload(FinalRun.grupo_calibracion).joinedload(GrupoCalibracion.material),
+    selectinload(Registro.mediciones),
+)
+_OPCIONES_GRUPO_CALIBRACION = (
+    joinedload(GrupoCalibracion.material),
+    selectinload(GrupoCalibracion.final_runs).selectinload(FinalRun.registros),
+)
 
 
 def materiales_catalogo(sesion: Session) -> list[dict]:
@@ -127,7 +143,11 @@ def suites(sesion: Session) -> list[dict]:
     """Espejo de `listarSuites` en `fs-data.ts`. La tabla `suites` (issue #22)
     solo describe barridos -- Final Run es otra tabla (`final_runs`, (E) del
     plan de #2), así que no hace falta filtrar por "tipo" como en el YAML."""
-    filas = sesion.scalars(select(Suite).order_by(Suite.created_at.desc()))
+    filas = sesion.scalars(
+        select(Suite)
+        .options(joinedload(Suite.material), selectinload(Suite.registros))
+        .order_by(Suite.created_at.desc())
+    )
     resultado = []
     for suite in filas:
         registro = suite.registros[0] if suite.registros else None
@@ -153,7 +173,7 @@ def suite_detalle(sesion: Session, suite_id: int) -> dict | None:
     (B) o "Duplicar" (A) -- espejo de `leerSuiteEditable` en `generar-suite.ts`.
     `svgPath`/`modoGrabadoSvg`/`svgResolucionRellenoMm` quedan pendientes de
     cuando el editor SVG (#3) suba a Storage en vez de a `assets/svg/`."""
-    suite = sesion.get(Suite, suite_id)
+    suite = sesion.get(Suite, suite_id, options=[joinedload(Suite.material)])
     if suite is None:
         return None
     return {
@@ -205,7 +225,9 @@ def registros(sesion: Session) -> list[dict]:
     reordenado de #2), así que solo hay un tipo de fila acá. Incluye
     corridas de Suite y de FinalRun (E) por igual -- Hoja de Registro nunca
     distinguió el origen en el sistema de archivos viejo."""
-    filas = sesion.scalars(select(Registro).order_by(Registro.created_at.desc()))
+    filas = sesion.scalars(
+        select(Registro).options(*_OPCIONES_REGISTRO).order_by(Registro.created_at.desc())
+    )
     resultado = []
     for registro in filas:
         material, espesor_mm, operacion = _contexto_registro(registro)
@@ -235,7 +257,9 @@ def registros(sesion: Session) -> list[dict]:
 def registro_detalle(sesion: Session, corrida_id: str) -> dict | None:
     """Forma que espera `RegistroEditor` (Hoja de Registro, C) -- el
     equivalente normalizado de un `_registro.csv`."""
-    registro = sesion.scalar(select(Registro).where(Registro.corrida_id == corrida_id))
+    registro = sesion.scalar(
+        select(Registro).where(Registro.corrida_id == corrida_id).options(*_OPCIONES_REGISTRO)
+    )
     if registro is None:
         return None
     material, espesor_mm, operacion = _contexto_registro(registro)
@@ -265,7 +289,9 @@ def costeo_detalle(sesion: Session, corrida_id: str) -> dict | None:
     """Espejo de `leerCosteo` en `costeo-data.ts` -- costos ya calculados por
     `calcular_y_guardar_costos_registro`. `None` si el registro no existe o
     todavía no se calculó ningún costo."""
-    registro = sesion.scalar(select(Registro).where(Registro.corrida_id == corrida_id))
+    registro = sesion.scalar(
+        select(Registro).where(Registro.corrida_id == corrida_id).options(*_OPCIONES_REGISTRO)
+    )
     if registro is None:
         return None
     material, espesor_mm, operacion = _contexto_registro(registro)
@@ -311,7 +337,7 @@ def panorama_familias(sesion: Session) -> list[dict]:
     costeadas_por_familia: dict[FamiliaMaterial, int] = {f: 0 for f in FamiliaMaterial}
     costos_por_familia: dict[FamiliaMaterial, list[float]] = {f: [] for f in FamiliaMaterial}
 
-    for registro in sesion.scalars(select(Registro)):
+    for registro in sesion.scalars(select(Registro).options(*_OPCIONES_REGISTRO)):
         material_nombre, _, _ = _contexto_registro(registro)
         # Fallback defensivo, igual que #10 (materiales-catalog.ts): un
         # registro real nunca se pierde de esta cuenta aunque su material,
@@ -331,7 +357,7 @@ def panorama_familias(sesion: Session) -> list[dict]:
     # levanta ValueError (mediciones reales sin respaldo de estimación), se
     # trata igual que "todavía no calibrado", nunca como error de la página.
     kwh_por_familia: dict[FamiliaMaterial, list[float]] = {f: [] for f in FamiliaMaterial}
-    for grupo in sesion.scalars(select(GrupoCalibracion)):
+    for grupo in sesion.scalars(select(GrupoCalibracion).options(*_OPCIONES_GRUPO_CALIBRACION)):
         try:
             resumen = resumen_calibracion_de_grupo(sesion, grupo)
         except ValueError:
@@ -367,7 +393,10 @@ def fichas_parametro(sesion: Session) -> list[dict]:
     de `grupos_calibracion`, acá solo entran los grupos que ya tienen una
     Ficha creada (ver `FichaParametro.grupo_calibracion`, relación 1:1)."""
     fichas = sesion.scalars(
-        select(FichaParametro).join(GrupoCalibracion).order_by(GrupoCalibracion.material_id, GrupoCalibracion.id)
+        select(FichaParametro)
+        .join(GrupoCalibracion)
+        .options(joinedload(FichaParametro.grupo_calibracion).joinedload(GrupoCalibracion.material))
+        .order_by(GrupoCalibracion.material_id, GrupoCalibracion.id)
     )
     return [
         {
@@ -390,7 +419,9 @@ def grupos_calibracion(sesion: Session) -> list[dict]:
     """Espejo de `listarGruposCalibracion` en `final-run-data.ts` (E, #64):
     cada grupo con sus ejecuciones (una por `FinalRun`, ordenadas), y si ya
     tiene una Ficha de Parámetro vigente."""
-    grupos = sesion.scalars(select(GrupoCalibracion).order_by(GrupoCalibracion.id))
+    grupos = sesion.scalars(
+        select(GrupoCalibracion).options(*_OPCIONES_GRUPO_CALIBRACION).order_by(GrupoCalibracion.id)
+    )
     resultado = []
     for grupo in grupos:
         ejecuciones = []
@@ -409,6 +440,11 @@ def grupos_calibracion(sesion: Session) -> list[dict]:
                     ),
                 }
             )
+        # `obtener_ficha_vigente` sigue siendo una query aparte por grupo (no
+        # una relación con eager loading) -- N+1 residual documentado en
+        # docs/backend-db-performance.md, de bajo impacto porque Calibración
+        # nunca lista muchos grupos a la vez (a diferencia de Historial/
+        # Suites, que sí tenían volumen real). Ver #165.
         ficha = obtener_ficha_vigente(sesion, grupo)
         resultado.append(
             {
@@ -432,7 +468,11 @@ def resumen_calibracion(sesion: Session, grupo_calibracion_id: str, minimo_ejecu
     `laser_toolkit.calibracion`) en vez de correr `summarize-final-run`
     como subproceso. Levanta `ValueError` (grupo inexistente o alguna
     ejecución sin medir) -- `main.py` lo traduce a HTTP."""
-    grupo = sesion.scalar(select(GrupoCalibracion).where(GrupoCalibracion.grupo_calibracion_id == grupo_calibracion_id))
+    grupo = sesion.scalar(
+        select(GrupoCalibracion)
+        .where(GrupoCalibracion.grupo_calibracion_id == grupo_calibracion_id)
+        .options(selectinload(GrupoCalibracion.final_runs).selectinload(FinalRun.registros))
+    )
     if grupo is None:
         raise ValueError(f"No existe el grupo de calibración {grupo_calibracion_id}.")
     resumen = resumen_calibracion_de_grupo(sesion, grupo, minimo_ejecuciones=minimo_ejecuciones)
@@ -495,7 +535,7 @@ def reportes_resumen(sesion: Session) -> dict:
     Prompt 11 necesita una línea base explícita de comparación, todavía sin
     definir -- deliberadamente fuera de este resumen, no un olvido."""
     combos: dict[tuple[str, float, str], list[float]] = {}
-    for registro in sesion.scalars(select(Registro)):
+    for registro in sesion.scalars(select(Registro).options(*_OPCIONES_REGISTRO)):
         material, espesor_mm, operacion = _contexto_registro(registro)
         for medicion in registro.mediciones:
             if medicion.costo_total_celda is not None:
@@ -513,7 +553,11 @@ def reportes_resumen(sesion: Session) -> dict:
     ]
 
     serie_kwh_calibrado = []
-    for grupo in sesion.scalars(select(GrupoCalibracion).order_by(GrupoCalibracion.grupo_calibracion_id)):
+    for grupo in sesion.scalars(
+        select(GrupoCalibracion)
+        .options(*_OPCIONES_GRUPO_CALIBRACION)
+        .order_by(GrupoCalibracion.grupo_calibracion_id)
+    ):
         puntos = [
             {
                 "fecha": final_run.fecha.isoformat(),

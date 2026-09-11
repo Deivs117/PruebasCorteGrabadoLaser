@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from laser_toolkit.config import MachineConfig, Operacion
 from laser_toolkit.costos import (
@@ -345,4 +345,13 @@ def desmarcar_candidato(sesion: Session, medicion: Medicion) -> None:
 
 
 def listar_candidatos(sesion: Session) -> list[CandidatoFinalRun]:
-    return list(sesion.scalars(select(CandidatoFinalRun).order_by(CandidatoFinalRun.marcado_en)))
+    """`candidato_a_dict` (en `apps/api/lectura.py`) recorre
+    candidato -> medicion -> registro -> suite -> material por cada fila --
+    sin esto, era un N+1 de 4 niveles (issue #165)."""
+    filas = select(CandidatoFinalRun).options(
+        joinedload(CandidatoFinalRun.medicion)
+        .joinedload(Medicion.registro)
+        .joinedload(Registro.suite)
+        .joinedload(Suite.material)
+    )
+    return list(sesion.scalars(filas.order_by(CandidatoFinalRun.marcado_en)))
