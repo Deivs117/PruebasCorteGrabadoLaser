@@ -47,7 +47,15 @@ _OPCIONES_REGISTRO = (
 )
 _OPCIONES_GRUPO_CALIBRACION = (
     joinedload(GrupoCalibracion.material),
-    selectinload(GrupoCalibracion.final_runs).selectinload(FinalRun.registros),
+    # `.selectinload(Registro.mediciones)` encadenado (issue #170): el fix
+    # del bug de `repeticiones` en `resumen_calibracion_de_grupo` (dividir
+    # kwh/tiempo de la corrida entre sus celdas reales) le agregó un acceso
+    # a `registro.mediciones` -- sin este tercer nivel, cualquier loop que
+    # llame a esa función por grupo (`panorama_familias`, `reportes_resumen`)
+    # reintroduce el mismo N+1 que #165 ya había resuelto.
+    selectinload(GrupoCalibracion.final_runs)
+    .selectinload(FinalRun.registros)
+    .selectinload(Registro.mediciones),
 )
 
 
@@ -386,6 +394,44 @@ def panorama_familias(sesion: Session) -> list[dict]:
     return resultado
 
 
+def _notas_operario_de_grupo(grupo: GrupoCalibracion) -> list[str]:
+    """Notas cargadas por el operario celda por celda (`Medicion.notas`)
+    durante las ejecuciones de la Final Run de este grupo -- issue #170,
+    antes invisibles en la Ficha (que solo mostraba su propio campo `notas`
+    editado a mano). Puede haber varias -- una por celda/ejecución."""
+    return [
+        medicion.notas
+        for final_run in grupo.final_runs
+        for registro in final_run.registros
+        for medicion in registro.mediciones
+        if medicion.notas
+    ]
+
+
+def _ficha_a_dict(ficha: FichaParametro) -> dict:
+    grupo = ficha.grupo_calibracion
+    return {
+        "grupoId": grupo.grupo_calibracion_id,
+        "material": grupo.material.nombre,
+        "espesorMm": str(grupo.espesor_mm),
+        "operacion": grupo.operacion.value,
+        "velocidadMmMin": str(grupo.velocidad_mm_min),
+        "potenciaPct": str(grupo.potencia_pct),
+        "estado": ficha.estado.value,
+        # Costo/tiempo por mm (corte) o mm² (grabado) -- issue #170,
+        # reemplaza al viejo `costoEstandarTotal` manual. Solo uno de los
+        # dos pares no es `None`, según `operacion` del grupo.
+        "costoPorMm": _costo_str(ficha.costo_por_mm),
+        "tiempoPorMmS": _costo_str(ficha.tiempo_por_mm_s),
+        "costoPorMm2": _costo_str(ficha.costo_por_mm2),
+        "tiempoPorMm2S": _costo_str(ficha.tiempo_por_mm2_s),
+        "materialCostoPendiente": ficha.material_costo_pendiente,
+        "fechaValidacion": (ficha.fecha_validacion.isoformat() if ficha.fecha_validacion is not None else ""),
+        "notas": ficha.notas or "",
+        "notasOperario": _notas_operario_de_grupo(grupo),
+    }
+
+
 def fichas_parametro(sesion: Session) -> list[dict]:
     """Espejo de `listarFichas` en `fichas-data.ts` (F6, issue #7): todas las
     Fichas de Parámetro que ya existen (oficiales o en revisión), con el
@@ -395,24 +441,16 @@ def fichas_parametro(sesion: Session) -> list[dict]:
     fichas = sesion.scalars(
         select(FichaParametro)
         .join(GrupoCalibracion)
-        .options(joinedload(FichaParametro.grupo_calibracion).joinedload(GrupoCalibracion.material))
+        .options(
+            joinedload(FichaParametro.grupo_calibracion).joinedload(GrupoCalibracion.material),
+            joinedload(FichaParametro.grupo_calibracion)
+            .selectinload(GrupoCalibracion.final_runs)
+            .selectinload(FinalRun.registros)
+            .selectinload(Registro.mediciones),
+        )
         .order_by(GrupoCalibracion.material_id, GrupoCalibracion.id)
     )
-    return [
-        {
-            "grupoId": ficha.grupo_calibracion.grupo_calibracion_id,
-            "material": ficha.grupo_calibracion.material.nombre,
-            "espesorMm": str(ficha.grupo_calibracion.espesor_mm),
-            "operacion": ficha.grupo_calibracion.operacion.value,
-            "velocidadMmMin": str(ficha.grupo_calibracion.velocidad_mm_min),
-            "potenciaPct": str(ficha.grupo_calibracion.potencia_pct),
-            "estado": ficha.estado.value,
-            "costoEstandarTotal": (str(ficha.costo_estandar_total) if ficha.costo_estandar_total is not None else ""),
-            "fechaValidacion": (ficha.fecha_validacion.isoformat() if ficha.fecha_validacion is not None else ""),
-            "notas": ficha.notas or "",
-        }
-        for ficha in fichas
-    ]
+    return [_ficha_a_dict(ficha) for ficha in fichas]
 
 
 def grupos_calibracion(sesion: Session) -> list[dict]:
@@ -446,6 +484,13 @@ def grupos_calibracion(sesion: Session) -> list[dict]:
         # nunca lista muchos grupos a la vez (a diferencia de Historial/
         # Suites, que sí tenían volumen real). Ver #165.
         ficha = obtener_ficha_vigente(sesion, grupo)
+        # Mismo umbral que `resumen_calibracion_de_grupo`/`resumir_calibracion`
+        # (default `minimo_ejecuciones=3`), pero sin llamarla de nuevo acá --
+        # ya tenemos `ejecuciones` armado, contar cuántas están `calibrada`
+        # es gratis y evita otra pasada + el try/except de ValueError (issue
+        # #170: el formulario "Nueva Ficha" usa este flag para sugerir
+        # `estado="oficial"` sin una llamada aparte por grupo).
+        calibrado = sum(1 for e in ejecuciones if e["calibrada"]) >= 3
         resultado.append(
             {
                 "grupoId": grupo.grupo_calibracion_id,
@@ -457,6 +502,7 @@ def grupos_calibracion(sesion: Session) -> list[dict]:
                 "repeticiones": repeticiones,
                 "ejecuciones": ejecuciones,
                 "fichaEstado": ficha.estado.value if ficha is not None else None,
+                "calibrado": calibrado,
             }
         )
     return resultado

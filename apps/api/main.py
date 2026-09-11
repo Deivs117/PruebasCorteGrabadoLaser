@@ -433,7 +433,6 @@ def resumen_calibracion(grupo_id: str, minimoEjecuciones: int = 3) -> dict:
 class FichaBody(BaseModel):
     estado: str
     notas: str | None = None
-    costoEstandarTotal: str | None = None
     fechaValidacion: str | None = None
 
 
@@ -452,9 +451,21 @@ def actualizar_ficha(grupo_id: str, body: FichaBody) -> dict:
                 grupo_id,
                 estado=body.estado,
                 notas=body.notas,
-                costo_estandar_total=float(body.costoEstandarTotal) if body.costoEstandarTotal else None,
                 fecha_validacion=date.fromisoformat(body.fechaValidacion) if body.fechaValidacion else None,
             )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/grupos-calibracion/{grupo_id}/ficha/regenerar-costos")
+def regenerar_costos_ficha(grupo_id: str) -> dict:
+    """Botón "Regenerar costos" (issue #170): recalcula el costo por
+    mm/mm² de una Ficha ya existente contra las tarifas vigentes ahora
+    mismo, sin tocar estado/notas/fecha -- para cuando se carga una tarifa
+    que antes faltaba."""
+    with sesion() as s:
+        try:
+            return final_run.regenerar_costos_ficha(s, grupo_id)
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
 

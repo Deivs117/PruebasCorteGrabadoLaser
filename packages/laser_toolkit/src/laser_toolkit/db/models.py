@@ -30,6 +30,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -352,7 +353,23 @@ class FichaParametro(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     grupo_calibracion_id: Mapped[int] = mapped_column(ForeignKey("grupos_calibracion.id"), unique=True)
-    costo_estandar_total: Mapped[float | None] = mapped_column(Float, default=None)
+    # Costo/tiempo normalizado por unidad física, 100% calculado (issue #170)
+    # -- reemplaza al viejo `costo_estandar_total` manual, que no tenía
+    # ninguna conexión real con las tarifas ni con lo medido en la Final Run.
+    # Uno solo de los dos pares aplica según `grupo_calibracion.operacion`
+    # (corte -> por mm cortado; grabado -> por mm² grabado), el otro par
+    # queda en `None`. Se recalculan con `recalcular_costos_ficha` (acción
+    # "Regenerar costos"), nunca se escriben a mano.
+    costo_por_mm: Mapped[float | None] = mapped_column(Float, default=None)
+    tiempo_por_mm_s: Mapped[float | None] = mapped_column(Float, default=None)
+    costo_por_mm2: Mapped[float | None] = mapped_column(Float, default=None)
+    tiempo_por_mm2_s: Mapped[float | None] = mapped_column(Float, default=None)
+    # `True` cuando el costo de material de corte no se pudo incluir porque
+    # `precio_material_por_m2` de ese material/espesor todavía no está en
+    # Tarifas -- nunca se inventa un total que ignore el componente en
+    # silencio (mismo criterio que `costos.costo_total`). Siempre `False`
+    # en grabado (no consume material).
+    material_costo_pendiente: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)
     estado: Mapped[EstadoFicha] = mapped_column(
         Enum(EstadoFicha, name="estado_ficha"), default=EstadoFicha.EN_REVISION
     )

@@ -18,6 +18,7 @@ from laser_toolkit.db.models import (
     CandidatoFinalRun,
     EstadoFicha,
     FamiliaMaterial,
+    FichaParametro,
     FinalRun,
     GrupoCalibracion,
     Material,
@@ -26,7 +27,10 @@ from laser_toolkit.db.repo_calibracion import (
     crear_final_run,
     crear_o_actualizar_ficha,
     obtener_o_crear_grupo_calibracion,
+    recalcular_costos_ficha,
+    resumen_calibracion_de_grupo,
 )
+from laser_toolkit.db.repo_negocio import construir_tarifas_config
 from laser_toolkit.db.repo_pruebas import (
     crear_registro_de_final_run,
     guardar_gcode_key,
@@ -172,13 +176,25 @@ def generar_siguiente_ejecucion(sesion: Session, grupo_calibracion_id: str) -> d
     return crear_ejecucion(sesion, payload)
 
 
+def _ficha_costos_a_dict(ficha: FichaParametro) -> dict:
+    return {
+        "estado": ficha.estado.value,
+        "notas": ficha.notas or "",
+        "fechaValidacion": (ficha.fecha_validacion.isoformat() if ficha.fecha_validacion is not None else ""),
+        "costoPorMm": ficha.costo_por_mm,
+        "tiempoPorMmS": ficha.tiempo_por_mm_s,
+        "costoPorMm2": ficha.costo_por_mm2,
+        "tiempoPorMm2S": ficha.tiempo_por_mm2_s,
+        "materialCostoPendiente": ficha.material_costo_pendiente,
+    }
+
+
 def actualizar_ficha(
     sesion: Session,
     grupo_calibracion_id: str,
     *,
     estado: str,
     notas: str | None = None,
-    costo_estandar_total: float | None = None,
     fecha_validacion: date | None = None,
 ) -> dict:
     """Crea o actualiza la Ficha de Parámetro (F6, issue #7) de un grupo --
@@ -189,9 +205,15 @@ def actualizar_ficha(
 
     Un solo endpoint cubre tanto el toggle rápido de Final Run ("Marcar
     Ficha como oficial", solo `estado`) como el editor completo de la
-    pantalla Fichas de Parámetro (#7, que además carga costo y fecha) --
-    `costo_estandar_total`/`fecha_validacion` en `None` simplemente no
-    tocan el valor ya guardado (ver `crear_o_actualizar_ficha`)."""
+    pantalla Fichas de Parámetro (#7, que además carga fecha/notas) --
+    `fecha_validacion` en `None` simplemente no toca el valor ya guardado
+    (ver `crear_o_actualizar_ficha`).
+
+    El costo por mm/mm² (issue #170) se recalcula acá también, con las
+    tarifas vigentes -- así una Ficha recién creada ya sale con costo, sin
+    depender de que alguien presione "Regenerar costos" a mano la primera
+    vez (esa acción, `regenerar_costos_ficha`, es para cuando cambian las
+    tarifas *después*, sin tocar estado/notas/fecha)."""
     grupo = _grupo_por_id(sesion, grupo_calibracion_id)
     try:
         estado_enum = EstadoFicha(estado)
@@ -202,16 +224,23 @@ def actualizar_ficha(
         grupo,
         estado=estado_enum,
         notas=notas,
-        costo_estandar_total=costo_estandar_total,
         fecha_validacion=fecha_validacion,
     )
+    ficha = recalcular_costos_ficha(sesion, grupo, construir_tarifas_config(sesion))
     sesion.commit()
-    return {
-        "estado": ficha.estado.value,
-        "notas": ficha.notas or "",
-        "costoEstandarTotal": (str(ficha.costo_estandar_total) if ficha.costo_estandar_total is not None else ""),
-        "fechaValidacion": (ficha.fecha_validacion.isoformat() if ficha.fecha_validacion is not None else ""),
-    }
+    return _ficha_costos_a_dict(ficha)
+
+
+def regenerar_costos_ficha(sesion: Session, grupo_calibracion_id: str) -> dict:
+    """Acción explícita "Regenerar costos" (issue #170): recalcula el costo
+    por mm/mm² de la Ficha ya existente contra las tarifas vigentes ahora
+    mismo, sin tocar estado/notas/fecha -- para cuando se carga una tarifa
+    de material que antes faltaba, o cambia alguna tarifa, sin que eso
+    obligue a "editar" la Ficha para algo que no cambió."""
+    grupo = _grupo_por_id(sesion, grupo_calibracion_id)
+    ficha = recalcular_costos_ficha(sesion, grupo, construir_tarifas_config(sesion))
+    sesion.commit()
+    return _ficha_costos_a_dict(ficha)
 
 
 def eliminar_grupo(sesion: Session, cliente_storage: Client, grupo_calibracion_id: str) -> None:
