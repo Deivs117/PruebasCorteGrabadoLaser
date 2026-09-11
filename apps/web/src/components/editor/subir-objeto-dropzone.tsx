@@ -118,6 +118,7 @@ export function SubirObjetoDropzone({
       materialProduccion: null,
       resolucionRellenoMm: 0.3,
       toolpath: {},
+      visible: true,
     });
   }
 
@@ -150,6 +151,7 @@ export function SubirObjetoDropzone({
         materialProduccion: null,
         resolucionRellenoMm: 0.3,
         toolpath: {},
+        visible: true,
       });
     } catch (error) {
       setError(
@@ -190,6 +192,7 @@ export function SubirObjetoDropzone({
       espejadoV: false,
       ...preprocesamiento,
       materialProduccion: null,
+      visible: true,
     });
     setRasterPendiente(null);
   }
