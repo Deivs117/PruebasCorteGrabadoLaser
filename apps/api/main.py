@@ -617,6 +617,14 @@ class ObjetoProyectoBody(BaseModel):
     # preservar. `None` para SVG/raster subidos a mano (nunca tuvieron
     # origen) y para proyectos guardados antes de #150.
     objetoOrigenId: str | None = None
+    # #179 (posterior a #150): mecanismo general de agrupación -- `None` si
+    # el objeto no pertenece a ningún grupo (incluye proyectos guardados
+    # antes de #179).
+    grupoId: str | None = None
+    # #179: capa oculta -- default `True` para que un objeto de un proyecto
+    # guardado antes de esta columna se siga leyendo como visible (nunca
+    # existió el campo, nunca hubo forma de ocultar nada).
+    visible: bool = True
     # Solo para tipo="svg":
     nombreArchivoSvg: str | None = None
     contenidoSvg: str | None = None
