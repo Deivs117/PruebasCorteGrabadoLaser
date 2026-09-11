@@ -117,6 +117,10 @@ IDs de las opciones: Backlog `54671fca` · Listo para hacer `1c4b27fa` · En pro
 
 Si además se sabe quién/qué sesión lo está trabajando, completar también el campo `Responsable` — ayuda a que dos sesiones no tomen el mismo ticket sin saberlo.
 
+## Queries a la base de datos: eager loading obligatorio en loops
+
+Ver `docs/backend-db-performance.md` para el detalle completo (causa raíz, cómo verificarlo, gotchas) — resumen: **cualquier query que itera una colección de filas y accede a una relación de esas filas tiene que declarar esa relación con `joinedload`/`selectinload` en el propio `select(...)`**, nunca confiar en el lazy loading por defecto de SQLAlchemy dentro de un loop. Esto fue la causa real (no los índices) de que Suites/Historial/Dashboard/Reportes tardaran varios segundos en cargar (issue #165) — un N+1 sistémico, sin un solo `joinedload`/`selectinload` en todo el repo antes del fix.
+
 ## Verificar cambios de UI: nunca con Claude in Chrome
 
 **No usar las herramientas `mcp__claude-in-chrome__*`** (screenshots, hover, inspección de DOM en el navegador) para verificar un cambio de frontend en este repo — ya costó cerca del 90% del presupuesto de una sesión completa verificar visualmente una corrección de UI trivial (icon-only hover), sin margen para terminar el resto del trabajo pendiente ese día.
