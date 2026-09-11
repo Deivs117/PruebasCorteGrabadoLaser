@@ -16,6 +16,14 @@ interface BarraAccionesObjetoProps {
   onEspejarVertical: () => void;
   onDuplicar: () => void;
   onEliminar: () => void;
+  /** Issue #179: mecanismo general de agrupación (no solo para la máscara
+   * de corte automática, ver `generarContornoCorte`) -- a lo sumo uno de
+   * los dos aparece: "Agrupar" con 2+ seleccionados que no forman ya un
+   * mismo grupo, "Desagrupar" cuando la selección ES un grupo existente.
+   * `undefined` = esa acción no aplica a la selección actual, no se
+   * renderiza el botón. */
+  onAgrupar?: () => void;
+  onDesagrupar?: () => void;
 }
 
 /**
@@ -32,6 +40,8 @@ export function BarraAccionesObjeto({
   onEspejarVertical,
   onDuplicar,
   onEliminar,
+  onAgrupar,
+  onDesagrupar,
 }: BarraAccionesObjetoProps) {
   return (
     <div
@@ -62,6 +72,52 @@ export function BarraAccionesObjeto({
       >
         <CopyAnimado className="size-4" strokeWidth={1.75} />
       </button>
+      {onAgrupar ? (
+        <button
+          type="button"
+          onClick={onAgrupar}
+          aria-label="Agrupar selección"
+          title="Agrupar -- se mueven/rotan/escalan siempre juntos"
+          className={iconButtonClasses()}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-4"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="12" height="12" rx="1" />
+            <rect x="9" y="9" width="12" height="12" rx="1" />
+          </svg>
+        </button>
+      ) : null}
+      {onDesagrupar ? (
+        <button
+          type="button"
+          onClick={onDesagrupar}
+          aria-label="Desagrupar selección"
+          title="Desagrupar -- vuelven a moverse/rotarse/escalarse por separado"
+          className={iconButtonClasses()}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-4"
+            aria-hidden="true"
+          >
+            <rect x="2" y="2" width="9" height="9" rx="1" />
+            <rect x="13" y="13" width="9" height="9" rx="1" />
+          </svg>
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={onEliminar}
