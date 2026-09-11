@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { CamposFicha } from "@/components/fichas/campos-ficha";
 import { ExportarPdfButton } from "@/components/fichas/exportar-pdf-button";
 import { FichaDocumento } from "@/components/fichas/ficha-documento";
+import type { CostosFicha } from "@/lib/final-run-data";
 import type { Ficha } from "@/lib/fichas-data";
 import type { FichaFormData } from "@/lib/ficha-schema";
 
@@ -16,7 +17,6 @@ interface FichaDetalleProps {
 function aFormData(ficha: Ficha): FichaFormData {
   return {
     estado: ficha.estado,
-    costoEstandarTotal: ficha.costoEstandarTotal,
     fechaValidacion: ficha.fechaValidacion,
     notas: ficha.notas,
   };
@@ -31,6 +31,8 @@ export function FichaDetalle({ inicial }: FichaDetalleProps) {
   const [datos, setDatos] = useState<FichaFormData>(() => aFormData(inicial));
   const [estado, setEstado] = useState<"idle" | "guardando" | "error">("idle");
   const [mensajeError, setMensajeError] = useState("");
+  const [regenerando, setRegenerando] = useState(false);
+  const [errorRegenerar, setErrorRegenerar] = useState("");
 
   function empezarEdicion() {
     setDatos(aFormData(ficha));
@@ -52,9 +54,11 @@ export function FichaDetalle({ inicial }: FichaDetalleProps) {
       const cuerpo = (await respuesta.json()) as {
         ok: boolean;
         error?: string;
-      };
+      } & Partial<CostosFicha>;
       if (cuerpo.ok) {
-        setFicha((anterior) => ({ ...anterior, ...datos }));
+        // El backend recalcula el costo por mm/mm² al guardar (issue #170)
+        // -- se refleja acá también, no solo lo que el formulario editó.
+        setFicha((anterior) => ({ ...anterior, ...datos, ...cuerpo }));
         setEditando(false);
       } else {
         setEstado("error");
@@ -63,6 +67,32 @@ export function FichaDetalle({ inicial }: FichaDetalleProps) {
     } catch {
       setEstado("error");
       setMensajeError("No se pudo conectar con el taller.");
+    }
+  }
+
+  async function regenerarCostos() {
+    setRegenerando(true);
+    setErrorRegenerar("");
+    try {
+      const respuesta = await fetch(
+        `/api/final-run/${encodeURIComponent(ficha.grupoId)}/ficha/regenerar-costos`,
+        { method: "POST" },
+      );
+      const cuerpo = (await respuesta.json()) as {
+        ok: boolean;
+        error?: string;
+      } & Partial<CostosFicha>;
+      if (cuerpo.ok) {
+        setFicha((anterior) => ({ ...anterior, ...cuerpo }));
+      } else {
+        setErrorRegenerar(
+          cuerpo.error ?? "No se pudieron regenerar los costos.",
+        );
+      }
+    } catch {
+      setErrorRegenerar("No se pudo conectar con el taller.");
+    } finally {
+      setRegenerando(false);
     }
   }
 
@@ -108,9 +138,14 @@ export function FichaDetalle({ inicial }: FichaDetalleProps) {
           potenciaPct={ficha.potenciaPct}
           grupoId={ficha.grupoId}
           estado={datos.estado}
-          costoEstandarTotal={datos.costoEstandarTotal}
+          costoPorMm={ficha.costoPorMm}
+          tiempoPorMmS={ficha.tiempoPorMmS}
+          costoPorMm2={ficha.costoPorMm2}
+          tiempoPorMm2S={ficha.tiempoPorMm2S}
+          materialCostoPendiente={ficha.materialCostoPendiente}
           fechaValidacion={datos.fechaValidacion}
           notas={datos.notas}
+          notasOperario={ficha.notasOperario}
         />
       </div>
     );
@@ -126,15 +161,32 @@ export function FichaDetalle({ inicial }: FichaDetalleProps) {
         potenciaPct={ficha.potenciaPct}
         grupoId={ficha.grupoId}
         estado={ficha.estado}
-        costoEstandarTotal={ficha.costoEstandarTotal}
+        costoPorMm={ficha.costoPorMm}
+        tiempoPorMmS={ficha.tiempoPorMmS}
+        costoPorMm2={ficha.costoPorMm2}
+        tiempoPorMm2S={ficha.tiempoPorMm2S}
+        materialCostoPendiente={ficha.materialCostoPendiente}
         fechaValidacion={ficha.fechaValidacion}
         notas={ficha.notas}
+        notasOperario={ficha.notasOperario}
       />
-      <div className="flex items-center gap-3 print:hidden">
+      <div className="flex flex-wrap items-center gap-3 print:hidden">
         <ExportarPdfButton />
         <Button variant="outline" onClick={empezarEdicion}>
           Editar
         </Button>
+        <Button
+          variant="outline"
+          onClick={regenerarCostos}
+          disabled={regenerando}
+        >
+          {regenerando ? "Regenerando…" : "Regenerar costos"}
+        </Button>
+        {errorRegenerar ? (
+          <p role="alert" className="text-danger text-sm font-medium">
+            {errorRegenerar}
+          </p>
+        ) : null}
       </div>
     </div>
   );

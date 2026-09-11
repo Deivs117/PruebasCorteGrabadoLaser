@@ -1,9 +1,9 @@
 import "server-only";
 
 import { pyGet } from "@/lib/py-api";
-import type { EstadoFicha } from "@/lib/final-run-data";
+import type { CostosFicha, EstadoFicha } from "@/lib/final-run-data";
 
-export interface Ficha {
+export interface Ficha extends CostosFicha {
   grupoId: string;
   material: string;
   espesorMm: string;
@@ -11,9 +11,11 @@ export interface Ficha {
   velocidadMmMin: string;
   potenciaPct: string;
   estado: EstadoFicha;
-  costoEstandarTotal: string;
   fechaValidacion: string;
   notas: string;
+  /** Notas cargadas celda por celda durante la calibración (issue #170) --
+   * distintas del campo `notas` de arriba (el de la propia Ficha). */
+  notasOperario: string[];
 }
 
 /**

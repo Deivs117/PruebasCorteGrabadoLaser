@@ -11,11 +11,20 @@ export interface FichaDocumentoProps {
   potenciaPct: string;
   grupoId: string;
   estado: EstadoFicha;
-  /** String vacío = "sin definir todavía" (no distingue "0" de "vacío" a
-   * propósito -- un costo real nunca es 0). */
-  costoEstandarTotal: string;
+  /** Costo/tiempo por mm cortado o mm² grabado (issue #170), 100%
+   * calculado -- string vacío = "todavía sin calibración medida", no se
+   * edita a mano. Solo el par que corresponde a `operacion` trae valor. */
+  costoPorMm: string;
+  tiempoPorMmS: string;
+  costoPorMm2: string;
+  tiempoPorMm2S: string;
+  /** El costo de corte no incluye material porque falta su tarifa. */
+  materialCostoPendiente: boolean;
   fechaValidacion: string;
   notas: string;
+  /** Notas cargadas celda por celda durante la calibración -- distintas de
+   * `notas` (el campo propio de la Ficha, editado a mano). */
+  notasOperario: string[];
 }
 
 /**
@@ -27,7 +36,9 @@ export interface FichaDocumentoProps {
  * - Vista previa en vivo del formulario "Nueva Ficha" (Prompt 12: "preview
  *   en Markdown renderizado a la derecha") -- acá se optó por previsualizar
  *   el documento real en vez de agregar una dependencia de Markdown solo
- *   para esto.
+ *   para esto. Antes de guardar todavía no hay costo calculado (issue
+ *   #170): la vista previa pasa los 4 campos de costo vacíos y este
+ *   componente los muestra como "Se calcula al guardar".
  */
 export function FichaDocumento({
   material,
@@ -37,10 +48,25 @@ export function FichaDocumento({
   potenciaPct,
   grupoId,
   estado,
-  costoEstandarTotal,
+  costoPorMm,
+  tiempoPorMmS,
+  costoPorMm2,
+  tiempoPorMm2S,
+  materialCostoPendiente,
   fechaValidacion,
   notas,
+  notasOperario,
 }: FichaDocumentoProps) {
+  const esCorte = operacion === "corte";
+  const costoValor = esCorte ? costoPorMm : costoPorMm2;
+  const tiempoValor = esCorte ? tiempoPorMmS : tiempoPorMm2S;
+  const etiquetaCosto = esCorte
+    ? "Costo por mm cortado"
+    : "Costo por mm² grabado";
+  const etiquetaTiempo = esCorte
+    ? "Tiempo por mm cortado"
+    : "Tiempo por mm² grabado";
+
   return (
     <Card
       data-ficha-imprimible
@@ -73,9 +99,15 @@ export function FichaDocumento({
           </dd>
         </div>
         <div>
-          <dt className="text-text-muted">Costo estándar</dt>
+          <dt className="text-text-muted">{etiquetaCosto}</dt>
           <dd className="text-navy font-mono text-lg font-medium">
-            {costoEstandarTotal ? costoEstandarTotal : "Sin definir"}
+            {costoValor ? costoValor : "Se calcula al guardar"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-text-muted">{etiquetaTiempo}</dt>
+          <dd className="text-navy font-mono text-lg font-medium">
+            {tiempoValor ? tiempoValor : "Se calcula al guardar"}
           </dd>
         </div>
         <div>
@@ -85,6 +117,13 @@ export function FichaDocumento({
           </dd>
         </div>
       </dl>
+
+      {esCorte && materialCostoPendiente ? (
+        <p className="border-orange/30 bg-orange-soft text-navy rounded-[var(--radius-sm)] border p-3 text-sm">
+          Costo de material pendiente de tarifa -- el costo de arriba solo
+          incluye energía y tiempo de máquina.
+        </p>
+      ) : null}
 
       <div className="border-border border-t pt-3 text-sm">
         <p className="text-text-muted">
@@ -102,6 +141,21 @@ export function FichaDocumento({
         <div className="border-border border-t pt-3 text-sm">
           <p className="text-text-muted mb-1">Notas</p>
           <p className="text-navy whitespace-pre-wrap">{notas}</p>
+        </div>
+      ) : null}
+
+      {notasOperario.length > 0 ? (
+        <div className="border-border border-t pt-3 text-sm">
+          <p className="text-text-muted mb-1">
+            Notas del operario (calibración)
+          </p>
+          <ul className="text-navy flex flex-col gap-1">
+            {notasOperario.map((nota, i) => (
+              <li key={i} className="whitespace-pre-wrap">
+                · {nota}
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
     </Card>
