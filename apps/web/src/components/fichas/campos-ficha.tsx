@@ -52,45 +52,22 @@ export function CamposFicha({ datos, onCambio, errores }: CamposFichaProps) {
         )}
       </Field>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field
-          label="Costo estándar total"
-          hint="Costo resultante de aplicar velocidad/potencia oficiales (Tarifas)."
-          error={errores?.costoEstandarTotal}
-        >
-          {(id, describedBy) => (
-            <input
-              id={id}
-              aria-describedby={describedBy}
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              placeholder="Sin definir"
-              value={datos.costoEstandarTotal}
-              onChange={(e) => onCambio({ costoEstandarTotal: e.target.value })}
-              className={`${INPUT_CLASSES} font-mono`}
-            />
-          )}
-        </Field>
-
-        <Field
-          label="Fecha de validación"
-          hint="Cuándo se confirmó esta combinación como oficial."
-          error={errores?.fechaValidacion}
-        >
-          {(id, describedBy) => (
-            <input
-              id={id}
-              aria-describedby={describedBy}
-              type="date"
-              value={datos.fechaValidacion}
-              onChange={(e) => onCambio({ fechaValidacion: e.target.value })}
-              className={`${INPUT_CLASSES} font-mono`}
-            />
-          )}
-        </Field>
-      </div>
+      <Field
+        label="Fecha de validación"
+        hint="Cuándo se confirmó esta combinación como oficial. El costo por mm/mm² no se edita acá -- se calcula solo a partir de las tarifas y lo calibrado en la Final Run."
+        error={errores?.fechaValidacion}
+      >
+        {(id, describedBy) => (
+          <input
+            id={id}
+            aria-describedby={describedBy}
+            type="date"
+            value={datos.fechaValidacion}
+            onChange={(e) => onCambio({ fechaValidacion: e.target.value })}
+            className={`${INPUT_CLASSES} max-w-48 font-mono`}
+          />
+        )}
+      </Field>
 
       <Field
         label="Notas"

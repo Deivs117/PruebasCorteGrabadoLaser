@@ -105,6 +105,10 @@ export interface GrupoCalibracion {
   repeticiones: number;
   ejecuciones: EjecucionFinalRun[];
   fichaEstado: EstadoFicha | null;
+  /** >=3 ejecuciones con kWh/tiempo medidos (issue #170) -- lo usa "Nueva
+   * Ficha" para sugerir `estado: "oficial"` de entrada, sin llamar a
+   * `resumirCalibracion` aparte. */
+  calibrado: boolean;
 }
 
 /** Espejo de `lectura.grupos_calibracion()` en `apps/api`. */
@@ -144,7 +148,21 @@ export async function resumirCalibracion(
   }
 }
 
-export interface ResultadoFicha {
+/** Costo/tiempo por mm (corte) o mm² (grabado), 100% calculado (issue
+ * #170) -- solo uno de los dos pares viene con valor, según `operacion`
+ * del grupo; el otro llega en `""`. */
+export interface CostosFicha {
+  costoPorMm: string;
+  tiempoPorMmS: string;
+  costoPorMm2: string;
+  tiempoPorMm2S: string;
+  /** `true` si el costo de corte no incluye material porque todavía no hay
+   * tarifa cargada para ese material/espesor -- nunca se inventa un total
+   * que lo ignore en silencio. Siempre `false` en grabado. */
+  materialCostoPendiente: boolean;
+}
+
+export interface ResultadoFicha extends Partial<CostosFicha> {
   ok: boolean;
   error?: string;
 }
@@ -152,9 +170,6 @@ export interface ResultadoFicha {
 export interface DatosFicha {
   estado: EstadoFicha;
   notas?: string;
-  /** Costo estándar total resultante (issue #7) -- string tal como lo
-   * escribe el formulario, `""` u omitido significa "sin definir todavía". */
-  costoEstandarTotal?: string;
   /** Formato AAAA-MM-DD. */
   fechaValidacion?: string;
 }
@@ -162,23 +177,50 @@ export interface DatosFicha {
 /** Marca (o revierte) la Ficha de Parámetro Estándar de un grupo (F6, issue
  * #7) -- crea o actualiza, nunca duplica (ver `crear_o_actualizar_ficha`).
  * El toggle rápido de Final Run ("Marcar Ficha como oficial") solo manda
- * `estado`; la pantalla Fichas de Parámetro manda el resto también. */
+ * `estado`; la pantalla Fichas de Parámetro manda el resto también.
+ *
+ * El backend recalcula el costo por mm/mm² de paso (issue #170) y lo
+ * devuelve en la respuesta -- así una Ficha recién creada ya sale con
+ * costo, sin depender de "Regenerar costos" la primera vez. */
 export async function actualizarFichaGrupo(
   grupoId: string,
   datos: DatosFicha,
 ): Promise<ResultadoFicha> {
   try {
-    await pyPost(`grupos-calibracion/${encodeURIComponent(grupoId)}/ficha`, {
-      estado: datos.estado,
-      notas: datos.notas,
-      costoEstandarTotal: datos.costoEstandarTotal,
-      fechaValidacion: datos.fechaValidacion,
-    });
-    return { ok: true };
+    const costos = await pyPost<CostosFicha>(
+      `grupos-calibracion/${encodeURIComponent(grupoId)}/ficha`,
+      {
+        estado: datos.estado,
+        notas: datos.notas,
+        fechaValidacion: datos.fechaValidacion,
+      },
+    );
+    return { ok: true, ...costos };
   } catch (error) {
     return {
       ok: false,
       error: mensajeDeError(error, "No se pudo actualizar la ficha."),
+    };
+  }
+}
+
+/** Botón "Regenerar costos" (issue #170): recalcula el costo por mm/mm² de
+ * una Ficha ya existente contra las tarifas vigentes ahora mismo, sin
+ * tocar estado/notas/fecha -- para cuando se carga una tarifa que antes
+ * faltaba, o cambia alguna tarifa. */
+export async function regenerarCostosFicha(
+  grupoId: string,
+): Promise<ResultadoFicha> {
+  try {
+    const costos = await pyPost<CostosFicha>(
+      `grupos-calibracion/${encodeURIComponent(grupoId)}/ficha/regenerar-costos`,
+      {},
+    );
+    return { ok: true, ...costos };
+  } catch (error) {
+    return {
+      ok: false,
+      error: mensajeDeError(error, "No se pudieron regenerar los costos."),
     };
   }
 }
