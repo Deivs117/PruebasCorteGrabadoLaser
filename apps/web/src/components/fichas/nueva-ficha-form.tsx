@@ -16,29 +16,50 @@ interface NuevaFichaFormProps {
   grupos: GrupoCalibracion[];
 }
 
-const DATOS_INICIALES: FichaFormData = {
-  estado: "en_revision",
-  costoEstandarTotal: "",
-  fechaValidacion: "",
-  notas: "",
-};
+/** AAAA-MM-DD en la fecha local (no `toISOString`, que es UTC y puede
+ * quedar un día atrás/adelante cerca de medianoche). */
+function hoyISO(): string {
+  const hoy = new Date();
+  const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoy.getDate()).padStart(2, "0");
+  return `${hoy.getFullYear()}-${mes}-${dia}`;
+}
+
+/** Defaults sugeridos al elegir un grupo (issue #170): `oficial` si ya está
+ * calibrado (≥3 ejecuciones medidas), si no `en_revision`; fecha de hoy.
+ * Ambos siguen siendo editables acá mismo -- son solo el punto de partida,
+ * no se reevalúan después de creada la Ficha. */
+function datosSugeridos(grupo: GrupoCalibracion): FichaFormData {
+  return {
+    estado: grupo.calibrado ? "oficial" : "en_revision",
+    fechaValidacion: hoyISO(),
+    notas: "",
+  };
+}
 
 export function NuevaFichaForm({ grupos }: NuevaFichaFormProps) {
   const router = useRouter();
   const [grupoId, setGrupoId] = useState("");
-  const [datos, setDatos] = useState<FichaFormData>(DATOS_INICIALES);
+  const [datos, setDatos] = useState<FichaFormData | null>(null);
   const [estado, setEstado] = useState<"idle" | "guardando" | "error">("idle");
   const [mensajeError, setMensajeError] = useState("");
 
   const grupo = grupos.find((g) => g.grupoId === grupoId);
 
+  function elegirGrupo(id: string) {
+    setGrupoId(id);
+    const elegido = grupos.find((g) => g.grupoId === id);
+    setDatos(elegido ? datosSugeridos(elegido) : null);
+    setEstado("idle");
+  }
+
   function actualizar(cambios: Partial<FichaFormData>) {
     setEstado("idle");
-    setDatos((anterior) => ({ ...anterior, ...cambios }));
+    setDatos((anterior) => (anterior ? { ...anterior, ...cambios } : anterior));
   }
 
   async function guardar() {
-    if (!grupo) return;
+    if (!grupo || !datos) return;
     setEstado("guardando");
     try {
       const respuesta = await fetch(
@@ -94,7 +115,7 @@ export function NuevaFichaForm({ grupos }: NuevaFichaFormProps) {
               <select
                 id={id}
                 value={grupoId}
-                onChange={(e) => setGrupoId(e.target.value)}
+                onChange={(e) => elegirGrupo(e.target.value)}
                 className={`${INPUT_CLASSES} bg-surface`}
               >
                 <option value="" disabled>
@@ -111,13 +132,13 @@ export function NuevaFichaForm({ grupos }: NuevaFichaFormProps) {
           </Field>
         </Card>
 
-        {grupo ? (
+        {grupo && datos ? (
           <Card className="flex flex-col gap-4 p-6">
             <CamposFicha datos={datos} onCambio={actualizar} />
           </Card>
         ) : null}
 
-        {grupo ? (
+        {grupo && datos ? (
           <div className="flex items-center gap-4">
             <Button
               variant="primary"
@@ -136,7 +157,7 @@ export function NuevaFichaForm({ grupos }: NuevaFichaFormProps) {
       </div>
 
       <div>
-        {grupo ? (
+        {grupo && datos ? (
           <FichaDocumento
             material={grupo.material}
             espesorMm={grupo.espesorMm}
@@ -145,9 +166,14 @@ export function NuevaFichaForm({ grupos }: NuevaFichaFormProps) {
             potenciaPct={grupo.potenciaPct}
             grupoId={grupo.grupoId}
             estado={datos.estado}
-            costoEstandarTotal={datos.costoEstandarTotal}
+            costoPorMm=""
+            tiempoPorMmS=""
+            costoPorMm2=""
+            tiempoPorMm2S=""
+            materialCostoPendiente={false}
             fechaValidacion={datos.fechaValidacion}
             notas={datos.notas}
+            notasOperario={[]}
           />
         ) : (
           <Card className="text-text-muted p-6 text-center text-sm">

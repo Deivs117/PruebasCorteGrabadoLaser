@@ -176,7 +176,7 @@ def test_grupo_calibracion_a_final_run_a_ficha(sesion):
     sesion.flush()
 
     ficha = FichaParametro(
-        grupo_calibracion_id=grupo.id, estado=EstadoFicha.OFICIAL, costo_estandar_total=1200.5
+        grupo_calibracion_id=grupo.id, estado=EstadoFicha.OFICIAL, costo_por_mm2=1200.5
     )
     sesion.add(ficha)
     sesion.commit()
