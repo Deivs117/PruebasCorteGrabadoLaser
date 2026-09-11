@@ -234,6 +234,17 @@ export function EditorLienzo({
   // resto de la UI de un solo objeto no cambiaron de forma, solo de dónde
   // sacan el objeto.
   const [seleccionadosIds, setSeleccionadosIds] = useState<string[]>([]);
+  // Issue #184: el toolpath combinado del lienzo ya no se puede tildar en
+  // cualquier momento -- solo existe DESPUÉS de exportar G-code al menos una
+  // vez (`gcodeExportadoDisponible`, se pone en `true` recién ahí, ver
+  // `exportarGcode`) y se oculta solo apenas se sigue editando el lienzo
+  // (el efecto de abajo, sobre `objetos`) para nunca mostrar un toolpath que
+  // ya no corresponde a la geometría/parámetros actuales. `vistaToolpath` es
+  // la preferencia del operario de mostrarlo u ocultarlo MIENTRAS esté
+  // disponible -- lo visible de verdad es `mostrarToolpath` (más abajo),
+  // el AND de ambos.
+  const [gcodeExportadoDisponible, setGcodeExportadoDisponible] =
+    useState(false);
   const [vistaToolpath, setVistaToolpath] = useState(false);
 
   // Modo Producción/Prueba (#17): GLOBAL a todo el lienzo -- es una
@@ -346,6 +357,14 @@ export function EditorLienzo({
   // a propósito, solo para marcar "ya estamos en el cliente".
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMontado(true), []);
+
+  // Issue #184: cualquier cambio a `objetos` (mover, rotar, escalar, cambiar
+  // parámetros, agregar/eliminar, incluso cachear un toolpath por-objeto vía
+  // `generarToolpath`) invalida el toolpath combinado ya exportado -- se
+  // corre en cada render donde `objetos` cambió de referencia, incluyendo el
+  // montaje inicial (no-op ahí, ya arranca en `false`).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setGcodeExportadoDisponible(false), [objetos]);
 
   useEffect(() => {
     const el = contenedorRef.current;
@@ -796,8 +815,12 @@ export function EditorLienzo({
         error?: string;
       };
       if (cuerpo.ok && cuerpo.gcode) {
+        // Issue #184: ya no fuerza la vista combinada del toolpath -- esto
+        // es la conversión de UN objeto puntual (botón "Ver toolpath" de
+        // `PanelObjeto`), no un G-code combinado exportado de verdad. El
+        // resultado queda cacheado en `objeto.toolpath` igual (se ve si más
+        // adelante se exporta y la vista combinada se habilita).
         fijarToolpath(id, operacion, { estado: "ok", gcode: cuerpo.gcode });
-        setVistaToolpath(true);
       } else {
         fijarToolpath(id, operacion, {
           estado: "error",
@@ -914,6 +937,12 @@ export function EditorLienzo({
       };
       if (cuerpo.ok && cuerpo.url) {
         window.open(cuerpo.url, "_blank");
+        // Issue #184: recién acá (G-code combinado ya exportado, aunque sea
+        // una versión) tiene sentido mostrar el toolpath -- antes de esto,
+        // ningún click lo habilita. `vistaToolpath` en `true` de entrada:
+        // la primera vez que se habilita, se ve solo sin un click extra.
+        setGcodeExportadoDisponible(true);
+        setVistaToolpath(true);
       } else {
         setErrorExportar(cuerpo.error ?? "No se pudo exportar el G-code.");
       }
@@ -1076,6 +1105,10 @@ export function EditorLienzo({
       : objetosFueraDeArea.length > 0
         ? "Movés o achicá los objetos que no caben en el área de trabajo antes de exportar."
         : null;
+
+  // Issue #184: lo que de verdad se renderiza -- disponible (se exportó y
+  // no se editó nada después) Y el operario no lo ocultó con el toggle.
+  const mostrarToolpath = gcodeExportadoDisponible && vistaToolpath;
 
   const noSeGuardaPor =
     objetos.length === 0
@@ -1405,7 +1438,7 @@ export function EditorLienzo({
                           areaTrabajoAnchoMm,
                           areaTrabajoAltoMm,
                         )}
-                        vistaToolpath={vistaToolpath}
+                        vistaToolpath={mostrarToolpath}
                         color={colorSeleccionDe(objeto)}
                         onSeleccionar={(aditivo) =>
                           seleccionarObjeto(objeto.id, aditivo)
@@ -1551,15 +1584,45 @@ export function EditorLienzo({
               </span>
             </div>
 
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={vistaToolpath}
-                onChange={(e) => setVistaToolpath(e.target.checked)}
-                className="accent-blue size-4"
-              />
-              <span className="text-navy">Ver toolpath generado</span>
-            </label>
+            {/* Issue #184: antes era un checkbox que se podía tildar en
+             * cualquier momento y no renderizaba nada de forma confiable
+             * (dependía de "Ver toolpath" por-objeto, que solo existe para
+             * SVG) -- ahora este control ni existe hasta que haya un
+             * G-code combinado recién exportado (`gcodeExportadoDisponible`),
+             * y desaparece solo apenas se sigue editando el lienzo. */}
+            {gcodeExportadoDisponible ? (
+              <button
+                type="button"
+                onClick={() => setVistaToolpath((v) => !v)}
+                aria-pressed={vistaToolpath}
+                title={
+                  vistaToolpath
+                    ? "Ocultar el toolpath del último G-code exportado"
+                    : "Ver el toolpath del último G-code exportado"
+                }
+                className={clsx(
+                  "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-[var(--duration-quick)] ease-[var(--ease-motion)]",
+                  vistaToolpath
+                    ? "border-blue bg-blue-soft text-blue"
+                    : "border-border text-text-muted hover:bg-navy-soft",
+                )}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.75}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="size-4"
+                  aria-hidden="true"
+                >
+                  <path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z" />
+                  <circle cx="12" cy="12" r="2.5" />
+                </svg>
+                Toolpath
+              </button>
+            ) : null}
           </div>
         </div>
 
