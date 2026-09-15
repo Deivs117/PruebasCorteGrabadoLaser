@@ -13,6 +13,7 @@ export interface MaquinaFormData {
   aceleracionMmS2: string;
   areaTrabajoAnchoMm: string;
   areaTrabajoAltoMm: string;
+  elevacionGrabadoMm: string;
 }
 
 const numeroPositivo = (mensaje: string) =>
@@ -41,4 +42,5 @@ export const maquinaSchema = z.object({
   ),
   areaTrabajoAnchoMm: numeroPositivo("Tiene que ser un número mayor a 0."),
   areaTrabajoAltoMm: numeroPositivo("Tiene que ser un número mayor a 0."),
+  elevacionGrabadoMm: numeroPositivo("Tiene que ser un número mayor a 0."),
 });

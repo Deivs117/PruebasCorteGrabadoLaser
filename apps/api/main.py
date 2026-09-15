@@ -114,6 +114,7 @@ class GuardarMaquinaBody(BaseModel):
     aceleracionMmS2: float
     areaTrabajoAnchoMm: float
     areaTrabajoAltoMm: float
+    elevacionGrabadoMm: float
 
 
 @app.put("/maquina")
@@ -128,6 +129,7 @@ def guardar_maquina(body: GuardarMaquinaBody) -> dict:
             punto_focal_mm=body.puntoFocalMm,
             velocidad_max_mm_min=body.velocidadMaxMmMin,
             aceleracion_mm_s2=body.aceleracionMmS2,
+            elevacion_grabado_mm=body.elevacionGrabadoMm,
             area_trabajo_ancho_mm=body.areaTrabajoAnchoMm,
             area_trabajo_alto_mm=body.areaTrabajoAltoMm,
         )

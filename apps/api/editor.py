@@ -1,11 +1,14 @@
 """Exportación de G-code combinado del Editor de Diseño (#3, cierre de
 #15/#16): el lienzo (#16) posiciona varios objetos (SVG y/o raster) sobre el
-área de trabajo real de la máquina; esta función los convierte, en el orden
-en que llegan, a un único G-code. Nunca se devuelve inline (límite ~4.5MB de
-Vercel, decisión de #2/#3): se sube a Storage y se devuelve un link de
-descarga firmado, mismo patrón que `generacion.generar`. Si la exportación
-viene de un proyecto de diseño guardado (issue #18), la key también se
-registra en su historial de exportaciones.
+área de trabajo real de la máquina; esta función los convierte a un único
+G-code, reordenando los bloques por TIPO de operación (todo el corte junto,
+todo el grabado junto -- issue #195) en vez de mantener el orden de objetos
+del lienzo, para que el eje Z suba/baje como mucho una vez por exportación.
+Nunca se devuelve inline (límite ~4.5MB de Vercel, decisión de #2/#3): se
+sube a Storage y se devuelve un link de descarga firmado, mismo patrón que
+`generacion.generar`. Si la exportación viene de un proyecto de diseño
+guardado (issue #18), la key también se registra en su historial de
+exportaciones.
 """
 
 from __future__ import annotations
@@ -15,9 +18,9 @@ import math
 import uuid
 
 import proyectos
-from laser_toolkit.config import MachineConfig
+from laser_toolkit.config import MachineConfig, Operacion
 from laser_toolkit.db.repo_negocio import construir_machine_config
-from laser_toolkit.gcode.writer import encabezado, pie
+from laser_toolkit.gcode.writer import combinar_bloques_por_operacion, encabezado, pie
 from laser_toolkit.raster.api import (
     UMBRAL_DISTANCIA_FONDO_POR_DEFECTO,
     calcular_centroide_imagen,
@@ -104,7 +107,13 @@ def _configuracion_raster_de_objeto(objeto: dict) -> ConfiguracionRaster:
     return ConfiguracionRaster(**{k: v for k, v in campos.items() if v is not None})
 
 
-def _gcode_de_objeto(objeto: dict, machine: MachineConfig) -> list[str]:
+def _gcode_de_objeto_por_operacion(objeto: dict, machine: MachineConfig) -> list[tuple[Operacion, list[str]]]:
+    """Igual que armar el G-code de `objeto`, pero separado por tipo de
+    operacion (`Operacion.CORTE`/`Operacion.GRABADO`) en vez de una lista
+    plana -- para que `exportar_gcode_combinado` pueda agrupar TODO el corte
+    y TODO el grabado de TODOS los objetos del lienzo antes de emitir, y
+    mover el eje Z (issue #195) una sola vez por exportacion, no una vez por
+    objeto."""
     ancho_mm: float = objeto["anchoMm"]
     alto_mm: float = objeto["altoMm"]
     # `xMm`/`yMm` son el CENTRO del objeto (ver `editor-tipos.ts`); los
@@ -117,10 +126,10 @@ def _gcode_de_objeto(objeto: dict, machine: MachineConfig) -> list[str]:
     parametros: dict[str, dict] = objeto["parametros"]
 
     if objeto["tipo"] == "svg":
-        gcode: list[str] = []
+        bloques: list[tuple[Operacion, list[str]]] = []
         for operacion in operaciones:
             params = parametros[operacion]
-            gcode += convertir_svg_texto_a_gcode(
+            gcode = convertir_svg_texto_a_gcode(
                 objeto["contenidoSvg"],
                 ancho_mm,
                 alto_mm,
@@ -133,27 +142,45 @@ def _gcode_de_objeto(objeto: dict, machine: MachineConfig) -> list[str]:
                 y_offset_mm=y_offset_mm,
                 angulo_rad=angulo_rad,
             )
-        return gcode
+            bloques.append((Operacion(operacion), gcode))
+        return bloques
 
     datos = _decodificar_data_uri(objeto["dataUri"])
     grabado = parametros["grabado"] if "grabado" in operaciones else None
     corte = parametros["corte"] if "corte" in operaciones else None
     grabado_potencia_baja_pct, grabado_potencia_alta_pct = _rango_potencia_grabado(grabado)
-    return generar_gcode_corte_y_grabado(
-        datos,
-        ancho_mm,
-        alto_mm,
-        machine,
-        grabado_velocidad_mm_min=grabado["velocidadMmMin"] if grabado else None,
-        grabado_potencia_baja_pct=grabado_potencia_baja_pct,
-        grabado_potencia_alta_pct=grabado_potencia_alta_pct,
-        grabado_config=_configuracion_raster_de_objeto(objeto),
-        corte_velocidad_mm_min=corte["velocidadMmMin"] if corte else None,
-        corte_potencia_pct=corte["potenciaPct"] if corte else None,
-        x_offset_mm=x_offset_mm,
-        y_offset_mm=y_offset_mm,
-        angulo_rad=angulo_rad,
-    )
+    raster_config = _configuracion_raster_de_objeto(objeto)
+
+    bloques = []
+    if grabado is not None:
+        gcode_grabado = generar_gcode_corte_y_grabado(
+            datos,
+            ancho_mm,
+            alto_mm,
+            machine,
+            grabado_velocidad_mm_min=grabado["velocidadMmMin"],
+            grabado_potencia_baja_pct=grabado_potencia_baja_pct,
+            grabado_potencia_alta_pct=grabado_potencia_alta_pct,
+            grabado_config=raster_config,
+            x_offset_mm=x_offset_mm,
+            y_offset_mm=y_offset_mm,
+            angulo_rad=angulo_rad,
+        )
+        bloques.append((Operacion.GRABADO, gcode_grabado))
+    if corte is not None:
+        gcode_corte = generar_gcode_corte_y_grabado(
+            datos,
+            ancho_mm,
+            alto_mm,
+            machine,
+            corte_velocidad_mm_min=corte["velocidadMmMin"],
+            corte_potencia_pct=corte["potenciaPct"],
+            x_offset_mm=x_offset_mm,
+            y_offset_mm=y_offset_mm,
+            angulo_rad=angulo_rad,
+        )
+        bloques.append((Operacion.CORTE, gcode_corte))
+    return bloques
 
 
 def exportar_gcode_combinado(
@@ -167,14 +194,23 @@ def exportar_gcode_combinado(
     `proyecto_id` (issue #18, opcional): cuando la exportación se pide desde
     un proyecto de diseño ya guardado, esta key también queda en su
     historial de exportaciones -- ver `proyectos.registrar_exportacion_de_proyecto`.
+
+    Los bloques de todos los objetos se reordenan por TIPO de operación
+    (issue #195) antes de emitir -- todo el grabado junto, todo el corte
+    junto, en vez del orden de objetos del lienzo -- para que el eje Z suba
+    y baje como mucho una vez en toda la exportación, ver
+    `laser_toolkit.gcode.writer.combinar_bloques_por_operacion`.
     """
     if not objetos:
         raise ValueError("El lienzo no tiene ningún objeto para exportar.")
 
     machine = construir_machine_config(sesion)
-    gcode: list[str] = list(encabezado("Editor de Diseño (#3) -- exportación combinada"))
+    bloques: list[tuple[Operacion, list[str]]] = []
     for objeto in objetos:
-        gcode += _gcode_de_objeto(objeto, machine)
+        bloques += _gcode_de_objeto_por_operacion(objeto, machine)
+
+    gcode: list[str] = list(encabezado("Editor de Diseño (#3) -- exportación combinada"))
+    gcode += combinar_bloques_por_operacion(bloques, machine)
     gcode += pie()
 
     contenido = ("\n".join(gcode) + "\n").encode("utf-8")
