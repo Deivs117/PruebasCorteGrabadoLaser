@@ -79,14 +79,30 @@ def gcode_relleno(
     gcode_grabado_raster`: sin esto, la maquina arranca y frena en seco
     justo en el borde real del trazo, y el borde queda sobre-quemado
     (mas tiempo cerca de velocidad cero justo donde el laser esta prendido).
+
+    El overscan de `sobrerecorrido_mm` esta pensado para celdas/trazos largos
+    (una Suite, una foto completa) -- aplicado tal cual a un relleno
+    vectorial con trazos finos (letras, patas de un insecto, etc.) resulta
+    contraproducente: un trazo real de 2mm con 5mm de overscan a cada lado
+    multiplica por 6 la distancia de ese segmento, y como la maquina nunca
+    llega a velocidad de crucero en un tramo tan corto (perfil triangular,
+    no trapezoidal), ese tiempo extra es casi puro acelerar/frenar sin
+    aportar nada al grabado real -- medido en una pieza real, el overscan
+    llego a ser el 56% del tiempo total de grabado. Por eso se lo TOPA al
+    largo real del propio trazo (`min(overscan, longitud_real)`): un trazo
+    largo sigue teniendo el overscan completo (protege el borde igual que
+    antes), uno corto recibe un overscan proporcional a su propio tamaño en
+    vez de una constante fija pensada para trazos mucho mas grandes.
+
     Cada `Segmento` de `generar_segmentos_relleno` ya viene horizontal
     (misma Y en ambos puntos, `x1 <= x2`), asi que extender el
     sobre-recorrido es una simple resta/suma en X."""
     s = _valor_s(potencia_pct, machine)
-    overscan_mm = sobrerecorrido_mm(velocidad_mm_min, machine)
+    overscan_maximo_mm = sobrerecorrido_mm(velocidad_mm_min, machine)
     lineas: list[str] = []
 
     for (x1, y), (x2, _y2) in segmentos:
+        overscan_mm = min(overscan_maximo_mm, x2 - x1)
         x_entrada = x1 - overscan_mm + x_offset_mm
         x_salida = x2 + overscan_mm + x_offset_mm
         y_abs = y + y_offset_mm

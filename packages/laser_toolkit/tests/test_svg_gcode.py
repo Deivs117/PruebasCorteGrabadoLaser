@@ -59,6 +59,32 @@ def test_gcode_relleno_aplica_sobrerrecorrido_con_laser_apagado():
     assert lineas[5] == "M5"
 
 
+def test_gcode_relleno_topa_overscan_al_largo_del_trazo():
+    """Un trazo mas corto que el overscan maximo configurado (ej. una pata
+    fina de un dibujo) no arrastra el overscan completo -- se topa a su
+    propio largo, para no multiplicar por varias veces la distancia real de
+    un trazo chico (hallazgo real: llego a ser el 56% del tiempo total de
+    grabado de un logo con muchos trazos finos)."""
+    machine = MachineConfig()
+    velocidad = 2000
+    overscan_maximo = sobrerecorrido_mm(velocidad, machine)
+
+    trazo_largo = 30.0
+    assert trazo_largo > overscan_maximo  # el caso que no debe cambiar
+    lineas_largo = gcode_relleno(
+        [((0.0, 0.0), (trazo_largo, 0.0))], 0, 0, velocidad_mm_min=velocidad, potencia_pct=50, machine=machine
+    )
+    assert lineas_largo[0] == f"G0 X{-overscan_maximo:.3f} Y0.000 F{machine.travel_feed_mm_min}"
+
+    trazo_corto = overscan_maximo / 2  # mas corto que el overscan maximo
+    lineas_corto = gcode_relleno(
+        [((0.0, 0.0), (trazo_corto, 0.0))], 0, 0, velocidad_mm_min=velocidad, potencia_pct=50, machine=machine
+    )
+    # El overscan efectivo queda topado al propio largo del trazo, no al
+    # maximo de la maquina -- la entrada es `-trazo_corto`, no `-overscan_maximo`.
+    assert lineas_corto[0] == f"G0 X{-trazo_corto:.3f} Y0.000 F{machine.travel_feed_mm_min}"
+
+
 def test_gcode_contorno_repite_pasadas():
     sp = Subpath(puntos=((0, 0), (10, 0)), cerrado=False)
     una_pasada = gcode_contorno([sp], 0, 0, velocidad_mm_min=500, potencia_pct=50, machine=MachineConfig())
