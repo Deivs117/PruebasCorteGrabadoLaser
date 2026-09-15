@@ -316,6 +316,13 @@ export function EditorLienzo({
   const [generandoContorno, setGenerandoContorno] = useState(false);
   const [errorContorno, setErrorContorno] = useState<string | null>(null);
 
+  // Marco de corte simple (#196) -- mismo criterio de estado que el
+  // contorno de arriba, en su propio par de banderas porque son dos
+  // acciones independientes del panel (ambas pueden estar disponibles a la
+  // vez para un mismo objeto).
+  const [generandoMarco, setGenerandoMarco] = useState(false);
+  const [errorMarco, setErrorMarco] = useState<string | null>(null);
+
   // "Guardar como proyecto" (#18): `proyectoId` pasa a tener valor apenas se
   // guarda por primera vez -- de ahí en más "Guardar" actualiza la misma
   // fila (PUT) en vez de crear un proyecto nuevo por cada guardado.
@@ -1082,6 +1089,113 @@ export function EditorLienzo({
     }
   }
 
+  /**
+   * Issue #196: genera un marco de corte simple (círculo/cuadrado) centrado
+   * en el centro de masa REAL del diseño (no el centro geométrico de su
+   * caja contenedora) y lo agrega como objeto SVG independiente -- misma
+   * mecánica de vínculo (`grupoId`/`objetoOrigenId`) que
+   * `generarContornoCorte` (#108), reusada tal cual: el marco nace agrupado
+   * con su objeto de origen. A diferencia de #108, aplica tanto a `svg`
+   * como a `raster` (el centroide se calcula distinto en cada caso, ver
+   * `apps/api/editor.calcular_marco_corte`, pero el resultado -- un
+   * desplazamiento `dxMm`/`dyMm` ya rotado desde el centro del objeto de
+   * origen -- es el mismo para ambos).
+   */
+  async function generarMarcoDeCorte(
+    id: string,
+    forma: "circulo" | "cuadrado",
+    tamanoMm: number,
+  ) {
+    const objeto = objetos.find((o) => o.id === id);
+    if (!objeto) return;
+
+    setGenerandoMarco(true);
+    setErrorMarco(null);
+    try {
+      const respuesta = await fetch("/api/editor/marco-corte", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tipo: objeto.tipo,
+          anchoMm: objeto.anchoMm,
+          altoMm: objeto.altoMm,
+          rotacionDeg: objeto.rotacionDeg,
+          forma,
+          tamanoMm,
+          ...(objeto.tipo === "svg"
+            ? { contenidoSvg: objeto.contenidoSvg }
+            : { dataUri: objeto.dataUri }),
+        }),
+      });
+      const cuerpo = (await respuesta.json()) as {
+        ok: boolean;
+        contenidoSvg?: string;
+        tamanoMm?: number;
+        dxMm?: number;
+        dyMm?: number;
+        error?: string;
+      };
+      if (
+        !cuerpo.ok ||
+        !cuerpo.contenidoSvg ||
+        cuerpo.tamanoMm === undefined ||
+        cuerpo.dxMm === undefined ||
+        cuerpo.dyMm === undefined
+      ) {
+        throw new Error(
+          cuerpo.error ?? "No se pudo generar el marco de corte.",
+        );
+      }
+
+      // Issue #179 (ver `generarContornoCorte`, mismo criterio): si el
+      // objeto de origen ya pertenecía a un grupo, el marco se suma a ESE
+      // grupo en vez de crear uno nuevo.
+      const grupoId = objeto.grupoId ?? crypto.randomUUID();
+      if (!objeto.grupoId) {
+        actualizarObjeto(objeto.id, (o) => ({ ...o, grupoId }));
+      }
+      const idMarco = crypto.randomUUID();
+      agregarObjeto({
+        id: idMarco,
+        tipo: "svg",
+        nombre: `Marco de ${objeto.nombre}`,
+        nombreArchivoSvg: `marco-${objeto.id}`,
+        contenidoSvg: cuerpo.contenidoSvg,
+        // El marco nace centrado en el centroide real, NO en el centro del
+        // objeto de origen -- `dxMm`/`dyMm` (ya rotado por el backend según
+        // `rotacionDeg` del objeto de origen) es exactamente ese
+        // desplazamiento.
+        xMm: objeto.xMm + cuerpo.dxMm,
+        yMm: objeto.yMm + cuerpo.dyMm,
+        anchoMm: cuerpo.tamanoMm,
+        altoMm: cuerpo.tamanoMm,
+        rotacionDeg: objeto.rotacionDeg,
+        operaciones: ["corte"],
+        parametros: PARAMETROS_POR_DEFECTO,
+        mantenerProporcion: true,
+        espejadoH: objeto.espejadoH,
+        espejadoV: objeto.espejadoV,
+        materialProduccion: null,
+        resolucionRellenoMm: 0.3,
+        toolpath: {},
+        objetoOrigenId: objeto.id,
+        grupoId,
+        visible: true,
+      });
+      // Ver comentario análogo en `generarContornoCorte` (#192) sobre por
+      // qué hace falta seleccionar el grupo entero a mano acá.
+      setSeleccionadosIds([objeto.id, idMarco]);
+    } catch (error) {
+      setErrorMarco(
+        error instanceof Error
+          ? error.message
+          : "No se pudo generar el marco de corte.",
+      );
+    } finally {
+      setGenerandoMarco(false);
+    }
+  }
+
   async function exportarGcode() {
     setExportando(true);
     setErrorExportar(null);
@@ -1838,6 +1952,11 @@ export function EditorLienzo({
                 }
                 generandoContorno={generandoContorno}
                 errorContorno={errorContorno}
+                onGenerarMarco={(forma, tamanoMm) =>
+                  generarMarcoDeCorte(seleccionadoUnico.id, forma, tamanoMm)
+                }
+                generandoMarco={generandoMarco}
+                errorMarco={errorMarco}
               />
             ) : (
               // #149 -- selección múltiple (siempre >1 acá: el wrapper de
