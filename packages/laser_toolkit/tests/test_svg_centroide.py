@@ -1,5 +1,6 @@
 import pytest
 
+from laser_toolkit.svg.api import calcular_centroide_svg_texto
 from laser_toolkit.svg.centroide import centroide_area_subpaths
 from laser_toolkit.svg.geometry import Subpath
 
@@ -27,16 +28,28 @@ def test_forma_asimetrica_centroide_se_corre_hacia_donde_hay_mas_area():
     assert cy == pytest.approx(5.0)
 
 
-def test_solo_subpaths_abiertos_es_un_error():
-    linea_abierta = Subpath(puntos=((0, 0), (10, 0), (10, 10)), cerrado=False)
-    with pytest.raises(ValueError, match="cerrados"):
-        centroide_area_subpaths([linea_abierta])
+def test_subpath_no_cerrado_explicitamente_aporta_area_igual_que_cerrado():
+    # Bug real (issue #196, encontrado probando contra un SVG real de
+    # cliente): muchos SVG exportados de vectorizacion/Illustrator (fill
+    # solido, stroke="none") nunca usan `Z` -- confian en el cierre
+    # implicito del renderizador para el fill, valido y estandar en SVG.
+    # `centroide_area_subpaths` NO debe filtrar por `subpath.cerrado`: un
+    # subpath con 3+ puntos aporta area sin importar ese campo.
+    cerrado = _rectangulo(0, 0, 10, 10, cerrado=True)
+    sin_cerrar = _rectangulo(0, 0, 10, 10, cerrado=False)
+    assert centroide_area_subpaths([cerrado]) == centroide_area_subpaths([sin_cerrar])
 
 
-def test_subpaths_abiertos_se_ignoran_si_hay_uno_cerrado():
+def test_sin_ningun_subpath_con_area_es_un_error():
+    linea_de_dos_puntos = Subpath(puntos=((0, 0), (10, 10)), cerrado=False)
+    with pytest.raises(ValueError, match="al menos 3 puntos"):
+        centroide_area_subpaths([linea_de_dos_puntos])
+
+
+def test_subpaths_de_menos_de_3_puntos_se_ignoran_si_hay_uno_con_area():
     cuadrado = _rectangulo(0, 0, 10, 10)
-    linea_abierta = Subpath(puntos=((100, 100), (200, 200)), cerrado=False)
-    cx, cy = centroide_area_subpaths([cuadrado, linea_abierta])
+    linea_de_dos_puntos = Subpath(puntos=((100, 100), (200, 200)), cerrado=False)
+    cx, cy = centroide_area_subpaths([cuadrado, linea_de_dos_puntos])
     assert cx == pytest.approx(5.0)
     assert cy == pytest.approx(5.0)
 
@@ -63,3 +76,39 @@ def test_area_total_cero_es_un_error():
     antihorario = Subpath(puntos=((0, 0), (10, 0), (10, 10), (0, 10)), cerrado=True)
     with pytest.raises(ValueError, match="area total"):
         centroide_area_subpaths([horario, antihorario])
+
+
+def _svg_sin_z(*subpaths_d: str) -> str:
+    """`path` con `fill` solido y `stroke="none"` -- mismo patron de un
+    export real de vectorizacion/Illustrator -- con varios subpaths (varios
+    `M` dentro del mismo `d`) y CERO comandos `Z` en todo el `d`."""
+    d = " ".join(subpaths_d)
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+        f'<path d="{d}" fill="#000000" stroke="none" /></svg>'
+    )
+
+
+def _svg_con_z(*subpaths_d: str) -> str:
+    d = " ".join(f"{sub} Z" for sub in subpaths_d)
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+        f'<path d="{d}" fill="#000000" stroke="none" /></svg>'
+    )
+
+
+def test_svg_real_sin_z_da_el_mismo_centroide_que_con_z_explicito():
+    # Reproduce el bug real: un rectangulo asimetrico (mas area a la
+    # derecha) partido en dos subpaths dentro del mismo `d`, ninguno
+    # cerrado con `Z` -- antes del fix esto reventaba con "no hay subpaths
+    # cerrados" pese a tener area real y valida.
+    grande = "M0,0 L10,0 L10,10 L0,10"
+    chico = "M10,0 L12,0 L12,10 L10,10"
+
+    svg_sin_z = _svg_sin_z(grande, chico)
+    svg_con_z = _svg_con_z(grande, chico)
+
+    centroide_sin_z = calcular_centroide_svg_texto(svg_sin_z, ancho_mm=100.0, alto_mm=100.0)
+    centroide_con_z = calcular_centroide_svg_texto(svg_con_z, ancho_mm=100.0, alto_mm=100.0)
+
+    assert centroide_sin_z == pytest.approx(centroide_con_z)

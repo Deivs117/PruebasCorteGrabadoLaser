@@ -4,12 +4,25 @@ que ajustar -- a diferencia del centroide ponderado por intensidad de
 `laser_toolkit.raster.centroide` (imagen rasterizada, necesita un umbral
 para el caso opaco), un SVG ya es geometria vectorial, el area es exacta.
 
-Se aplica la formula por separado a cada subpath CERRADO y se combinan por
-area con signo: un diseño con "agujeros" (ej. la letra 'O', o cualquier
-`path` con `fill-rule` que use un subpath interior en sentido de giro
-opuesto al exterior) resta su area sola, sin logica especial para detectar
-"cual subpath es el agujero" -- es la misma propiedad que ya usa el
-renderizado SVG estandar (nonzero/evenodd) para saber que rellenar.
+Se aplica la formula por separado a CADA subpath con al menos 3 puntos --
+sin mirar `subpath.cerrado` -- y se combinan por area con signo: un diseño
+con "agujeros" (ej. la letra 'O', o cualquier `path` con `fill-rule` que use
+un subpath interior en sentido de giro opuesto al exterior) resta su area
+sola, sin logica especial para detectar "cual subpath es el agujero" -- es
+la misma propiedad que ya usa el renderizado SVG estandar (nonzero/evenodd)
+para saber que rellenar.
+
+Por que se ignora `subpath.cerrado`: ese campo solo indica si el `d` original
+traia un comando `Z` explicito (relevante para el TRAZADO de contorno, ver
+`Subpath`) -- muchos SVG reales (exportados de vectorizacion/Illustrator,
+`fill` solido + `stroke="none"`) nunca usan `Z`, confian en el cierre
+implicito del renderizador para el fill (valido y estandar en SVG: un
+subpath sin `Z` igual se cierra a los fines de que area rellena). Filtrar
+por `cerrado` dejaba esos SVG sin ningun subpath elegible pese a tener area
+real. La formula de abajo (`_area_y_centroide_subpath`) ya envuelve el
+indice con `(i + 1) % n`, o sea que matematicamente ya asume ese cierre
+implicito para cualquier poligono -- el filtro era innecesariamente
+estricto, no una necesidad de la formula.
 """
 
 from __future__ import annotations
@@ -19,8 +32,9 @@ from laser_toolkit.svg.geometry import Punto, Subpath
 
 def _area_y_centroide_subpath(subpath: Subpath) -> tuple[float, Punto]:
     """Area con signo (positiva = sentido antihorario) y centroide de UN
-    subpath, tratado como poligono cerrado sin importar `subpath.cerrado`
-    (el llamador ya filtro por eso -- ver `centroide_area_subpaths`)."""
+    subpath, tratado SIEMPRE como poligono cerrado sin importar
+    `subpath.cerrado` -- ver la nota del modulo sobre por que ese campo no
+    aplica aca."""
     puntos = subpath.puntos
     n = len(puntos)
     if n < 3:
@@ -53,22 +67,25 @@ def _area_y_centroide_subpath(subpath: Subpath) -> tuple[float, Punto]:
 def centroide_area_subpaths(subpaths: list[Subpath]) -> Punto:
     """Centro de masa real del area encerrada por `subpaths`.
 
-    Solo los subpaths CERRADOS aportan area (`subpath.cerrado`, ver
-    `laser_toolkit.svg.geometry.Subpath`) -- una linea o polilinea abierta no
-    encierra ninguna region para "pesar". Levanta `ValueError` si no hay
-    ningun subpath cerrado, o si el area total combinada da exactamente cero
-    (formas degeneradas, o areas que se cancelan entre si)."""
-    cerrados = [sp for sp in subpaths if sp.cerrado and len(sp.puntos) >= 3]
-    if not cerrados:
+    TODO subpath con al menos 3 puntos aporta area, sin mirar
+    `subpath.cerrado` (ver la nota del modulo -- ese campo no distingue
+    "tiene area" de "no tiene area" en SVG real, muchos exports validos
+    nunca marcan `Z`). Un subpath de 1-2 puntos (una linea suelta) no
+    encierra ninguna region y se ignora. Levanta `ValueError` si ningun
+    subpath tiene al menos 3 puntos, o si el area total combinada da
+    exactamente cero (formas degeneradas, o areas que se cancelan entre
+    si)."""
+    candidatos = [sp for sp in subpaths if len(sp.puntos) >= 3]
+    if not candidatos:
         raise ValueError(
-            "No hay subpaths cerrados con area para calcular un centroide "
-            "(el SVG solo tiene lineas/curvas abiertas)."
+            "No hay subpaths con al menos 3 puntos para calcular un "
+            "centroide (el SVG solo tiene lineas sueltas)."
         )
 
     area_total = 0.0
     x_acumulado = 0.0
     y_acumulado = 0.0
-    for subpath in cerrados:
+    for subpath in candidatos:
         area, (cx, cy) = _area_y_centroide_subpath(subpath)
         area_total += area
         x_acumulado += area * cx
@@ -76,9 +93,9 @@ def centroide_area_subpaths(subpaths: list[Subpath]) -> Punto:
 
     if area_total == 0:
         raise ValueError(
-            "El area total de los subpaths cerrados es cero (formas "
-            "degeneradas, o areas que se cancelan exactamente) -- no se "
-            "puede calcular un centroide."
+            "El area total de los subpaths es cero (formas degeneradas, o "
+            "areas que se cancelan exactamente) -- no se puede calcular un "
+            "centroide."
         )
 
     return (x_acumulado / area_total, y_acumulado / area_total)
