@@ -21,11 +21,21 @@ import proyectos
 from laser_toolkit.config import MachineConfig, Operacion
 from laser_toolkit.db.repo_negocio import construir_machine_config
 from laser_toolkit.gcode.writer import combinar_bloques_por_operacion, encabezado, pie
-from laser_toolkit.raster.api import calcular_contorno_imagen_con_margen, generar_gcode_corte_y_grabado
+from laser_toolkit.raster.api import (
+    UMBRAL_DISTANCIA_FONDO_POR_DEFECTO,
+    calcular_centroide_imagen,
+    calcular_contorno_imagen_con_margen,
+    generar_gcode_corte_y_grabado,
+)
 from laser_toolkit.raster.config import ConfiguracionRaster
+from laser_toolkit.raster.contorno import FormaMarco, generar_marco
 from laser_toolkit.storage.operaciones import BUCKET_GCODE, subir_gcode, url_firmada
-from laser_toolkit.svg.api import convertir_svg_texto_a_gcode
-from laser_toolkit.svg.geometry import Subpath
+from laser_toolkit.svg.api import (
+    calcular_centroide_svg_texto,
+    convertir_svg_texto_a_gcode,
+)
+from laser_toolkit.svg.geometry import Punto, Subpath
+from laser_toolkit.svg.transform import rotar_punto
 from sqlalchemy.orm import Session
 from supabase import Client
 
@@ -270,4 +280,66 @@ def calcular_contorno_corte(data_uri: str, ancho_mm: float, alto_mm: float, marg
     }
 
 
-__all__ = ["calcular_contorno_corte", "exportar_gcode_combinado"]
+def calcular_marco_corte(
+    tipo: str,
+    ancho_mm: float,
+    alto_mm: float,
+    rotacion_deg: float,
+    forma: FormaMarco,
+    tamano_mm: float,
+    *,
+    contenido_svg: str | None = None,
+    data_uri: str | None = None,
+    umbral_distancia_fondo: float = UMBRAL_DISTANCIA_FONDO_POR_DEFECTO,
+) -> dict:
+    """Issue #196: marco de corte simple (circulo/cuadrado) centrado en el
+    centro de masa REAL del diseño -- alternativa a `calcular_contorno_corte`
+    (#108, silueta/bounding box) cuando el pedido es una forma prolija (ej.
+    una pieza circular de MDF con un logo grabado adentro).
+
+    El centro de masa se calcula en el espacio LOCAL del objeto (caja
+    `ancho_mm x alto_mm`, sin rotar -- `svg.api.calcular_centroide_svg_texto`
+    para `tipo="svg"`, `raster.api.calcular_centroide_imagen` para
+    `tipo="raster"`), igual que el resto de la geometria local del editor.
+    El marco en si nace centrado en su propia caja `tamano_mm x tamano_mm`
+    (`generar_marco`, siempre centrado por construccion) y se serializa como
+    SVG independiente, listo para agregarse como objeto nuevo del lienzo.
+
+    Como el marco es un objeto NUEVO y separado (no una geometria interna
+    del objeto de origen), el `xMm`/`yMm` donde va a caer en el lienzo no lo
+    resuelve esta funcion -- devuelve `dxMm`/`dyMm`, el desplazamiento desde
+    el CENTRO del objeto de origen hasta el centroide real, ya rotado por
+    `rotacion_deg` (misma convencion de sentido/eje que
+    `_angulo_rad_desde_lienzo`, así el desplazamiento sigue siendo correcto
+    aunque el objeto de origen este rotado en el lienzo). Quien llama
+    (`editor-lienzo.tsx`) solo necesita sumar `dxMm`/`dyMm` a `xMm`/`yMm` del
+    objeto de origen para ubicar el nuevo objeto -- mismo mecanismo de
+    vinculo `grupoId`/`objetoOrigenId` que ya usa #108, sin reinventarlo."""
+    if tipo == "svg":
+        if not contenido_svg:
+            raise ValueError("Falta 'contenidoSvg' para generar el marco de un objeto SVG.")
+        centro_local = calcular_centroide_svg_texto(contenido_svg, ancho_mm, alto_mm)
+    elif tipo == "raster":
+        if not data_uri:
+            raise ValueError("Falta 'dataUri' para generar el marco de un objeto raster.")
+        datos = _decodificar_data_uri(data_uri)
+        centro_local = calcular_centroide_imagen(datos, ancho_mm, alto_mm, umbral_distancia_fondo)
+    else:
+        raise ValueError(f"Tipo de objeto no soportado para generar un marco de corte: {tipo!r}.")
+
+    marco_local = generar_marco((tamano_mm / 2, tamano_mm / 2), forma, tamano_mm)
+    contenido_svg_marco = _svg_desde_subpaths([marco_local], tamano_mm, tamano_mm)
+
+    offset_local: Punto = (centro_local[0] - ancho_mm / 2, centro_local[1] - alto_mm / 2)
+    angulo_rad = _angulo_rad_desde_lienzo(rotacion_deg)
+    dx_mm, dy_mm = rotar_punto(offset_local, (0.0, 0.0), angulo_rad)
+
+    return {
+        "contenidoSvg": contenido_svg_marco,
+        "tamanoMm": tamano_mm,
+        "dxMm": dx_mm,
+        "dyMm": dy_mm,
+    }
+
+
+__all__ = ["calcular_contorno_corte", "calcular_marco_corte", "exportar_gcode_combinado"]

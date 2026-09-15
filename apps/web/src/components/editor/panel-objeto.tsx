@@ -23,6 +23,7 @@ import {
   type FichaCliente,
 } from "@/lib/fichas-cliente";
 import { MARGEN_CONTORNO_MM_POR_DEFECTO } from "@/lib/editor-contorno-schema";
+import { TAMANO_MARCO_MM_POR_DEFECTO } from "@/lib/editor-marco-schema";
 import type {
   ObjetoLienzo,
   Operacion,
@@ -66,6 +67,10 @@ interface PanelObjetoProps {
   onGenerarContorno: (margenMm: number) => void;
   generandoContorno: boolean;
   errorContorno: string | null;
+  /** Issue #196: aplica tanto a `tipo="svg"` como a `tipo="raster"`. */
+  onGenerarMarco: (forma: "circulo" | "cuadrado", tamanoMm: number) => void;
+  generandoMarco: boolean;
+  errorMarco: string | null;
 }
 
 const OPERACIONES: { valor: Operacion; etiqueta: string }[] = [
@@ -100,6 +105,9 @@ export function PanelObjeto({
   onGenerarContorno,
   generandoContorno,
   errorContorno,
+  onGenerarMarco,
+  generandoMarco,
+  errorMarco,
 }: PanelObjetoProps) {
   const proporcionOriginal = objeto.anchoMm / objeto.altoMm;
   // #109 -- estado propio del modal de preprocesamiento de imagen, sección
@@ -109,6 +117,12 @@ export function PanelObjeto({
     useState(false);
   const [margenContornoMm, setMargenContornoMm] = useState(
     MARGEN_CONTORNO_MM_POR_DEFECTO,
+  );
+  const [formaMarco, setFormaMarco] = useState<"circulo" | "cuadrado">(
+    "circulo",
+  );
+  const [tamanoMarcoMm, setTamanoMarcoMm] = useState(
+    TAMANO_MARCO_MM_POR_DEFECTO,
   );
 
   function alternarOperacion(operacion: Operacion) {
@@ -863,6 +877,69 @@ export function PanelObjeto({
           ) : null}
         </div>
       ) : null}
+
+      <div className="border-border flex flex-col gap-2 border-t pt-3">
+        <p className="text-navy text-xs font-semibold uppercase">
+          Marco de corte
+        </p>
+        <p className="text-text-muted text-xs">
+          Genera un círculo o cuadrado de tamaño fijo, centrado en el centro de
+          masa real del diseño (no en el centro geométrico de su caja) — útil
+          para piezas de forma prolija, por ejemplo una pieza circular de MDF
+          con un logo grabado adentro.
+        </p>
+        <div className="flex items-end gap-2">
+          <Field label="Forma">
+            {(id) => (
+              <select
+                id={id}
+                value={formaMarco}
+                onChange={(e) =>
+                  setFormaMarco(e.target.value as "circulo" | "cuadrado")
+                }
+                className={INPUT_CLASSES}
+              >
+                <option value="circulo">Círculo</option>
+                <option value="cuadrado">Cuadrado</option>
+              </select>
+            )}
+          </Field>
+          <Field
+            label={formaMarco === "circulo" ? "Diámetro (mm)" : "Lado (mm)"}
+          >
+            {(id) => (
+              <input
+                id={id}
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="1"
+                value={tamanoMarcoMm}
+                onChange={(e) =>
+                  setTamanoMarcoMm(
+                    numeroODefault(e.target.value, tamanoMarcoMm),
+                  )
+                }
+                className={clsx(INPUT_CLASSES, "font-mono")}
+              />
+            )}
+          </Field>
+          <Button
+            variant="outline"
+            size="sm"
+            loading={generandoMarco}
+            disabled={tamanoMarcoMm <= 0}
+            onClick={() => onGenerarMarco(formaMarco, tamanoMarcoMm)}
+          >
+            {generandoMarco ? "Generando…" : "Generar marco de corte"}
+          </Button>
+        </div>
+        {errorMarco ? (
+          <p role="alert" className="text-danger text-xs">
+            {errorMarco}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

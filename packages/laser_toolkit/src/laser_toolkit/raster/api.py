@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from laser_toolkit.config import MachineConfig
 from laser_toolkit.raster.canal import calcular_matriz_intensidad
+from laser_toolkit.raster.centroide import UMBRAL_DISTANCIA_FONDO_POR_DEFECTO, centroide_ponderado_imagen
 from laser_toolkit.raster.config import ConfiguracionRaster
 from laser_toolkit.raster.contorno import extraer_contorno, extraer_contorno_con_margen
 from laser_toolkit.raster.gcode import gcode_grabado_raster
@@ -19,6 +20,7 @@ from laser_toolkit.svg.transform import Punto, rotar_punto
 __all__ = [
     "calcular_contorno_imagen",
     "calcular_contorno_imagen_con_margen",
+    "calcular_centroide_imagen",
     "convertir_imagen_a_gcode_grabado",
     "generar_gcode_corte_y_grabado",
 ]
@@ -51,6 +53,19 @@ def calcular_contorno_imagen_con_margen(
     mm que ocupa el contorno -- ver `raster.contorno.extraer_contorno_con_margen`."""
     imagen = decodificar_imagen(datos)
     return extraer_contorno_con_margen(imagen, ancho_mm, alto_mm, margen_mm)
+
+
+def calcular_centroide_imagen(
+    datos: bytes,
+    ancho_mm: float,
+    alto_mm: float,
+    umbral_distancia_fondo: float = UMBRAL_DISTANCIA_FONDO_POR_DEFECTO,
+) -> Punto:
+    """Decodifica `datos` y devuelve el centro de masa real de la imagen, en
+    espacio local (issue #196) -- ver `raster.centroide.centroide_ponderado_imagen`
+    para el criterio alfa vs. distancia de color."""
+    imagen = decodificar_imagen(datos)
+    return centroide_ponderado_imagen(imagen, ancho_mm, alto_mm, umbral_distancia_fondo)
 
 
 def convertir_imagen_a_gcode_grabado(

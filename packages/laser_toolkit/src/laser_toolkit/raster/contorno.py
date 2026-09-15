@@ -18,9 +18,10 @@ v1, ver docstring de `_trazar_bordes_mascara`).
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import cast
+from typing import Literal, cast
 
 from PIL import Image, ImageFilter
 
@@ -28,6 +29,18 @@ from laser_toolkit.svg.geometry import Punto, Subpath
 
 # Bajo este valor de alfa (0-255) un pixel se considera "fuera" de la pieza.
 UMBRAL_ALFA = 128
+
+# Issue #196: forma de un marco de corte simple generado alrededor del
+# centro de masa real de un diseño (ver `raster.centroide`/`svg.centroide`),
+# alternativa a la silueta/bounding box real de `extraer_contorno` cuando el
+# pedido es una pieza de forma prolija (ej. una pieza circular de MDF).
+FormaMarco = Literal["circulo", "cuadrado"]
+
+# Cantidad de segmentos para aproximar el circulo del marco -- mismo orden
+# de magnitud que `_elipse_a_subpath` en `svg.document` (circulos/elipses de
+# un SVG real), suficiente para que un circulo de corte no se note
+# poligonal a los tamaños tipicos de una pieza de taller.
+_PASOS_CIRCULO_MARCO = 128
 
 # Issue #183: `_mascara_binaria`/`_trazar_bordes_mascara` recorren CADA pixel
 # en Python puro (sin numpy) -- para una imagen con transparencia real a
@@ -143,6 +156,47 @@ def _contorno_rectangulo(ancho_mm: float, alto_mm: float) -> Subpath:
         puntos=((0.0, 0.0), (ancho_mm, 0.0), (ancho_mm, alto_mm), (0.0, alto_mm)),
         cerrado=True,
     )
+
+
+def generar_marco(centro: Punto, forma: FormaMarco, tamano_mm: float) -> Subpath:
+    """Marco de corte simple (circulo o cuadrado) centrado en `centro`
+    (issue #196): la alternativa a `extraer_contorno`/
+    `extraer_contorno_con_margen` cuando el diseño necesita una forma de
+    corte prolija en vez de la silueta/bounding box real de la imagen --
+    tipicamente centrado en el centro de masa real del diseño (ver
+    `raster.centroide`/`svg.centroide`), no en el centro geometrico de su
+    caja contenedora.
+
+    `tamano_mm` es el DIAMETRO (forma="circulo") o el LADO
+    (forma="cuadrado") -- nunca un radio/semilado, para que quien llama
+    (la UI del editor) pida directamente el numero que el operario piensa
+    ("quiero una pieza de 50mm de diametro"), sin tener que dividir a mano."""
+    if tamano_mm <= 0:
+        raise ValueError(f"El tamaño del marco debe ser mayor a 0 (recibido: {tamano_mm}).")
+
+    cx, cy = centro
+    if forma == "cuadrado":
+        mitad = tamano_mm / 2
+        return Subpath(
+            puntos=(
+                (cx - mitad, cy - mitad),
+                (cx + mitad, cy - mitad),
+                (cx + mitad, cy + mitad),
+                (cx - mitad, cy + mitad),
+            ),
+            cerrado=True,
+        )
+    if forma == "circulo":
+        radio = tamano_mm / 2
+        puntos = tuple(
+            (
+                cx + radio * math.cos(2 * math.pi * i / _PASOS_CIRCULO_MARCO),
+                cy + radio * math.sin(2 * math.pi * i / _PASOS_CIRCULO_MARCO),
+            )
+            for i in range(_PASOS_CIRCULO_MARCO)
+        )
+        return Subpath(puntos=puntos, cerrado=True)
+    raise ValueError(f"Forma de marco no soportada: {forma!r} (esperado 'circulo' o 'cuadrado').")
 
 
 def _extraer_contorno_alfa(alfa: Image.Image, ancho_mm: float, alto_mm: float) -> list[Subpath]:

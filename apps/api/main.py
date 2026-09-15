@@ -573,6 +573,45 @@ def generar_contorno_corte(body: ContornoCorteBody) -> dict:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+class MarcoCorteBody(BaseModel):
+    """Issue #196: entrada del botón "Generar marco de corte" del panel del
+    objeto (svg o raster) -- forma simple (círculo/cuadrado) de tamaño
+    elegido por el usuario, centrada en el centro de masa real del diseño."""
+
+    tipo: Literal["svg", "raster"]
+    anchoMm: float
+    altoMm: float
+    rotacionDeg: float = 0.0
+    forma: Literal["circulo", "cuadrado"]
+    tamanoMm: float
+    # Solo para tipo="svg":
+    contenidoSvg: str | None = None
+    # Solo para tipo="raster":
+    dataUri: str | None = None
+    umbralDistanciaFondo: float | None = None
+
+
+@app.post("/editor/marco-corte")
+def generar_marco_corte(body: MarcoCorteBody) -> dict:
+    try:
+        kwargs = {}
+        if body.umbralDistanciaFondo is not None:
+            kwargs["umbral_distancia_fondo"] = body.umbralDistanciaFondo
+        return editor.calcular_marco_corte(
+            body.tipo,
+            body.anchoMm,
+            body.altoMm,
+            body.rotacionDeg,
+            body.forma,
+            body.tamanoMm,
+            contenido_svg=body.contenidoSvg,
+            data_uri=body.dataUri,
+            **kwargs,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 # ============================================================
 # Proyectos de diseño reutilizables del Editor (issue #18)
 # ============================================================
