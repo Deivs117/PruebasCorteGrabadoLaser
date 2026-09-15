@@ -94,17 +94,23 @@ def gcode_relleno(
     antes), uno corto recibe un overscan proporcional a su propio tamaño en
     vez de una constante fija pensada para trazos mucho mas grandes.
 
-    Cada `Segmento` de `generar_segmentos_relleno` ya viene horizontal
-    (misma Y en ambos puntos, `x1 <= x2`), asi que extender el
-    sobre-recorrido es una simple resta/suma en X."""
+    Cada `Segmento` de `generar_segmentos_relleno` viene horizontal (misma Y
+    en ambos puntos), pero el sentido de recorrido (cual punto es la entrada
+    y cual la salida) puede ir en cualquier direccion -- el zigzag de filas
+    alternadas invierte el orden en las filas de "vuelta" para que la
+    maquina no viaje en vacio de vuelta al extremo izquierdo en cada fila.
+    Por eso acá no se asume `x1 <= x2`: la entrada/salida del overscan se
+    extienden en la direccion real de avance de CADA segmento, tomada tal
+    cual viene."""
     s = _valor_s(potencia_pct, machine)
     overscan_maximo_mm = sobrerecorrido_mm(velocidad_mm_min, machine)
     lineas: list[str] = []
 
     for (x1, y), (x2, _y2) in segmentos:
-        overscan_mm = min(overscan_maximo_mm, x2 - x1)
-        x_entrada = x1 - overscan_mm + x_offset_mm
-        x_salida = x2 + overscan_mm + x_offset_mm
+        direccion = 1.0 if x2 >= x1 else -1.0
+        overscan_mm = min(overscan_maximo_mm, abs(x2 - x1))
+        x_entrada = x1 - direccion * overscan_mm + x_offset_mm
+        x_salida = x2 + direccion * overscan_mm + x_offset_mm
         y_abs = y + y_offset_mm
         lineas.append(f"G0 X{x_entrada:.3f} Y{y_abs:.3f} F{machine.travel_feed_mm_min}")
         lineas.append("M4 S0")

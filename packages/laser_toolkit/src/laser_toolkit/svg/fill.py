@@ -45,7 +45,18 @@ def _cruces_en_y(aristas: list[tuple[Punto, Punto]], y: float) -> list[float]:
 
 def generar_segmentos_relleno(subpaths: list[Subpath], resolucion_mm: float) -> list[Segmento]:
     """Lineas de relleno horizontales, espaciadas `resolucion_mm`, recortadas
-    a las zonas "dentro" segun la regla par-impar."""
+    a las zonas "dentro" segun la regla par-impar.
+
+    Filas alternadas en zigzag (boustrophedon), igual que
+    `laser_toolkit.gcode.writer.grabar_relleno`/`laser_toolkit.raster.gcode.
+    gcode_grabado_raster`: una fila de "ida" (izquierda a derecha) devuelve
+    sus segmentos en orden creciente de X, cada uno de menor a mayor X; la
+    fila de "vuelta" los devuelve en orden DECRECIENTE de X, cada uno de
+    mayor a menor X -- para que el ultimo punto de una fila quede cerca del
+    primer punto de la siguiente, en vez de que la maquina viaje en vacio
+    de vuelta al extremo izquierdo cada vez que termina una fila a la
+    derecha. `gcode_relleno` ya no asume `x1 <= x2` en cada segmento, sigue
+    el sentido real que trae cada uno."""
     if resolucion_mm <= 0:
         raise ValueError("resolucion_mm debe ser positiva")
 
@@ -59,11 +70,16 @@ def generar_segmentos_relleno(subpaths: list[Subpath], resolucion_mm: float) -> 
 
     segmentos: list[Segmento] = []
     y = y_min + resolucion_mm / 2  # centrado en cada franja, evita rozar vertices
+    ida = True
     while y < y_max:
         cruces = _cruces_en_y(aristas, y)
         # Los cruces vienen en pares consecutivos: [dentro, fuera, dentro, fuera, ...]
-        for i in range(0, len(cruces) - 1, 2):
-            segmentos.append(((cruces[i], y), (cruces[i + 1], y)))
+        pares = [(cruces[i], cruces[i + 1]) for i in range(0, len(cruces) - 1, 2)]
+        if ida:
+            segmentos += [((x1, y), (x2, y)) for x1, x2 in pares]
+        else:
+            segmentos += [((x2, y), (x1, y)) for x1, x2 in reversed(pares)]
         y += resolucion_mm
+        ida = not ida
 
     return segmentos

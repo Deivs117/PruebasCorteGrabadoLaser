@@ -59,6 +59,23 @@ def test_gcode_relleno_aplica_sobrerrecorrido_con_laser_apagado():
     assert lineas[5] == "M5"
 
 
+def test_gcode_relleno_respeta_sentido_de_fila_de_vuelta():
+    """Un segmento en sentido decreciente (fila de "vuelta" del zigzag,
+    `generar_segmentos_relleno`) extiende el overscan hacia la IZQUIERDA en
+    ambos extremos (misma direccion del recorrido), no hacia la derecha
+    como si fuera `x1 <= x2` -- de lo contrario el overscan de salida
+    invadiria el segmento real en vez de alejarse de el."""
+    machine = MachineConfig()
+    velocidad = 1000
+    overscan = sobrerecorrido_mm(velocidad, machine)
+    lineas = gcode_relleno(
+        [((15.0, 2.0), (5.0, 2.0))], 0, 0, velocidad_mm_min=velocidad, potencia_pct=50, machine=machine
+    )
+    # Entra por la derecha (15 + overscan) y sale por la izquierda (5 - overscan).
+    assert lineas[0] == f"G0 X{15.0 + overscan:.3f} Y2.000 F{machine.travel_feed_mm_min}"
+    assert lineas[4] == f"G1 X{5.0 - overscan:.3f} Y2.000 F{velocidad} S0"
+
+
 def test_gcode_relleno_topa_overscan_al_largo_del_trazo():
     """Un trazo mas corto que el overscan maximo configurado (ej. una pata
     fina de un dibujo) no arrastra el overscan completo -- se topa a su
