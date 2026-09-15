@@ -168,29 +168,32 @@ def combinar_bloques_por_operacion(
     bloques: list[tuple[Operacion, list[str]]], machine: MachineConfig
 ) -> list[str]:
     """Concatena bloques de G-code ya generados (uno por objeto+operacion,
-    ver `apps.api.editor.exportar_gcode_combinado`) agrupando TODO el corte
-    junto y TODO el grabado junto, en vez de mantener el orden de llegada
-    -- para mover el eje Z una sola vez en toda la exportacion combinada
-    (issue #195), no una vez por objeto.
+    ver `apps.api.editor.exportar_gcode_combinado`) agrupando TODO el
+    grabado junto y TODO el corte junto, en vez de mantener el orden de
+    llegada -- para mover el eje Z una sola vez en toda la exportacion
+    combinada (issue #195), no una vez por objeto.
 
-    El corte se emite primero, sin ningun movimiento de Z: la convencion del
-    taller es que el operador ya cero el eje Z sobre el material para
-    cortar (ver `MachineConfig.elevacion_grabado_mm`), asi que ese es el
-    nivel de referencia del que parte -- y al que vuelve -- toda la corrida.
-    Si los bloques son todos del mismo tipo (solo corte o solo grabado) no
-    se emite NINGUN movimiento de Z: no hace falta subir para grabar si
-    nunca se va a volver a cortar en esta misma exportacion, y viceversa.
+    El grabado se emite primero, con el ascenso de Z (`elevar_z_para_grabado`)
+    como primer movimiento de Z de toda la corrida; el corte se emite al
+    final, precedido por el descenso simetrico (`bajar_z_para_corte`) --
+    orden confirmado con el usuario. No asume en que nivel dejo cebado el
+    eje Z el operador antes de arrancar la exportacion combinada; solo
+    garantiza que, si hay ambos tipos de bloque, el ascenso y el descenso
+    ocurren exactamente una vez cada uno, y en ese orden. Si los bloques son
+    todos del mismo tipo (solo corte o solo grabado) no se emite NINGUN
+    movimiento de Z: no hace falta subir para grabar si nunca se va a volver
+    a cortar en esta misma exportacion, y viceversa.
     """
-    bloques_corte = [
-        linea for operacion, bloque in bloques if operacion == Operacion.CORTE for linea in bloque
-    ]
     bloques_grabado = [
         linea for operacion, bloque in bloques if operacion == Operacion.GRABADO for linea in bloque
     ]
+    bloques_corte = [
+        linea for operacion, bloque in bloques if operacion == Operacion.CORTE for linea in bloque
+    ]
 
     if bloques_corte and bloques_grabado:
-        return bloques_corte + elevar_z_para_grabado(machine) + bloques_grabado + bajar_z_para_corte(machine)
-    return bloques_corte + bloques_grabado
+        return elevar_z_para_grabado(machine) + bloques_grabado + bajar_z_para_corte(machine) + bloques_corte
+    return bloques_grabado + bloques_corte
 
 
 def cortar_cuadrado(celda: Celda, machine: MachineConfig) -> list[str]:

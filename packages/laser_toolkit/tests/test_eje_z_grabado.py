@@ -62,13 +62,17 @@ def test_combinar_bloques_corte_y_grabado_emite_exactamente_un_ascenso_y_un_desc
 
     # Exactamente un ascenso y un descenso en TODA la exportacion -- no uno
     # por cada uno de los 3 objetos que traen corte o los 2 que traen grabado.
+    # El ascenso va primero (grabado se emite antes que corte).
     assert movimientos_z == [
         "G0 Z4.000 ; subir del foco de corte al de grabado",
         "G0 Z-4.000 ; bajar del foco de grabado al de corte",
     ]
 
 
-def test_combinar_bloques_agrupa_todo_el_corte_junto_y_todo_el_grabado_junto() -> None:
+def test_combinar_bloques_emite_grabado_primero_y_corte_al_final() -> None:
+    """Orden confirmado con el usuario: TODO el grabado agrupado al inicio
+    (con el ascenso de Z como primer movimiento de Z de la corrida), TODO
+    el corte agrupado al final (precedido por el descenso)."""
     machine = _machine(4.0)
     bloques = [
         (Operacion.CORTE, ["CORTE_A"]),
@@ -79,8 +83,16 @@ def test_combinar_bloques_agrupa_todo_el_corte_junto_y_todo_el_grabado_junto() -
 
     resultado = combinar_bloques_por_operacion(bloques, machine)
 
-    assert resultado.index("CORTE_A") < resultado.index("CORTE_B") < resultado.index("GRABADO_A")
-    assert resultado.index("GRABADO_A") < resultado.index("GRABADO_B")
+    assert resultado.index("GRABADO_A") < resultado.index("GRABADO_B") < resultado.index("CORTE_A")
+    assert resultado.index("CORTE_A") < resultado.index("CORTE_B")
+    # El ascenso es el primer elemento de toda la lista (antes que cualquier
+    # bloque de grabado); el descenso viene despues de todo el grabado y
+    # antes de todo el corte.
+    assert resultado[0] == "G91 ; posicionamiento relativo (solo para este movimiento de Z)"
+    indice_ascenso = resultado.index("G0 Z4.000 ; subir del foco de corte al de grabado")
+    indice_descenso = resultado.index("G0 Z-4.000 ; bajar del foco de grabado al de corte")
+    assert indice_ascenso < resultado.index("GRABADO_A")
+    assert resultado.index("GRABADO_A") < indice_descenso < resultado.index("CORTE_A")
 
 
 def test_combinar_bloques_solo_corte_no_emite_ningun_movimiento_de_z() -> None:
