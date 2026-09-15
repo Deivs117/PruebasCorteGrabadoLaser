@@ -9,7 +9,7 @@ quemados cuando la maquina desacelera en las esquinas.
 
 from __future__ import annotations
 
-from laser_toolkit.config import MachineConfig, SuiteConfig
+from laser_toolkit.config import MachineConfig, Operacion, SuiteConfig
 from laser_toolkit.gcode.grid import Celda
 from laser_toolkit.gcode.label_font import trazos_texto
 
@@ -139,6 +139,58 @@ def pie() -> list[str]:
         "M5 ; laser apagado",
         "G0 X0 Y0 ; volver al origen",
     ]
+
+
+def elevar_z_para_grabado(machine: MachineConfig) -> list[str]:
+    """G-code que sube el cabezal `machine.elevacion_grabado_mm` en Z, de forma
+    RELATIVA (`G91`/`G0 Z<delta>`/`G90`), justo antes de emitir un bloque de
+    grabado -- ver `MachineConfig.elevacion_grabado_mm` (issue #195) para la
+    justificacion de por que es relativo y no Z absoluto."""
+    return [
+        "G91 ; posicionamiento relativo (solo para este movimiento de Z)",
+        f"G0 Z{machine.elevacion_grabado_mm:.3f} ; subir del foco de corte al de grabado",
+        "G90 ; volver a posicionamiento absoluto",
+    ]
+
+
+def bajar_z_para_corte(machine: MachineConfig) -> list[str]:
+    """Descenso simetrico de `elevar_z_para_grabado`: vuelve el cabezal al foco
+    de corte justo antes de emitir un bloque de corte, con el mismo delta en
+    sentido contrario -- tambien relativo, nunca Z absoluto."""
+    return [
+        "G91 ; posicionamiento relativo (solo para este movimiento de Z)",
+        f"G0 Z{-machine.elevacion_grabado_mm:.3f} ; bajar del foco de grabado al de corte",
+        "G90 ; volver a posicionamiento absoluto",
+    ]
+
+
+def combinar_bloques_por_operacion(
+    bloques: list[tuple[Operacion, list[str]]], machine: MachineConfig
+) -> list[str]:
+    """Concatena bloques de G-code ya generados (uno por objeto+operacion,
+    ver `apps.api.editor.exportar_gcode_combinado`) agrupando TODO el corte
+    junto y TODO el grabado junto, en vez de mantener el orden de llegada
+    -- para mover el eje Z una sola vez en toda la exportacion combinada
+    (issue #195), no una vez por objeto.
+
+    El corte se emite primero, sin ningun movimiento de Z: la convencion del
+    taller es que el operador ya cero el eje Z sobre el material para
+    cortar (ver `MachineConfig.elevacion_grabado_mm`), asi que ese es el
+    nivel de referencia del que parte -- y al que vuelve -- toda la corrida.
+    Si los bloques son todos del mismo tipo (solo corte o solo grabado) no
+    se emite NINGUN movimiento de Z: no hace falta subir para grabar si
+    nunca se va a volver a cortar en esta misma exportacion, y viceversa.
+    """
+    bloques_corte = [
+        linea for operacion, bloque in bloques if operacion == Operacion.CORTE for linea in bloque
+    ]
+    bloques_grabado = [
+        linea for operacion, bloque in bloques if operacion == Operacion.GRABADO for linea in bloque
+    ]
+
+    if bloques_corte and bloques_grabado:
+        return bloques_corte + elevar_z_para_grabado(machine) + bloques_grabado + bajar_z_para_corte(machine)
+    return bloques_corte + bloques_grabado
 
 
 def cortar_cuadrado(celda: Celda, machine: MachineConfig) -> list[str]:

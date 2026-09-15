@@ -109,6 +109,7 @@ def guardar_configuracion_maquina(
     aceleracion_mm_s2: float,
     area_trabajo_ancho_mm: float,
     area_trabajo_alto_mm: float,
+    elevacion_grabado_mm: float,
 ) -> dict:
     """Espejo de `guardarMaquina` en `maquina-data.ts`. A diferencia de
     tarifas, esto pasa a ser el default global real de toda la máquina
@@ -125,6 +126,7 @@ def guardar_configuracion_maquina(
         aceleracion_mm_s2=aceleracion_mm_s2,
         area_trabajo_ancho_mm=area_trabajo_ancho_mm,
         area_trabajo_alto_mm=area_trabajo_alto_mm,
+        elevacion_grabado_mm=elevacion_grabado_mm,
     )
     sesion.commit()
     return configuracion_maquina(sesion)
