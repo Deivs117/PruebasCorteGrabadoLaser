@@ -113,6 +113,7 @@ def configuracion_maquina(sesion: Session) -> dict:
         "aceleracionMmS2": fila.aceleracion_mm_s2,
         "areaTrabajoAnchoMm": fila.area_trabajo_ancho_mm,
         "areaTrabajoAltoMm": fila.area_trabajo_alto_mm,
+        "elevacionGrabadoMm": fila.elevacion_grabado_mm,
     }
 
 

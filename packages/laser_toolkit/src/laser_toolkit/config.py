@@ -114,6 +114,29 @@ class MachineConfig(BaseModel):
             "advertir si un diseño excede la mesa fisica antes de generar G-code."
         ),
     )
+    elevacion_grabado_mm: float = Field(
+        default=4.0,
+        gt=0,
+        description=(
+            "Cuanto sube el cabezal en Z (mm) para pasar del foco de CORTE al foco de "
+            "GRABADO -- calibrado a mano en el taller: 3mm de material dejan el foco a la "
+            "altura de corte, 7mm a la de grabado, es decir +4mm (issue #195). Se emite "
+            "SIEMPRE como movimiento RELATIVO (`G91`/`G0 Z<delta>`/`G90`), nunca Z "
+            "absoluto: la maquina no tiene el eje Z homeado a un cero de fabrica, solo "
+            "depende de que el operador haya cerado Z sobre el material para cortar, como "
+            "ya hace hoy -- moverlo a un Z absoluto asumiria una calibracion de maquina "
+            "que no existe. Una exportacion combinada de corte+grabado (editor de diseño, "
+            "#3) sube este delta UNA sola vez antes de todo el bloque de grabado y lo "
+            "vuelve a bajar UNA sola vez antes de volver al bloque de corte -- nunca una "
+            "vez por objeto -- para minimizar cuantas veces sube/baja el cabezal (mas "
+            "movimientos de Z acumulan mas riesgo de deriva por backlash). Ver "
+            "`laser_toolkit.gcode.writer.elevar_z_para_grabado` / `bajar_z_para_corte` y "
+            "`laser_toolkit.gcode.writer.combinar_bloques_por_operacion`. "
+            "**Validar en la maquina real antes de confiar en esto sin supervision:** "
+            "confirmar que el eje Z sube/baja exactamente este valor y vuelve a la "
+            "posicion de corte sin deriva."
+        ),
+    )
 
 
 class SuiteConfig(BaseModel):
