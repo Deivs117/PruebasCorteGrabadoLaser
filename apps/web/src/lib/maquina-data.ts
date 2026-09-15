@@ -13,6 +13,7 @@ interface ConfiguracionMaquinaApi {
   aceleracionMmS2: number;
   areaTrabajoAnchoMm: number;
   areaTrabajoAltoMm: number;
+  elevacionGrabadoMm: number;
 }
 
 /**
@@ -33,6 +34,7 @@ export async function leerMaquina(): Promise<MaquinaFormData> {
     aceleracionMmS2: String(datos.aceleracionMmS2),
     areaTrabajoAnchoMm: String(datos.areaTrabajoAnchoMm),
     areaTrabajoAltoMm: String(datos.areaTrabajoAltoMm),
+    elevacionGrabadoMm: String(datos.elevacionGrabadoMm),
   };
 }
 
@@ -52,5 +54,6 @@ export async function guardarMaquina(datos: MaquinaFormData): Promise<void> {
     aceleracionMmS2: Number(datos.aceleracionMmS2),
     areaTrabajoAnchoMm: Number(datos.areaTrabajoAnchoMm),
     areaTrabajoAltoMm: Number(datos.areaTrabajoAltoMm),
+    elevacionGrabadoMm: Number(datos.elevacionGrabadoMm),
   });
 }

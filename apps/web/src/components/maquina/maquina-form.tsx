@@ -51,6 +51,16 @@ const CAMPOS_LASER: CampoNumerico[] = [
   },
 ];
 
+const CAMPOS_EJE_Z: CampoNumerico[] = [
+  {
+    clave: "elevacionGrabadoMm",
+    label: "Elevación Z para grabado",
+    hint: "Cuánto sube el cabezal en Z (movimiento relativo) para pasar del foco de corte al de grabado en una exportación combinada del editor (#195).",
+    sufijo: "mm",
+    step: "0.1",
+  },
+];
+
 const CAMPOS_MOVIMIENTO: CampoNumerico[] = [
   {
     clave: "travelFeedMmMin",
@@ -192,6 +202,16 @@ export function MaquinaForm({ inicial }: MaquinaFormProps) {
         <p className="text-navy text-base font-semibold">Movimiento</p>
         <CampoGrupo
           campos={CAMPOS_MOVIMIENTO}
+          datos={datos}
+          errores={errores}
+          onCambio={actualizar}
+        />
+      </Card>
+
+      <Card className="flex flex-col gap-4 p-6">
+        <p className="text-navy text-base font-semibold">Eje Z</p>
+        <CampoGrupo
+          campos={CAMPOS_EJE_Z}
           datos={datos}
           errores={errores}
           onCambio={actualizar}

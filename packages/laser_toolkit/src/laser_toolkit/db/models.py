@@ -453,6 +453,9 @@ class ConfiguracionMaquina(Base):
     # 300x180mm = area real de la CNC 3018 + LT-80W-F45 de este taller (#11).
     area_trabajo_ancho_mm: Mapped[float] = mapped_column(Float, default=300.0)
     area_trabajo_alto_mm: Mapped[float] = mapped_column(Float, default=180.0)
+    # Nuevo por #195: elevacion relativa de Z (mm) entre el foco de corte y el
+    # de grabado -- ver `laser_toolkit.config.MachineConfig.elevacion_grabado_mm`.
+    elevacion_grabado_mm: Mapped[float] = mapped_column(Float, default=4.0)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

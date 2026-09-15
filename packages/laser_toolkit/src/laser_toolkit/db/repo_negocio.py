@@ -102,6 +102,7 @@ def obtener_configuracion_maquina(sesion: Session) -> ConfiguracionMaquina:
         aceleracion_mm_s2=defaults.aceleracion_mm_s2,
         area_trabajo_ancho_mm=defaults.area_trabajo_ancho_mm,
         area_trabajo_alto_mm=defaults.area_trabajo_alto_mm,
+        elevacion_grabado_mm=defaults.elevacion_grabado_mm,
     )
     sesion.add(fila)
     sesion.flush()
@@ -122,6 +123,7 @@ def construir_machine_config(sesion: Session) -> MachineConfig:
         aceleracion_mm_s2=fila.aceleracion_mm_s2,
         area_trabajo_ancho_mm=fila.area_trabajo_ancho_mm,
         area_trabajo_alto_mm=fila.area_trabajo_alto_mm,
+        elevacion_grabado_mm=fila.elevacion_grabado_mm,
     )
 
 
@@ -137,6 +139,7 @@ def actualizar_configuracion_maquina(
     aceleracion_mm_s2: float,
     area_trabajo_ancho_mm: float,
     area_trabajo_alto_mm: float,
+    elevacion_grabado_mm: float,
 ) -> ConfiguracionMaquina:
     """Sobreescribe la fila única de `configuracion_maquina` -- pasa a ser el
     default global real que usa todo el toolkit (no un pre-llenado del
@@ -152,5 +155,6 @@ def actualizar_configuracion_maquina(
     fila.aceleracion_mm_s2 = aceleracion_mm_s2
     fila.area_trabajo_ancho_mm = area_trabajo_ancho_mm
     fila.area_trabajo_alto_mm = area_trabajo_alto_mm
+    fila.elevacion_grabado_mm = elevacion_grabado_mm
     sesion.flush()
     return fila

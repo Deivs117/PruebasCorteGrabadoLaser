@@ -110,6 +110,7 @@ def test_actualizar_configuracion_maquina_sobreescribe_la_fila_unica(sesion):
         aceleracion_mm_s2=60.0,
         area_trabajo_ancho_mm=400.0,
         area_trabajo_alto_mm=250.0,
+        elevacion_grabado_mm=5.0,
     )
     sesion.commit()
 
@@ -119,3 +120,4 @@ def test_actualizar_configuracion_maquina_sobreescribe_la_fila_unica(sesion):
     machine = construir_machine_config(sesion)
     assert machine.area_trabajo_ancho_mm == 400.0
     assert machine.area_trabajo_alto_mm == 250.0
+    assert machine.elevacion_grabado_mm == 5.0
