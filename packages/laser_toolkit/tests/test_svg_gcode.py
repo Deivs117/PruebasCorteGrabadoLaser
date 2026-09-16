@@ -2,7 +2,13 @@ import pytest
 
 from laser_toolkit.config import MachineConfig
 from laser_toolkit.gcode.writer import sobrerecorrido_mm
-from laser_toolkit.svg.gcode import gcode_contorno, gcode_relleno, longitud_contorno_mm, longitud_relleno_mm
+from laser_toolkit.svg.gcode import (
+    gcode_contorno,
+    gcode_relleno,
+    longitud_contorno_mm,
+    longitud_relleno_mm,
+    ordenar_subpaths_por_proximidad,
+)
 from laser_toolkit.svg.geometry import Subpath
 
 
@@ -154,6 +160,45 @@ def test_gcode_contorno_pasadas_invalidas_es_un_error():
     sp = Subpath(puntos=((0, 0), (10, 0)), cerrado=False)
     with pytest.raises(ValueError, match="pasadas"):
         gcode_contorno([sp], 0, 0, velocidad_mm_min=500, potencia_pct=50, machine=MachineConfig(), pasadas=0)
+
+
+def test_ordenar_subpaths_por_proximidad_vecino_mas_cercano():
+    """Tres piezas de corte separadas (ej. tres letras sueltas) en un orden
+    "malo" (el del archivo SVG): A en X=0, B en X=100, C en X=10. Arrancando
+    desde (0,0), el orden optimo por proximidad es A, C, B (10 esta mucho
+    mas cerca de 0 que de 100) -- no A, B, C como vendria del archivo."""
+    a = Subpath(puntos=((0, 0), (1, 0)), cerrado=False)
+    b = Subpath(puntos=((100, 0), (101, 0)), cerrado=False)
+    c = Subpath(puntos=((10, 0), (11, 0)), cerrado=False)
+    ordenados = ordenar_subpaths_por_proximidad([a, b, c], punto_inicial=(0.0, 0.0))
+    assert ordenados == [a, c, b]
+
+
+def test_ordenar_subpaths_por_proximidad_usa_punto_de_salida_del_anterior():
+    """Un subpath abierto que ya recorrio bastante lejos de su punto de
+    entrada deja al cabezal en su punto de SALIDA (el ultimo punto), no en
+    el de entrada -- el siguiente salto se mide desde ahi."""
+    largo = Subpath(puntos=((0, 0), (0, 100)), cerrado=False)  # entra en (0,0), sale en (0,100)
+    cerca_de_la_salida = Subpath(puntos=((0, 105), (1, 105)), cerrado=False)
+    cerca_de_la_entrada = Subpath(puntos=((0, 5), (1, 5)), cerrado=False)
+    ordenados = ordenar_subpaths_por_proximidad(
+        [largo, cerca_de_la_entrada, cerca_de_la_salida], punto_inicial=(0.0, 0.0)
+    )
+    # Arranca por 'largo' (el mas cerca de (0,0)), y de ahi salta al que esta
+    # cerca de su SALIDA (0,100), no al que esta cerca de su entrada.
+    assert ordenados == [largo, cerca_de_la_salida, cerca_de_la_entrada]
+
+
+def test_gcode_contorno_reordena_subpaths_por_proximidad():
+    """`gcode_contorno` aplica el reordenamiento de forma transparente --
+    sin importar el orden de entrada, el primer bloque emitido es el del
+    subpath mas cercano a (0,0)."""
+    lejos = Subpath(puntos=((100, 0), (101, 0)), cerrado=False)
+    cerca = Subpath(puntos=((1, 0), (2, 0)), cerrado=False)
+    lineas = gcode_contorno(
+        [lejos, cerca], 0, 0, velocidad_mm_min=500, potencia_pct=50, machine=MachineConfig()
+    )
+    assert lineas[0] == "G0 X1.000 Y0.000 F3000"  # 'cerca' va primero, no 'lejos'
 
 
 def test_longitud_contorno_cuadrado_cerrado():

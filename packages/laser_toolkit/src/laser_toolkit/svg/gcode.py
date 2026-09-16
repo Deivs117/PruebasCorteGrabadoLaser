@@ -12,11 +12,63 @@ import math
 from laser_toolkit.config import MachineConfig
 from laser_toolkit.gcode.writer import sobrerecorrido_mm
 from laser_toolkit.svg.fill import Segmento
-from laser_toolkit.svg.geometry import Subpath
+from laser_toolkit.svg.geometry import Punto, Subpath
 
 
 def _valor_s(potencia_pct: int, machine: MachineConfig) -> int:
     return round((potencia_pct / 100) * machine.laser_max_s)
+
+
+def _punto_de_entrada(sp: Subpath) -> Punto:
+    return sp.puntos[0]
+
+
+def _punto_de_salida(sp: Subpath) -> Punto:
+    # Un subpath cerrado vuelve a su propio punto de entrada (ver el `append`
+    # de cierre en `gcode_contorno`) -- el punto de salida real es el mismo
+    # que el de entrada. Uno abierto termina donde termina su ultimo punto.
+    return sp.puntos[0] if sp.cerrado else sp.puntos[-1]
+
+
+def _distancia(a: Punto, b: Punto) -> float:
+    return math.hypot(a[0] - b[0], a[1] - b[1])
+
+
+def ordenar_subpaths_por_proximidad(
+    subpaths: list[Subpath], punto_inicial: Punto = (0.0, 0.0)
+) -> list[Subpath]:
+    """Reordena `subpaths` con un vecino-mas-cercano voraz (mismo criterio
+    que "Reduce travel moves" de LightBurn): en vez de cortar/grabar el
+    contorno en el orden en que aparecen en el archivo SVG (arbitrario, el
+    orden en que alguien dibujo cada forma en Illustrator/Inkscape), arranca
+    del subpath cuyo punto de entrada esta mas cerca de `punto_inicial`, y
+    de ahi en mas siempre salta al que este mas cerca de donde termino el
+    anterior -- para un diseño con varias piezas de corte separadas (varias
+    letras sueltas, por ejemplo), esto reduce el recorrido total en vacio
+    (`G0`) entre una pieza y la siguiente.
+
+    Bajo impacto para un solo subpath (un circulo, un cuadrado) -- la
+    ganancia real aparece con muchos subpaths independientes. Algoritmo
+    O(n^2), aceptable para la cantidad de piezas de corte tipica de un
+    diseño real (decenas, no miles) -- no es el optimo exacto del problema
+    del viajante, es la misma heuristica voraz que ya usan LightBurn y
+    similares para esto.
+
+    `punto_inicial` simplifica asumiendo que el cabezal arranca en (0,0) --
+    no conoce la posicion real de la maquina al momento de emitir este
+    bloque (podria venir de otro objeto del lienzo antes), asi que es una
+    aproximacion razonable, no la optima exacta."""
+    restantes = list(subpaths)
+    ordenados: list[Subpath] = []
+    actual = punto_inicial
+    while restantes:
+        indice_mas_cercano = min(
+            range(len(restantes)), key=lambda i: _distancia(actual, _punto_de_entrada(restantes[i]))
+        )
+        elegido = restantes.pop(indice_mas_cercano)
+        ordenados.append(elegido)
+        actual = _punto_de_salida(elegido)
+    return ordenados
 
 
 def gcode_contorno(
@@ -35,16 +87,23 @@ def gcode_contorno(
     100% de potencia para cortar de punta a punta, una sola no alcanza).
     Cada subpath se recorre por completo `pasadas` veces antes de pasar al
     siguiente, para no ir y volver de un lado al otro del dibujo entre
-    pasadas."""
+    pasadas.
+
+    Los subpaths se recorren en el orden que da `ordenar_subpaths_por_proximidad`
+    (vecino mas cercano), no en el orden en que vienen del SVG -- reduce el
+    recorrido en vacio entre piezas de corte separadas (issue: "reordenar
+    por proximidad", ver LightBurn "Reduce travel moves")."""
     if pasadas < 1:
         raise ValueError("pasadas debe ser al menos 1")
 
     s = _valor_s(potencia_pct, machine)
     lineas: list[str] = []
+    # Filtra los degenerados ANTES de ordenar -- `ordenar_subpaths_por_proximidad`
+    # asume `sp.puntos[0]` valido, y un subpath de 0-1 puntos de todos modos
+    # se salteaba sin emitir nada (ver el chequeo que sigue).
+    subpaths_validos = [sp for sp in subpaths if len(sp.puntos) >= 2]
 
-    for sp in subpaths:
-        if len(sp.puntos) < 2:
-            continue
+    for sp in ordenar_subpaths_por_proximidad(subpaths_validos):
         puntos = list(sp.puntos)
         if sp.cerrado:
             puntos.append(puntos[0])
