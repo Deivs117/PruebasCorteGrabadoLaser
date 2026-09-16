@@ -6,6 +6,7 @@ segun `MachineConfig.laser_max_s`).
 
 from __future__ import annotations
 
+import itertools
 import math
 
 from laser_toolkit.config import MachineConfig
@@ -72,54 +73,72 @@ def gcode_relleno(
     potencia_pct: int,
     machine: MachineConfig,
 ) -> list[str]:
-    """G-code que graba cada segmento horizontal de relleno como una pasada
-    independiente, con sobre-recorrido (`sobrerecorrido_mm`, laser apagado)
-    a cada lado del segmento real -- mismo mecanismo, y misma razon, que
-    `laser_toolkit.gcode.writer.grabar_relleno`/`laser_toolkit.raster.gcode.
-    gcode_grabado_raster`: sin esto, la maquina arranca y frena en seco
-    justo en el borde real del trazo, y el borde queda sobre-quemado
-    (mas tiempo cerca de velocidad cero justo donde el laser esta prendido).
+    """G-code de relleno con UN solo `M4`/`M5` por FILA de barrido, no uno
+    por cada segmento de tinta de esa fila -- mismo mecanismo de "tono
+    continuo" que ya usa `laser_toolkit.raster.gcode.gcode_grabado_raster`
+    para fotos (un `G1` continuo por fila, modulando `S` a lo largo del
+    camino: `S0` en los huecos entre islas de tinta, `S{potencia}` dentro de
+    cada una), nunca portado hasta ahora al relleno vectorial.
 
-    El overscan de `sobrerecorrido_mm` esta pensado para celdas/trazos largos
-    (una Suite, una foto completa) -- aplicado tal cual a un relleno
-    vectorial con trazos finos (letras, patas de un insecto, etc.) resulta
-    contraproducente: un trazo real de 2mm con 5mm de overscan a cada lado
-    multiplica por 6 la distancia de ese segmento, y como la maquina nunca
-    llega a velocidad de crucero en un tramo tan corto (perfil triangular,
-    no trapezoidal), ese tiempo extra es casi puro acelerar/frenar sin
-    aportar nada al grabado real -- medido en una pieza real, el overscan
-    llego a ser el 56% del tiempo total de grabado. Por eso se lo TOPA al
-    largo real del propio trazo (`min(overscan, longitud_real)`): un trazo
-    largo sigue teniendo el overscan completo (protege el borde igual que
-    antes), uno corto recibe un overscan proporcional a su propio tamaño en
-    vez de una constante fija pensada para trazos mucho mas grandes.
+    Por que importa: antes, cada isla de tinta de una fila (cada letra,
+    cada pata de un dibujo) armaba/desarmaba el laser por separado
+    (`M4`...`G1`...`M5`), y cada `M4`/`M5` obliga a GRBL a frenar a cero y
+    volver a acelerar -- medido en una pieza real con muchos trazos finos,
+    esas paradas dominaban el tiempo total (ver el hallazgo de #195/overscan
+    del mismo dia). Con un solo arranque/parada por fila entera (no por
+    isla), esas paradas se reducen en el mismo orden que la cantidad
+    promedio de islas por fila.
 
-    Cada `Segmento` de `generar_segmentos_relleno` viene horizontal (misma Y
-    en ambos puntos), pero el sentido de recorrido (cual punto es la entrada
-    y cual la salida) puede ir en cualquier direccion -- el zigzag de filas
-    alternadas invierte el orden en las filas de "vuelta" para que la
-    maquina no viaje en vacio de vuelta al extremo izquierdo en cada fila.
-    Por eso acá no se asume `x1 <= x2`: la entrada/salida del overscan se
-    extienden en la direccion real de avance de CADA segmento, tomada tal
-    cual viene."""
+    El sobre-recorrido (`sobrerecorrido_mm`) ahora se aplica UNA vez al
+    principio de la fila y UNA vez al final (no por cada isla) -- exactamente
+    igual que `gcode_grabado_raster`, porque ya no hace falta "re-acelerar"
+    entre islas de la misma fila: la maquina nunca se detiene ahi, solo baja
+    `S` a 0 mientras sigue en movimiento. Topado al largo real de TODA la
+    fila (de la primera a la ultima isla), no al de cada isla individual --
+    con el arranque/parada unificado, ya no hay un perfil triangular por
+    isla que proteger."""
     s = _valor_s(potencia_pct, machine)
     overscan_maximo_mm = sobrerecorrido_mm(velocidad_mm_min, machine)
     lineas: list[str] = []
 
-    for (x1, y), (x2, _y2) in segmentos:
-        direccion = 1.0 if x2 >= x1 else -1.0
-        overscan_mm = min(overscan_maximo_mm, abs(x2 - x1))
-        x_entrada = x1 - direccion * overscan_mm + x_offset_mm
-        x_salida = x2 + direccion * overscan_mm + x_offset_mm
+    for fila in _agrupar_por_fila(segmentos):
+        primer_x, y = fila[0][0]
+        ultimo_x, _ = fila[-1][1]
+        direccion = 1.0 if ultimo_x >= primer_x else -1.0
+        overscan_mm = min(overscan_maximo_mm, abs(ultimo_x - primer_x))
         y_abs = y + y_offset_mm
-        lineas.append(f"G0 X{x_entrada:.3f} Y{y_abs:.3f} F{machine.travel_feed_mm_min}")
+
+        def abs_x(x_local: float) -> float:
+            return x_local + x_offset_mm
+
+        entrada = primer_x - direccion * overscan_mm
+        salida = ultimo_x + direccion * overscan_mm
+
+        lineas.append(f"G0 X{abs_x(entrada):.3f} Y{y_abs:.3f} F{machine.travel_feed_mm_min}")
         lineas.append("M4 S0")
-        lineas.append(f"G1 X{x1 + x_offset_mm:.3f} Y{y_abs:.3f} F{velocidad_mm_min} S0")
-        lineas.append(f"G1 X{x2 + x_offset_mm:.3f} Y{y_abs:.3f} F{velocidad_mm_min} S{s}")
-        lineas.append(f"G1 X{x_salida:.3f} Y{y_abs:.3f} F{velocidad_mm_min} S0")
+        cursor_x = entrada
+        for (x1, _y1), (x2, _y2) in fila:
+            if x1 != cursor_x:
+                lineas.append(f"G1 X{abs_x(x1):.3f} Y{y_abs:.3f} F{velocidad_mm_min} S0")
+            lineas.append(f"G1 X{abs_x(x2):.3f} Y{y_abs:.3f} F{velocidad_mm_min} S{s}")
+            cursor_x = x2
+        if salida != cursor_x:
+            lineas.append(f"G1 X{abs_x(salida):.3f} Y{y_abs:.3f} F{velocidad_mm_min} S0")
         lineas.append("M5")
 
     return lineas
+
+
+def _agrupar_por_fila(segmentos: list[Segmento]) -> list[list[Segmento]]:
+    """Agrupa `segmentos` (ya en el orden real de recorrido de
+    `generar_segmentos_relleno`, zigzag incluido) por fila -- todos los
+    segmentos de una misma fila comparten la misma Y exacta (mismo `y` que
+    pasa el barrido de `generar_segmentos_relleno`), y ya vienen contiguos
+    en la lista (una fila completa antes de pasar a la siguiente)."""
+    return [
+        list(grupo)
+        for _y, grupo in itertools.groupby(segmentos, key=lambda seg: seg[0][1])
+    ]
 
 
 def longitud_contorno_mm(subpaths: list[Subpath]) -> float:

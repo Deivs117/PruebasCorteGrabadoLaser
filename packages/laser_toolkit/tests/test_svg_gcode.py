@@ -76,6 +76,43 @@ def test_gcode_relleno_respeta_sentido_de_fila_de_vuelta():
     assert lineas[4] == f"G1 X{5.0 - overscan:.3f} Y2.000 F{velocidad} S0"
 
 
+def test_gcode_relleno_fusiona_varias_islas_de_una_fila_en_un_solo_m4_m5():
+    """El hallazgo real de la pieza Serelia: una fila con varias islas de
+    tinta separadas (ej. las patas de un dibujo, letras) armaba/desarmaba
+    el laser por cada una -- ahora es UN solo M4/M5 para la fila entera,
+    con S0 en el hueco entre islas (recorrido continuo, sin parar), igual
+    que ya hace `raster.gcode.gcode_grabado_raster` para fotos."""
+    machine = MachineConfig(laser_max_s=1000)
+    # Misma fila (Y=0), dos islas de tinta: 0->2 y 5->8, con un hueco 2->5.
+    fila = [((0.0, 0.0), (2.0, 0.0)), ((5.0, 0.0), (8.0, 0.0))]
+    lineas = gcode_relleno(fila, 0, 0, velocidad_mm_min=1000, potencia_pct=40, machine=machine)
+
+    assert lineas.count("M4 S0") == 1
+    assert lineas.count("M5") == 1
+    # El G1 que atraviesa el hueco (2 -> 5) va con S0 (laser apagado, pero
+    # SIN parar -- no hay M4/M5 entre las dos islas).
+    assert any(linea == "G1 X5.000 Y0.000 F1000 S0" for linea in lineas)
+    # Cada isla se quema con la potencia real (S400 = 40% de 1000).
+    assert sum(1 for linea in lineas if linea.endswith("S400")) == 2
+
+
+def test_gcode_relleno_topa_overscan_al_largo_de_toda_la_fila():
+    """El sobre-recorrido de una fila con varias islas se topa al largo de
+    TODA la fila (de la primera a la ultima isla), no al de una isla
+    individual -- con el arranque/parada unificado por fila ya no hace
+    falta proteger cada isla por separado."""
+    machine = MachineConfig()
+    velocidad = 800
+    overscan_maximo = sobrerecorrido_mm(velocidad, machine)
+    # Islas muy cortas (1mm cada una) pero la fila entera (0 a 4) es mas
+    # larga que el overscan maximo de la maquina -- no debe toparse.
+    largo_fila = 4.0
+    assert largo_fila > overscan_maximo
+    fila = [((0.0, 0.0), (1.0, 0.0)), ((3.0, 0.0), (4.0, 0.0))]
+    lineas = gcode_relleno(fila, 0, 0, velocidad_mm_min=velocidad, potencia_pct=50, machine=machine)
+    assert lineas[0] == f"G0 X{-overscan_maximo:.3f} Y0.000 F{machine.travel_feed_mm_min}"
+
+
 def test_gcode_relleno_topa_overscan_al_largo_del_trazo():
     """Un trazo mas corto que el overscan maximo configurado (ej. una pata
     fina de un dibujo) no arrastra el overscan completo -- se topa a su
