@@ -63,10 +63,15 @@ def _valores_de_linea(codigo: str) -> dict[str, float]:
 def estimar_duracion_s(lineas: list[str], machine: MachineConfig) -> float:
     """Duracion estimada (segundos) de ejecutar `lineas` de G-code en `machine`.
 
-    Solo modela movimiento en el plano XY (`G0`/`G1`) -- los `G91`/`G0 Z...`
-    de cambio de foco (`elevar_z_para_grabado`/`bajar_z_para_corte`) no
-    llevan X/Y y no aportan distancia, asi que quedan implicitamente en cero
-    sin necesitar un caso especial."""
+    Modela movimiento en el plano XY tanto de `G1` (corte/grabado) COMO de
+    `G0` (desplazamiento en vacio entre celdas/filas, laser apagado) -- un
+    `G0` SI arranca y frena a cero como cualquier otro movimiento (GRBL no
+    lo funde con el `G1`/M-code siguiente), asi que un G-code con muchos
+    saltos entre celdas puede tener una fraccion no despreciable de su
+    tiempo total en puros desplazamientos. Los `G91`/`G0 Z...` de cambio de
+    foco (`elevar_z_para_grabado`/`bajar_z_para_corte`) no llevan X/Y y no
+    aportan distancia, asi que quedan implicitamente en cero sin necesitar
+    un caso especial."""
     aceleracion = machine.aceleracion_mm_s2
     x, y, feed = 0.0, 0.0, 0.0
     fase_longitud_mm = 0.0
@@ -98,25 +103,37 @@ def estimar_duracion_s(lineas: list[str], machine: MachineConfig) -> float:
         valores = _valores_de_linea(codigo)
         nuevo_x = valores.get("X", x)
         nuevo_y = valores.get("Y", y)
-        if "F" in valores:
-            feed = valores["F"]
+        nuevo_feed = valores.get("F", feed)
+
+        if comando == "G0":
+            # Cierra cualquier fase de G1 pendiente -- un G0 no continua la
+            # velocidad de un G1 anterior -- y se cuenta como su PROPIO
+            # arranque/frenado (no se acumula con otros G0, ver docstring).
+            cerrar_fase()
+            distancia_mm = math.hypot(nuevo_x - x, nuevo_y - y)
+            if distancia_mm > 0:
+                tiempo_total_s += tiempo_fase_s(distancia_mm, nuevo_feed, aceleracion)
+            x, y, feed = nuevo_x, nuevo_y, nuevo_feed
+            continue
 
         if comando == "G1":
+            if fase_longitud_mm > 0 and nuevo_feed != feed:
+                cerrar_fase()  # cambio de feed a mitad de fase, sin M-code de por medio
             dx, dy = nuevo_x - x, nuevo_y - y
             longitud_mm = math.hypot(dx, dy)
             fase_longitud_mm += longitud_mm
-            fase_feed_mm_min = feed
+            fase_feed_mm_min = nuevo_feed
             if longitud_mm > 0:
                 fase_segmentos.append((dx, dy, longitud_mm))
-            x, y = nuevo_x, nuevo_y
+            x, y, feed = nuevo_x, nuevo_y, nuevo_feed
             continue
 
-        # M3/M4/M5 (encendido/apagado laser) y G0 (desplazamiento en vacio)
-        # cierran la fase acumulada: GRBL frena a cero para ejecutar
-        # cualquiera de estos, asi que no hay continuidad de velocidad con
-        # lo que venga despues.
+        # M3/M4/M5 (encendido/apagado laser) y cualquier otro codigo
+        # (G90/G91/G21...) cierran la fase acumulada: GRBL frena a cero para
+        # ejecutar un M-code, asi que no hay continuidad de velocidad con lo
+        # que venga despues.
         cerrar_fase()
-        x, y = nuevo_x, nuevo_y
+        x, y, feed = nuevo_x, nuevo_y, nuevo_feed
 
     cerrar_fase()
 

@@ -96,3 +96,13 @@ def test_estimar_duracion_movimientos_de_z_no_aportan_tiempo(machine: MachineCon
         "G90 ; volver a posicionamiento absoluto",
     ]
     assert estimar_duracion_s(gcode, machine) == 0.0
+
+
+def test_estimar_duracion_incluye_el_desplazamiento_en_vacio_g0(machine: MachineConfig):
+    # Regresion: un G0 con distancia XY real (viaje entre celdas, laser
+    # apagado) tiene que sumar tiempo -- GRBL no lo funde con el siguiente
+    # G1/M-code, arranca y frena a cero como cualquier otro movimiento.
+    gcode = ["G0 X50.000 Y0.000 F3000"]
+    duracion = estimar_duracion_s(gcode, machine)
+    assert duracion == pytest.approx(tiempo_fase_s(50.0, 3000, machine.aceleracion_mm_s2))
+    assert duracion > 0
