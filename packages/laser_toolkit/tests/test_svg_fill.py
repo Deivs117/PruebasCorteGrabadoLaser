@@ -1,6 +1,9 @@
 import pytest
 
-from laser_toolkit.svg.fill import generar_segmentos_relleno
+from laser_toolkit.svg.fill import (
+    agrupar_subpaths_por_tinta_real,
+    generar_segmentos_relleno,
+)
 from laser_toolkit.svg.geometry import Subpath
 
 
@@ -61,3 +64,27 @@ def test_resolucion_no_positiva_falla():
 
 def test_sin_subpaths_no_genera_segmentos():
     assert generar_segmentos_relleno([], resolucion_mm=1.0) == []
+
+
+def test_tinta_real_separa_dos_letras_con_cajas_que_se_tocan():
+    """El caso real que motivo esta funcion: dos "letras" a la misma altura
+    (comparten el renglon, cajas envolventes que se tocan/superponen en Y)
+    pero con un hueco blanco REAL entre ellas en X -- la agrupacion por
+    tinta rasterizada las separa en 2, como corresponde a lo que se ve."""
+    letra_a = Subpath(puntos=((0, 0), (10, 0), (10, 10), (0, 10)), cerrado=True)
+    letra_b = Subpath(puntos=((15, 0), (25, 0), (25, 10), (15, 10)), cerrado=True)  # 5mm de hueco real
+
+    grupos = agrupar_subpaths_por_tinta_real([letra_a, letra_b], resolucion_mm=1.0)
+    assert len(grupos) == 2
+    assert {id(sp) for grupo in grupos for sp in grupo} == {id(letra_a), id(letra_b)}
+
+
+def test_tinta_real_mantiene_junto_un_agujero():
+    """Un subpath 'agujero' (la 'O' de una letra) queda en el mismo grupo
+    que su exterior -- ambos aportan tinta a la MISMA region conexa una vez
+    rasterizados."""
+    exterior = Subpath(puntos=((0, 0), (20, 0), (20, 20), (0, 20)), cerrado=True)
+    interior = Subpath(puntos=((5, 5), (15, 5), (15, 15), (5, 15)), cerrado=True)
+    grupos = agrupar_subpaths_por_tinta_real([exterior, interior], resolucion_mm=1.0)
+    assert len(grupos) == 1
+    assert len(grupos[0]) == 2
