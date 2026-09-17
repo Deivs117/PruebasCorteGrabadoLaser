@@ -20,6 +20,7 @@ import uuid
 import proyectos
 from laser_toolkit.config import MachineConfig, Operacion
 from laser_toolkit.db.repo_negocio import construir_machine_config
+from laser_toolkit.gcode.estimar_tiempo import estimar_duracion_s
 from laser_toolkit.gcode.writer import combinar_bloques_por_operacion, encabezado, pie
 from laser_toolkit.raster.api import (
     UMBRAL_DISTANCIA_FONDO_POR_DEFECTO,
@@ -215,9 +216,9 @@ def exportar_gcode_combinado(
     for objeto in objetos:
         bloques += _gcode_de_objeto_por_operacion(objeto, machine)
 
-    gcode: list[str] = list(encabezado("Editor de Diseño (#3) -- exportación combinada"))
-    gcode += combinar_bloques_por_operacion(bloques, machine)
-    gcode += pie()
+    cuerpo = combinar_bloques_por_operacion(bloques, machine) + pie()
+    duracion_estimada_s = estimar_duracion_s(cuerpo, machine)
+    gcode = encabezado("Editor de Diseño (#3) -- exportación combinada", duracion_estimada_s) + cuerpo
 
     contenido = ("\n".join(gcode) + "\n").encode("utf-8")
     corrida_id = f"editor-{uuid.uuid4().hex[:12]}"
@@ -227,7 +228,7 @@ def exportar_gcode_combinado(
     if proyecto_id is not None:
         proyectos.registrar_exportacion_de_proyecto(sesion, proyecto_id, key)
 
-    return {"ok": True, "gcodeStorageKey": key, "url": url}
+    return {"ok": True, "gcodeStorageKey": key, "url": url, "duracionEstimadaS": round(duracion_estimada_s)}
 
 
 def _svg_desde_subpaths(subpaths: list[Subpath], ancho_mm: float, alto_mm: float) -> str:
