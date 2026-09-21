@@ -42,6 +42,15 @@ export interface ParametrosOperacion {
   fichaGrupoId?: string;
   fichaBajaGrupoId?: string;
   fichaAltaGrupoId?: string;
+  /** Pasadas de corte -- el corte del editor (SVG: `gcode_contorno`) solo
+   * hacía una pasada siempre, sin forma de pedir más (hallazgo de la
+   * prueba real del cliente Serelía: MDF de 3mm necesita 2 pasadas a 100%
+   * de potencia para cortar de punta a punta). Solo tiene efecto real en
+   * la operación "corte" -- se acepta en "grabado" también para no
+   * complicar el tipo, pero `apps/api/editor.py` la ignora ahí (el
+   * relleno siempre se graba una sola vez). `undefined`/1 = una sola
+   * pasada, el comportamiento de siempre. */
+  pasadas?: number;
 }
 
 /** Estado de la conversión a G-code de una operación puntual de un objeto —

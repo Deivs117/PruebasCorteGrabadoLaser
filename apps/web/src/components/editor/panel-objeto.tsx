@@ -295,6 +295,41 @@ export function PanelObjeto({
       ) : null}
       {/* === fin #109 === */}
 
+      {/* === resolución de relleno (solo SVG) ===
+          Antes fija en 0.3mm sin forma de cambiarla (default de
+          `subir-objeto-dropzone.tsx`) -- hallazgo de la prueba real del
+          cliente Serelía: con el punto focal real del láser (0.08mm) el
+          relleno queda mucho más fino. El default nuevo ya sale de
+          `MachineConfig.punto_focal_mm` al subir el SVG; esto es para
+          poder ajustarlo después sin volver a subir el archivo. */}
+      {objeto.tipo === "svg" ? (
+        <Field
+          label="Resolución de relleno (mm)"
+          hint="Paso entre líneas del grabado por relleno -- más chico = más fino y más lento. El punto focal real del láser (página Máquina) es el mínimo que tiene sentido."
+        >
+          {(id) => (
+            <input
+              id={id}
+              type="number"
+              inputMode="decimal"
+              min={0.01}
+              step={0.01}
+              value={objeto.resolucionRellenoMm}
+              onChange={(e) =>
+                onCambiar({
+                  resolucionRellenoMm: Math.max(
+                    0.01,
+                    numeroODefault(e.target.value, objeto.resolucionRellenoMm),
+                  ),
+                })
+              }
+              className={clsx(INPUT_CLASSES, "font-mono")}
+            />
+          )}
+        </Field>
+      ) : null}
+      {/* === fin resolución de relleno === */}
+
       {excedeArea ? (
         <div className="border-orange/30 bg-orange-soft flex items-start gap-2 rounded-[var(--radius-sm)] border p-2.5">
           <TriangleAlertAnimado className="text-orange mt-0.5 size-4 shrink-0" />
@@ -766,6 +801,48 @@ export function PanelObjeto({
                 </Field>
               )}
             </div>
+            {/* Pasadas de corte -- solo tiene efecto real en "corte" (el
+                relleno de grabado siempre se graba una sola vez, ver
+                `editor-tipos.ts`). Hallazgo de la prueba real del cliente
+                Serelía: MDF de 3mm necesita 2 pasadas a 100% de potencia
+                para cortar de punta a punta, y el editor no tenía forma de
+                pedirlo. */}
+            {operacion === "corte" ? (
+              <Field
+                label="Pasadas"
+                hint="Cuántas veces se repite el corte completo -- MDF de 3mm suele necesitar 2 a máxima potencia."
+              >
+                {(id) => (
+                  <input
+                    id={id}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    disabled={bloqueada}
+                    value={objeto.parametros.corte.pasadas ?? 1}
+                    onChange={(e) =>
+                      actualizarParametro("corte", {
+                        pasadas: Math.max(
+                          1,
+                          Math.round(
+                            numeroODefault(
+                              e.target.value,
+                              objeto.parametros.corte.pasadas ?? 1,
+                            ),
+                          ),
+                        ),
+                      })
+                    }
+                    className={clsx(
+                      INPUT_CLASSES,
+                      "font-mono",
+                      bloqueada && "opacity-60",
+                    )}
+                  />
+                )}
+              </Field>
+            ) : null}
             {esRango ? (
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Potencia baja (%)">
