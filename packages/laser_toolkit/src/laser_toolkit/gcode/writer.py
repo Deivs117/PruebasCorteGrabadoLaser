@@ -9,7 +9,7 @@ quemados cuando la maquina desacelera en las esquinas.
 
 from __future__ import annotations
 
-from laser_toolkit.config import MachineConfig, SuiteConfig
+from laser_toolkit.config import MachineConfig, Operacion, SuiteConfig
 from laser_toolkit.gcode.grid import Celda
 from laser_toolkit.gcode.label_font import trazos_texto
 
@@ -124,14 +124,37 @@ def _valor_s(potencia_pct: int, machine: MachineConfig) -> int:
     return round((potencia_pct / 100) * machine.laser_max_s)
 
 
-def encabezado(comentario: str) -> list[str]:
-    return [
+def _formatear_duracion(segundos: float) -> str:
+    horas, resto_s = divmod(round(segundos), 3600)
+    minutos, segundos_resto = divmod(resto_s, 60)
+    partes = [f"{horas}h"] if horas else []
+    partes.append(f"{minutos}min")
+    partes.append(f"{segundos_resto}s")
+    return " ".join(partes)
+
+
+def encabezado(comentario: str, duracion_estimada_s: float | None = None) -> list[str]:
+    """`duracion_estimada_s` (issue del pedido de Serelia, ver `handoff.md`):
+    estimacion de duracion total de la corrida, calculada por
+    `laser_toolkit.gcode.estimar_tiempo.estimar_duracion_s` sobre el CUERPO
+    ya generado -- por eso el caller arma cuerpo -> estima -> recien ahi
+    antepone este encabezado, nunca al reves (la estimacion necesita el
+    G-code real para parsearlo)."""
+    lineas = [
         f"; {comentario}",
         "; Generado por laser_toolkit -- no editar a mano, regenerar desde el YAML de configuracion",
+    ]
+    if duracion_estimada_s is not None:
+        lineas.append(
+            f"; Duracion estimada: {_formatear_duracion(duracion_estimada_s)} "
+            f"({round(duracion_estimada_s)}s)"
+        )
+    lineas += [
         "G21 ; unidades en milimetros",
         "G90 ; posicionamiento absoluto",
         "M5 ; laser apagado por seguridad al iniciar",
     ]
+    return lineas
 
 
 def pie() -> list[str]:
@@ -139,6 +162,61 @@ def pie() -> list[str]:
         "M5 ; laser apagado",
         "G0 X0 Y0 ; volver al origen",
     ]
+
+
+def elevar_z_para_grabado(machine: MachineConfig) -> list[str]:
+    """G-code que sube el cabezal `machine.elevacion_grabado_mm` en Z, de forma
+    RELATIVA (`G91`/`G0 Z<delta>`/`G90`), justo antes de emitir un bloque de
+    grabado -- ver `MachineConfig.elevacion_grabado_mm` (issue #195) para la
+    justificacion de por que es relativo y no Z absoluto."""
+    return [
+        "G91 ; posicionamiento relativo (solo para este movimiento de Z)",
+        f"G0 Z{machine.elevacion_grabado_mm:.3f} ; subir del foco de corte al de grabado",
+        "G90 ; volver a posicionamiento absoluto",
+    ]
+
+
+def bajar_z_para_corte(machine: MachineConfig) -> list[str]:
+    """Descenso simetrico de `elevar_z_para_grabado`: vuelve el cabezal al foco
+    de corte justo antes de emitir un bloque de corte, con el mismo delta en
+    sentido contrario -- tambien relativo, nunca Z absoluto."""
+    return [
+        "G91 ; posicionamiento relativo (solo para este movimiento de Z)",
+        f"G0 Z{-machine.elevacion_grabado_mm:.3f} ; bajar del foco de grabado al de corte",
+        "G90 ; volver a posicionamiento absoluto",
+    ]
+
+
+def combinar_bloques_por_operacion(
+    bloques: list[tuple[Operacion, list[str]]], machine: MachineConfig
+) -> list[str]:
+    """Concatena bloques de G-code ya generados (uno por objeto+operacion,
+    ver `apps.api.editor.exportar_gcode_combinado`) agrupando TODO el
+    grabado junto y TODO el corte junto, en vez de mantener el orden de
+    llegada -- para mover el eje Z una sola vez en toda la exportacion
+    combinada (issue #195), no una vez por objeto.
+
+    El grabado se emite primero, con el ascenso de Z (`elevar_z_para_grabado`)
+    como primer movimiento de Z de toda la corrida; el corte se emite al
+    final, precedido por el descenso simetrico (`bajar_z_para_corte`) --
+    orden confirmado con el usuario. No asume en que nivel dejo cebado el
+    eje Z el operador antes de arrancar la exportacion combinada; solo
+    garantiza que, si hay ambos tipos de bloque, el ascenso y el descenso
+    ocurren exactamente una vez cada uno, y en ese orden. Si los bloques son
+    todos del mismo tipo (solo corte o solo grabado) no se emite NINGUN
+    movimiento de Z: no hace falta subir para grabar si nunca se va a volver
+    a cortar en esta misma exportacion, y viceversa.
+    """
+    bloques_grabado = [
+        linea for operacion, bloque in bloques if operacion == Operacion.GRABADO for linea in bloque
+    ]
+    bloques_corte = [
+        linea for operacion, bloque in bloques if operacion == Operacion.CORTE for linea in bloque
+    ]
+
+    if bloques_corte and bloques_grabado:
+        return elevar_z_para_grabado(machine) + bloques_grabado + bajar_z_para_corte(machine) + bloques_corte
+    return bloques_grabado + bloques_corte
 
 
 def cortar_cuadrado(celda: Celda, machine: MachineConfig) -> list[str]:

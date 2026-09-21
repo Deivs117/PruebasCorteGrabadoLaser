@@ -114,6 +114,7 @@ class GuardarMaquinaBody(BaseModel):
     aceleracionMmS2: float
     areaTrabajoAnchoMm: float
     areaTrabajoAltoMm: float
+    elevacionGrabadoMm: float
 
 
 @app.put("/maquina")
@@ -128,6 +129,7 @@ def guardar_maquina(body: GuardarMaquinaBody) -> dict:
             punto_focal_mm=body.puntoFocalMm,
             velocidad_max_mm_min=body.velocidadMaxMmMin,
             aceleracion_mm_s2=body.aceleracionMmS2,
+            elevacion_grabado_mm=body.elevacionGrabadoMm,
             area_trabajo_ancho_mm=body.areaTrabajoAnchoMm,
             area_trabajo_alto_mm=body.areaTrabajoAltoMm,
         )
@@ -500,6 +502,11 @@ class ParametrosOperacionBody(BaseModel):
     fichaGrupoId: str | None = None
     fichaBajaGrupoId: str | None = None
     fichaAltaGrupoId: str | None = None
+    # Pasadas de corte (issue: el corte del editor no soportaba varias
+    # pasadas) -- solo tiene efecto real en la operacion "corte" de un
+    # objeto SVG (`_gcode_de_objeto` en editor.py); se acepta igual en
+    # "grabado" para no reventar el body, pero se ignora ahi.
+    pasadas: int | None = None
 
 
 class ObjetoExportarBody(BaseModel):
@@ -567,6 +574,45 @@ class ContornoCorteBody(BaseModel):
 def generar_contorno_corte(body: ContornoCorteBody) -> dict:
     try:
         return editor.calcular_contorno_corte(body.dataUri, body.anchoMm, body.altoMm, body.margenMm)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+class MarcoCorteBody(BaseModel):
+    """Issue #196: entrada del botón "Generar marco de corte" del panel del
+    objeto (svg o raster) -- forma simple (círculo/cuadrado) de tamaño
+    elegido por el usuario, centrada en el centro de masa real del diseño."""
+
+    tipo: Literal["svg", "raster"]
+    anchoMm: float
+    altoMm: float
+    rotacionDeg: float = 0.0
+    forma: Literal["circulo", "cuadrado"]
+    tamanoMm: float
+    # Solo para tipo="svg":
+    contenidoSvg: str | None = None
+    # Solo para tipo="raster":
+    dataUri: str | None = None
+    umbralDistanciaFondo: float | None = None
+
+
+@app.post("/editor/marco-corte")
+def generar_marco_corte(body: MarcoCorteBody) -> dict:
+    try:
+        kwargs = {}
+        if body.umbralDistanciaFondo is not None:
+            kwargs["umbral_distancia_fondo"] = body.umbralDistanciaFondo
+        return editor.calcular_marco_corte(
+            body.tipo,
+            body.anchoMm,
+            body.altoMm,
+            body.rotacionDeg,
+            body.forma,
+            body.tamanoMm,
+            contenido_svg=body.contenidoSvg,
+            data_uri=body.dataUri,
+            **kwargs,
+        )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 

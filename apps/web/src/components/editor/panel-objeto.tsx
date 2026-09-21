@@ -23,6 +23,7 @@ import {
   type FichaCliente,
 } from "@/lib/fichas-cliente";
 import { MARGEN_CONTORNO_MM_POR_DEFECTO } from "@/lib/editor-contorno-schema";
+import { TAMANO_MARCO_MM_POR_DEFECTO } from "@/lib/editor-marco-schema";
 import type {
   ObjetoLienzo,
   Operacion,
@@ -66,6 +67,10 @@ interface PanelObjetoProps {
   onGenerarContorno: (margenMm: number) => void;
   generandoContorno: boolean;
   errorContorno: string | null;
+  /** Issue #196: aplica tanto a `tipo="svg"` como a `tipo="raster"`. */
+  onGenerarMarco: (forma: "circulo" | "cuadrado", tamanoMm: number) => void;
+  generandoMarco: boolean;
+  errorMarco: string | null;
 }
 
 const OPERACIONES: { valor: Operacion; etiqueta: string }[] = [
@@ -100,6 +105,9 @@ export function PanelObjeto({
   onGenerarContorno,
   generandoContorno,
   errorContorno,
+  onGenerarMarco,
+  generandoMarco,
+  errorMarco,
 }: PanelObjetoProps) {
   const proporcionOriginal = objeto.anchoMm / objeto.altoMm;
   // #109 -- estado propio del modal de preprocesamiento de imagen, sección
@@ -109,6 +117,12 @@ export function PanelObjeto({
     useState(false);
   const [margenContornoMm, setMargenContornoMm] = useState(
     MARGEN_CONTORNO_MM_POR_DEFECTO,
+  );
+  const [formaMarco, setFormaMarco] = useState<"circulo" | "cuadrado">(
+    "circulo",
+  );
+  const [tamanoMarcoMm, setTamanoMarcoMm] = useState(
+    TAMANO_MARCO_MM_POR_DEFECTO,
   );
 
   function alternarOperacion(operacion: Operacion) {
@@ -280,6 +294,41 @@ export function PanelObjeto({
         </div>
       ) : null}
       {/* === fin #109 === */}
+
+      {/* === resolución de relleno (solo SVG) ===
+          Antes fija en 0.3mm sin forma de cambiarla (default de
+          `subir-objeto-dropzone.tsx`) -- hallazgo de la prueba real del
+          cliente Serelía: con el punto focal real del láser (0.08mm) el
+          relleno queda mucho más fino. El default nuevo ya sale de
+          `MachineConfig.punto_focal_mm` al subir el SVG; esto es para
+          poder ajustarlo después sin volver a subir el archivo. */}
+      {objeto.tipo === "svg" ? (
+        <Field
+          label="Resolución de relleno (mm)"
+          hint="Paso entre líneas del grabado por relleno -- más chico = más fino y más lento. El punto focal real del láser (página Máquina) es el mínimo que tiene sentido."
+        >
+          {(id) => (
+            <input
+              id={id}
+              type="number"
+              inputMode="decimal"
+              min={0.01}
+              step={0.01}
+              value={objeto.resolucionRellenoMm}
+              onChange={(e) =>
+                onCambiar({
+                  resolucionRellenoMm: Math.max(
+                    0.01,
+                    numeroODefault(e.target.value, objeto.resolucionRellenoMm),
+                  ),
+                })
+              }
+              className={clsx(INPUT_CLASSES, "font-mono")}
+            />
+          )}
+        </Field>
+      ) : null}
+      {/* === fin resolución de relleno === */}
 
       {excedeArea ? (
         <div className="border-orange/30 bg-orange-soft flex items-start gap-2 rounded-[var(--radius-sm)] border p-2.5">
@@ -752,6 +801,48 @@ export function PanelObjeto({
                 </Field>
               )}
             </div>
+            {/* Pasadas de corte -- solo tiene efecto real en "corte" (el
+                relleno de grabado siempre se graba una sola vez, ver
+                `editor-tipos.ts`). Hallazgo de la prueba real del cliente
+                Serelía: MDF de 3mm necesita 2 pasadas a 100% de potencia
+                para cortar de punta a punta, y el editor no tenía forma de
+                pedirlo. */}
+            {operacion === "corte" ? (
+              <Field
+                label="Pasadas"
+                hint="Cuántas veces se repite el corte completo -- MDF de 3mm suele necesitar 2 a máxima potencia."
+              >
+                {(id) => (
+                  <input
+                    id={id}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    disabled={bloqueada}
+                    value={objeto.parametros.corte.pasadas ?? 1}
+                    onChange={(e) =>
+                      actualizarParametro("corte", {
+                        pasadas: Math.max(
+                          1,
+                          Math.round(
+                            numeroODefault(
+                              e.target.value,
+                              objeto.parametros.corte.pasadas ?? 1,
+                            ),
+                          ),
+                        ),
+                      })
+                    }
+                    className={clsx(
+                      INPUT_CLASSES,
+                      "font-mono",
+                      bloqueada && "opacity-60",
+                    )}
+                  />
+                )}
+              </Field>
+            ) : null}
             {esRango ? (
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Potencia baja (%)">
@@ -863,6 +954,69 @@ export function PanelObjeto({
           ) : null}
         </div>
       ) : null}
+
+      <div className="border-border flex flex-col gap-2 border-t pt-3">
+        <p className="text-navy text-xs font-semibold uppercase">
+          Marco de corte
+        </p>
+        <p className="text-text-muted text-xs">
+          Genera un círculo o cuadrado de tamaño fijo, centrado en el centro de
+          masa real del diseño (no en el centro geométrico de su caja) — útil
+          para piezas de forma prolija, por ejemplo una pieza circular de MDF
+          con un logo grabado adentro.
+        </p>
+        <div className="flex items-end gap-2">
+          <Field label="Forma">
+            {(id) => (
+              <select
+                id={id}
+                value={formaMarco}
+                onChange={(e) =>
+                  setFormaMarco(e.target.value as "circulo" | "cuadrado")
+                }
+                className={INPUT_CLASSES}
+              >
+                <option value="circulo">Círculo</option>
+                <option value="cuadrado">Cuadrado</option>
+              </select>
+            )}
+          </Field>
+          <Field
+            label={formaMarco === "circulo" ? "Diámetro (mm)" : "Lado (mm)"}
+          >
+            {(id) => (
+              <input
+                id={id}
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="1"
+                value={tamanoMarcoMm}
+                onChange={(e) =>
+                  setTamanoMarcoMm(
+                    numeroODefault(e.target.value, tamanoMarcoMm),
+                  )
+                }
+                className={clsx(INPUT_CLASSES, "font-mono")}
+              />
+            )}
+          </Field>
+          <Button
+            variant="outline"
+            size="sm"
+            loading={generandoMarco}
+            disabled={tamanoMarcoMm <= 0}
+            onClick={() => onGenerarMarco(formaMarco, tamanoMarcoMm)}
+          >
+            {generandoMarco ? "Generando…" : "Generar marco de corte"}
+          </Button>
+        </div>
+        {errorMarco ? (
+          <p role="alert" className="text-danger text-xs">
+            {errorMarco}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
