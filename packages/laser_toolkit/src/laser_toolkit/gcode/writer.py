@@ -124,14 +124,37 @@ def _valor_s(potencia_pct: int, machine: MachineConfig) -> int:
     return round((potencia_pct / 100) * machine.laser_max_s)
 
 
-def encabezado(comentario: str) -> list[str]:
-    return [
+def _formatear_duracion(segundos: float) -> str:
+    horas, resto_s = divmod(round(segundos), 3600)
+    minutos, segundos_resto = divmod(resto_s, 60)
+    partes = [f"{horas}h"] if horas else []
+    partes.append(f"{minutos}min")
+    partes.append(f"{segundos_resto}s")
+    return " ".join(partes)
+
+
+def encabezado(comentario: str, duracion_estimada_s: float | None = None) -> list[str]:
+    """`duracion_estimada_s` (issue del pedido de Serelia, ver `handoff.md`):
+    estimacion de duracion total de la corrida, calculada por
+    `laser_toolkit.gcode.estimar_tiempo.estimar_duracion_s` sobre el CUERPO
+    ya generado -- por eso el caller arma cuerpo -> estima -> recien ahi
+    antepone este encabezado, nunca al reves (la estimacion necesita el
+    G-code real para parsearlo)."""
+    lineas = [
         f"; {comentario}",
         "; Generado por laser_toolkit -- no editar a mano, regenerar desde el YAML de configuracion",
+    ]
+    if duracion_estimada_s is not None:
+        lineas.append(
+            f"; Duracion estimada: {_formatear_duracion(duracion_estimada_s)} "
+            f"({round(duracion_estimada_s)}s)"
+        )
+    lineas += [
         "G21 ; unidades en milimetros",
         "G90 ; posicionamiento absoluto",
         "M5 ; laser apagado por seguridad al iniciar",
     ]
+    return lineas
 
 
 def pie() -> list[str]:

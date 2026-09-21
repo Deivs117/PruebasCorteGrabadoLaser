@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import date
 
 from laser_toolkit.config import FinalRunConfig, Operacion
+from laser_toolkit.gcode.estimar_tiempo import estimar_duracion_s
 from laser_toolkit.gcode.grid import Celda
 from laser_toolkit.gcode.timing import tiempo_corte_celda_s, tiempo_grabado_celda_s
 from laser_toolkit.gcode.writer import (
@@ -65,23 +66,23 @@ def generar_final_run(config: FinalRunConfig) -> tuple[list[str], list[dict]]:
     grupo = id_grupo_calibracion(config)
     corrida_id = f"{grupo}_ejec{config.ejecucion}"
 
-    gcode = encabezado(f"FINAL RUN -- {grupo} -- ejecucion {config.ejecucion}")
+    cuerpo: list[str] = []
     filas: list[dict] = []
     margen_etiqueta_mm, alto_etiqueta_mm = tamano_etiqueta_mm(config.espaciado_mm)
 
     for celda in celdas:
         if config.operacion is Operacion.CORTE:
-            gcode += cortar_cuadrado(celda, config.machine)
+            cuerpo += cortar_cuadrado(celda, config.machine)
             tiempo_s = tiempo_corte_celda_s(celda)
             area_mm2 = celda.tamano_mm**2
         else:
             # Mismo criterio que en suites/engrave.py: paso de linea atado al
             # punto focal real del modulo, no a una constante arbitraria.
-            gcode += grabar_relleno(celda, config.machine, resolucion_linea_mm=config.machine.punto_focal_mm)
+            cuerpo += grabar_relleno(celda, config.machine, resolucion_linea_mm=config.machine.punto_focal_mm)
             tiempo_s = tiempo_grabado_celda_s(celda, resolucion_linea_mm=config.machine.punto_focal_mm)
             area_mm2 = 0.0
 
-        gcode += grabar_etiqueta(
+        cuerpo += grabar_etiqueta(
             celda.id,
             x_mm=celda.x_mm,
             y_mm=celda.y_mm + celda.tamano_mm + margen_etiqueta_mm,
@@ -110,5 +111,8 @@ def generar_final_run(config: FinalRunConfig) -> tuple[list[str], list[dict]]:
             }
         )
 
-    gcode += pie()
+    cuerpo += pie()
+    duracion_estimada_s = estimar_duracion_s(cuerpo, config.machine)
+    gcode = encabezado(f"FINAL RUN -- {grupo} -- ejecucion {config.ejecucion}", duracion_estimada_s)
+    gcode += cuerpo
     return gcode, filas
