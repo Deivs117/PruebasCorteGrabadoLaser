@@ -29,6 +29,12 @@ interface SubirObjetoDropzoneProps {
    * "Grabado Vectorial", `/grabado-svg`) -- permite reusar uno sin volver a
    * subir el archivo (y sin acumular otro duplicado más en el bucket). */
   bibliotecaSvg: SvgBibliotecaItem[];
+  /** Punto focal real del láser (`MachineConfig.punto_focal_mm`, página
+   * "Máquina") -- default de `resolucionRellenoMm` para un SVG recién
+   * subido: antes era un 0.3mm fijo sin relación con la máquina real, ver
+   * el hallazgo de la prueba real del cliente Serelía. Editable después
+   * desde el panel del objeto, esto es solo el punto de partida. */
+  resolucionRellenoMmPorDefecto: number;
 }
 
 /** Lado más largo del objeto recién subido, en mm — el operario ajusta el
@@ -64,6 +70,7 @@ export function SubirObjetoDropzone({
   onAgregar,
   siguientePosicion,
   bibliotecaSvg,
+  resolucionRellenoMmPorDefecto,
 }: SubirObjetoDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [sobreZona, setSobreZona] = useState(false);
@@ -116,7 +123,7 @@ export function SubirObjetoDropzone({
       espejadoH: false,
       espejadoV: false,
       materialProduccion: null,
-      resolucionRellenoMm: 0.3,
+      resolucionRellenoMm: resolucionRellenoMmPorDefecto,
       toolpath: {},
       visible: true,
     });
@@ -149,7 +156,7 @@ export function SubirObjetoDropzone({
         espejadoH: false,
         espejadoV: false,
         materialProduccion: null,
-        resolucionRellenoMm: 0.3,
+        resolucionRellenoMm: resolucionRellenoMmPorDefecto,
         toolpath: {},
         visible: true,
       });

@@ -160,6 +160,11 @@ interface EditorLienzoProps {
    * Vectorial" -- se pasan al panel "Subir" para poder reusar uno en vez
    * de resubir el archivo. */
   bibliotecaSvg: SvgBibliotecaItem[];
+  /** Punto focal real del láser (`MachineConfig.punto_focal_mm`, página
+   * "Máquina") -- default de `resolucionRellenoMm` al subir un SVG nuevo,
+   * ver `SubirObjetoDropzone`. Antes era un 0.3mm fijo sin relación con la
+   * máquina real. */
+  puntoFocalMm: number;
 }
 
 /** `corte` sigue el outline del diseño; `grabado` es el relleno detallado —
@@ -227,6 +232,7 @@ export function EditorLienzo({
   areaTrabajoAltoMm,
   proyectoInicial = null,
   bibliotecaSvg,
+  puntoFocalMm,
 }: EditorLienzoProps) {
   const router = useRouter();
   const [montado, setMontado] = useState(false);
@@ -1628,6 +1634,7 @@ export function EditorLienzo({
               onAgregar={agregarObjeto}
               siguientePosicion={siguientePosicion}
               bibliotecaSvg={bibliotecaSvg}
+              resolucionRellenoMmPorDefecto={puntoFocalMm}
             />
           }
           contenidoCapas={

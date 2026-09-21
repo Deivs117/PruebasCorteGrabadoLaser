@@ -46,6 +46,7 @@ export default async function EditorDeDiseno({
     <EditorLienzo
       areaTrabajoAnchoMm={Number(maquina.areaTrabajoAnchoMm)}
       areaTrabajoAltoMm={Number(maquina.areaTrabajoAltoMm)}
+      puntoFocalMm={Number(maquina.puntoFocalMm)}
       proyectoInicial={
         proyecto
           ? {
