@@ -17,6 +17,10 @@ const parametrosOperacionSchema = z
     fichaGrupoId: z.string().optional(),
     fichaBajaGrupoId: z.string().optional(),
     fichaAltaGrupoId: z.string().optional(),
+    // Pasadas de corte -- sin declararla acá, reabrir un proyecto guardado
+    // pierde el valor elegido igual que pasaba con las Fichas (ver el
+    // comentario de arriba).
+    pasadas: z.number().int().gt(0).optional(),
   })
   .refine(
     (p) =>

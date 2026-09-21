@@ -15,6 +15,10 @@ const parametrosOperacionSchema = z
     potenciaPct: z.number().int().gt(0).lte(100).optional(),
     potenciaBajaPct: z.number().int().gte(0).lte(100).optional(),
     potenciaAltaPct: z.number().int().gt(0).lte(100).optional(),
+    // Solo tiene efecto en la operación "corte" (ver `apps/api/main.py`,
+    // `ParametrosOperacionBody.pasadas`) -- se acepta igual en "grabado"
+    // para no bifurcar el schema por operación.
+    pasadas: z.number().int().gt(0).optional(),
   })
   .refine(
     (p) =>
