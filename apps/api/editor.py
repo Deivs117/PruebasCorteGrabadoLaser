@@ -141,6 +141,12 @@ def _gcode_de_objeto_por_operacion(objeto: dict, machine: MachineConfig) -> list
                 x_offset_mm=x_offset_mm,
                 y_offset_mm=y_offset_mm,
                 angulo_rad=angulo_rad,
+                # `pasadas` solo tiene efecto sobre el contorno (corte) --
+                # `convertir_svg_texto_a_gcode` lo ignora en modo "relleno".
+                # Default 1 si el objeto (persistido antes de esta feature)
+                # no trae el campo todavia, o lo trae en `None` explicito
+                # (`ParametrosOperacionBody.pasadas` es opcional).
+                pasadas=params.get("pasadas") or 1,
             )
             bloques.append((Operacion(operacion), gcode))
         return bloques

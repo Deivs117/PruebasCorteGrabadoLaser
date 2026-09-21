@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 
 from laser_toolkit.config import MachineConfig
+from laser_toolkit.gcode.writer import sobrerecorrido_mm
 from laser_toolkit.svg.fill import Segmento
 from laser_toolkit.svg.geometry import Subpath
 
@@ -24,9 +25,19 @@ def gcode_contorno(
     velocidad_mm_min: int,
     potencia_pct: int,
     machine: MachineConfig,
+    pasadas: int = 1,
 ) -> list[str]:
     """G-code que traza el contorno de cada subpath (cerrando solo los que
-    `Subpath.cerrado` marca como tales)."""
+    `Subpath.cerrado` marca como tales), repitiendo cada uno `pasadas` veces
+    (issue: el corte del editor no soportaba varias pasadas, a diferencia del
+    corte de Suites/`cortar_cuadrado` -- MDF de 3mm real necesita 2 pasadas a
+    100% de potencia para cortar de punta a punta, una sola no alcanza).
+    Cada subpath se recorre por completo `pasadas` veces antes de pasar al
+    siguiente, para no ir y volver de un lado al otro del dibujo entre
+    pasadas."""
+    if pasadas < 1:
+        raise ValueError("pasadas debe ser al menos 1")
+
     s = _valor_s(potencia_pct, machine)
     lineas: list[str] = []
 
@@ -38,11 +49,17 @@ def gcode_contorno(
             puntos.append(puntos[0])
 
         x0, y0 = puntos[0]
-        lineas.append(f"G0 X{x0 + x_offset_mm:.3f} Y{y0 + y_offset_mm:.3f} F{machine.travel_feed_mm_min}")
-        lineas.append(f"M4 S{s}")
-        for x, y in puntos[1:]:
-            lineas.append(f"G1 X{x + x_offset_mm:.3f} Y{y + y_offset_mm:.3f} F{velocidad_mm_min}")
-        lineas.append("M5")
+        for pasada in range(pasadas):
+            lineas.append(f"G0 X{x0 + x_offset_mm:.3f} Y{y0 + y_offset_mm:.3f} F{machine.travel_feed_mm_min}")
+            lineas.append(f"M4 S{s}")
+            for x, y in puntos[1:]:
+                lineas.append(f"G1 X{x + x_offset_mm:.3f} Y{y + y_offset_mm:.3f} F{velocidad_mm_min}")
+            lineas.append("M5")
+            if pasada < pasadas - 1:
+                lineas.append(
+                    f"; pasada {pasada + 2}/{pasadas}: aplicar z_step_mm de la configuracion "
+                    "(ajuste manual de Z o G-code M-code segun el firmware)"
+                )
 
     return lineas
 
@@ -56,14 +73,28 @@ def gcode_relleno(
     machine: MachineConfig,
 ) -> list[str]:
     """G-code que graba cada segmento horizontal de relleno como una pasada
-    independiente (G0 al inicio del segmento, M4, G1 al final, M5)."""
+    independiente, con sobre-recorrido (`sobrerecorrido_mm`, laser apagado)
+    a cada lado del segmento real -- mismo mecanismo, y misma razon, que
+    `laser_toolkit.gcode.writer.grabar_relleno`/`laser_toolkit.raster.gcode.
+    gcode_grabado_raster`: sin esto, la maquina arranca y frena en seco
+    justo en el borde real del trazo, y el borde queda sobre-quemado
+    (mas tiempo cerca de velocidad cero justo donde el laser esta prendido).
+    Cada `Segmento` de `generar_segmentos_relleno` ya viene horizontal
+    (misma Y en ambos puntos, `x1 <= x2`), asi que extender el
+    sobre-recorrido es una simple resta/suma en X."""
     s = _valor_s(potencia_pct, machine)
+    overscan_mm = sobrerecorrido_mm(velocidad_mm_min, machine)
     lineas: list[str] = []
 
-    for (x1, y1), (x2, y2) in segmentos:
-        lineas.append(f"G0 X{x1 + x_offset_mm:.3f} Y{y1 + y_offset_mm:.3f} F{machine.travel_feed_mm_min}")
-        lineas.append(f"M4 S{s}")
-        lineas.append(f"G1 X{x2 + x_offset_mm:.3f} Y{y2 + y_offset_mm:.3f} F{velocidad_mm_min}")
+    for (x1, y), (x2, _y2) in segmentos:
+        x_entrada = x1 - overscan_mm + x_offset_mm
+        x_salida = x2 + overscan_mm + x_offset_mm
+        y_abs = y + y_offset_mm
+        lineas.append(f"G0 X{x_entrada:.3f} Y{y_abs:.3f} F{machine.travel_feed_mm_min}")
+        lineas.append("M4 S0")
+        lineas.append(f"G1 X{x1 + x_offset_mm:.3f} Y{y_abs:.3f} F{velocidad_mm_min} S0")
+        lineas.append(f"G1 X{x2 + x_offset_mm:.3f} Y{y_abs:.3f} F{velocidad_mm_min} S{s}")
+        lineas.append(f"G1 X{x_salida:.3f} Y{y_abs:.3f} F{velocidad_mm_min} S0")
         lineas.append("M5")
 
     return lineas
