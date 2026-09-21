@@ -502,6 +502,11 @@ class ParametrosOperacionBody(BaseModel):
     fichaGrupoId: str | None = None
     fichaBajaGrupoId: str | None = None
     fichaAltaGrupoId: str | None = None
+    # Pasadas de corte (issue: el corte del editor no soportaba varias
+    # pasadas) -- solo tiene efecto real en la operacion "corte" de un
+    # objeto SVG (`_gcode_de_objeto` en editor.py); se acepta igual en
+    # "grabado" para no reventar el body, pero se ignora ahi.
+    pasadas: int | None = None
 
 
 class ObjetoExportarBody(BaseModel):

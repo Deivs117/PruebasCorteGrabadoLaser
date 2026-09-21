@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import date
 
 from laser_toolkit.config import SuiteConfig
+from laser_toolkit.gcode.estimar_tiempo import estimar_duracion_s
 from laser_toolkit.gcode.grid import construir_grilla
 from laser_toolkit.gcode.timing import tiempo_grabado_celda_s
 from laser_toolkit.gcode.writer import (
@@ -77,13 +78,13 @@ def generar_suite_grabado(config: SuiteConfig) -> tuple[list[str], list[dict]]:
     fecha = config.fecha or date.today().isoformat()
     corrida_id = nombre_base(config)
 
-    gcode = encabezado(f"Suite de GRABADO -- {config.material} {config.espesor_mm}mm -- lote {config.lote}")
+    cuerpo: list[str] = []
     filas: list[dict] = []
     margen_etiqueta_mm, alto_etiqueta_mm = tamano_etiqueta_mm(config.espaciado_mm)
 
     for celda in celdas:
         if subpaths_svg is not None:
-            gcode += _gcode_svg_celda(
+            cuerpo += _gcode_svg_celda(
                 subpaths_svg, celda.x_mm, celda.y_mm, celda.velocidad_mm_min, celda.potencia_pct, config
             )
             tiempo_s = tiempo_estimado_svg_s(
@@ -97,10 +98,10 @@ def generar_suite_grabado(config: SuiteConfig) -> tuple[list[str], list[dict]]:
             # del modulo (Config.machine.punto_focal_mm): un paso mas ancho deja
             # franjas sin quemar entre lineas, uno mas angosto solo duplica el
             # tiempo de maquina sin grabar mas oscuro.
-            gcode += grabar_relleno(celda, config.machine, resolucion_linea_mm=config.machine.punto_focal_mm)
+            cuerpo += grabar_relleno(celda, config.machine, resolucion_linea_mm=config.machine.punto_focal_mm)
             tiempo_s = tiempo_grabado_celda_s(celda, resolucion_linea_mm=config.machine.punto_focal_mm)
 
-        gcode += grabar_etiqueta(
+        cuerpo += grabar_etiqueta(
             celda.id,
             x_mm=celda.x_mm,
             # Arriba de la celda (dentro del espaciado hacia la fila siguiente): a
@@ -135,5 +136,11 @@ def generar_suite_grabado(config: SuiteConfig) -> tuple[list[str], list[dict]]:
             }
         )
 
-    gcode += pie()
+    cuerpo += pie()
+    duracion_estimada_s = estimar_duracion_s(cuerpo, config.machine)
+    gcode = encabezado(
+        f"Suite de GRABADO -- {config.material} {config.espesor_mm}mm -- lote {config.lote}",
+        duracion_estimada_s,
+    )
+    gcode += cuerpo
     return gcode, filas

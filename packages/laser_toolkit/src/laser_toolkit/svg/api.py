@@ -93,10 +93,12 @@ def convertir_svg_a_gcode(
     x_offset_mm: float = 0.0,
     y_offset_mm: float = 0.0,
     angulo_rad: float = 0.0,
+    pasadas: int = 1,
 ) -> list[str]:
     """Convierte un SVG en lineas de G-code, lista para escribir a un archivo
     `.gcode` o insertar dentro de una suite mas grande (ver
-    `laser_toolkit.suites.engrave`)."""
+    `laser_toolkit.suites.engrave`). `pasadas` solo afecta el contorno, ver
+    `convertir_svg_texto_a_gcode`."""
     subpaths = cargar_subpaths_svg(ruta_svg, ancho_mm, alto_mm, angulo_rad=angulo_rad)
     return _gcode_desde_subpaths(
         subpaths,
@@ -107,6 +109,7 @@ def convertir_svg_a_gcode(
         machine,
         modo,
         resolucion_relleno_mm,
+        pasadas,
     )
 
 
@@ -122,11 +125,16 @@ def convertir_svg_texto_a_gcode(
     x_offset_mm: float = 0.0,
     y_offset_mm: float = 0.0,
     angulo_rad: float = 0.0,
+    pasadas: int = 1,
 ) -> list[str]:
     """Igual que `convertir_svg_a_gcode`, a partir del contenido SVG ya en
     memoria -- la pieza que le faltaba al editor de diseño (#3/#16) para
     poder exportar un objeto SVG posicionado sin pasar por un archivo en
-    disco (generación en `apps/api`, función serverless de Vercel)."""
+    disco (generación en `apps/api`, función serverless de Vercel).
+
+    `pasadas` solo tiene efecto sobre el CONTORNO (`gcode_contorno`) -- el
+    relleno (`gcode_relleno`) siempre se graba una sola vez, no es una
+    operacion de corte que necesite repetirse."""
     subpaths = cargar_subpaths_svg_texto(contenido_svg, ancho_mm, alto_mm, angulo_rad=angulo_rad)
     return _gcode_desde_subpaths(
         subpaths,
@@ -137,6 +145,7 @@ def convertir_svg_texto_a_gcode(
         machine,
         modo,
         resolucion_relleno_mm,
+        pasadas,
     )
 
 
@@ -149,10 +158,13 @@ def _gcode_desde_subpaths(
     machine: MachineConfig,
     modo: ModoGrabadoSvg,
     resolucion_relleno_mm: float,
+    pasadas: int = 1,
 ) -> list[str]:
     gcode: list[str] = []
     if modo in (ModoGrabadoSvg.CONTORNO, ModoGrabadoSvg.CONTORNO_Y_RELLENO):
-        gcode += gcode_contorno(subpaths, x_offset_mm, y_offset_mm, velocidad_mm_min, potencia_pct, machine)
+        gcode += gcode_contorno(
+            subpaths, x_offset_mm, y_offset_mm, velocidad_mm_min, potencia_pct, machine, pasadas
+        )
     if modo in (ModoGrabadoSvg.RELLENO, ModoGrabadoSvg.CONTORNO_Y_RELLENO):
         segmentos = generar_segmentos_relleno(subpaths, resolucion_relleno_mm)
         gcode += gcode_relleno(segmentos, x_offset_mm, y_offset_mm, velocidad_mm_min, potencia_pct, machine)
