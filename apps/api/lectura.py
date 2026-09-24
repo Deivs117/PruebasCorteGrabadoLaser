@@ -660,18 +660,20 @@ def _totales_por_material(sesion: Session) -> list[dict]:
       automáticamente por la suite/final run -- siempre presente en toda
       celda de corte; 0.0 en grabado por diseño (no corta/consume material,
       ver `costos.costo_material`).
-    - `tiempoS`/`kwhTotal`: la mayoría de las celdas nunca pasan por Costeo
-      (esa es la lectura MANUAL del medidor/cronómetro de la corrida
-      completa) -- exigir esa medición real dejaba la inmensa mayoría de
-      "pruebas ya hechas" fuera del total, que es justo lo que este ticket
-      pide evitar. Por celda: si hay medición real
-      (`tiempo_maquina_celda_s`/`kwh_celda`, prorrateo de
-      `calcular_y_guardar_costos_registro`) se usa esa; si no, se cae al
-      estimado (`tiempo_estimado_celda_s`, siempre generado, y
-      `costos.kwh_estimado_celda`, la misma "estimación de respaldo" que ya
-      usa Costeo cuando no hay lectura del medidor ese día). `nCeldasMedidas`
-      cuenta cuántas de las `nCeldas` son medición real -- el resto del total
-      es estimado.
+    - `tiempoS`/`kwhTotal`: la medición real del medidor/cronómetro
+      (`Registro.kwh_corrida_medido`/`tiempo_real_corrida_s`, Hoja de
+      Registro) se carga ANTES y por separado de Costeo -- Costeo es un paso
+      aparte que además exige tarifas configuradas, y recién ahí prorratea
+      ese dato a `Medicion.kwh_celda`/`tiempo_maquina_celda_s`. Usar solo el
+      valor ya prorrateado (como se hizo en un intento anterior de este
+      mismo fix) ignoraba la medición real de corridas evaluadas pero sin
+      Costeo corrido todavía, que en la práctica es la mayoría. Por eso acá
+      se usa el dato real a nivel de CORRIDA directamente en cuanto existe
+      -- sin pasar por Costeo -- y solo se cae al estimado
+      (`tiempo_estimado_celda_s`, siempre generado, + `costos.kwh_estimado_celda`)
+      cuando la corrida todavía no tiene esa medición cargada. `nCeldasMedidas`
+      cuenta cuántas de las `nCeldas` pertenecen a una corrida con medición
+      real -- el resto del total es estimado.
     """
     machine = construir_machine_config(sesion)
     acumulado: dict[str, dict[str, float]] = {}
@@ -681,14 +683,16 @@ def _totales_por_material(sesion: Session) -> list[dict]:
             material,
             {"area_material_mm2": 0.0, "tiempo_s": 0.0, "kwh_total": 0.0, "n_celdas": 0, "n_celdas_medidas": 0},
         )
-        for medicion in registro.mediciones:
-            entrada["area_material_mm2"] += medicion.area_material_mm2
-            entrada["n_celdas"] += 1
-            if medicion.tiempo_maquina_celda_s is not None and medicion.kwh_celda is not None:
-                entrada["tiempo_s"] += medicion.tiempo_maquina_celda_s
-                entrada["kwh_total"] += medicion.kwh_celda
-                entrada["n_celdas_medidas"] += 1
-            else:
+        n_celdas_registro = len(registro.mediciones)
+        entrada["area_material_mm2"] += sum(m.area_material_mm2 for m in registro.mediciones)
+        entrada["n_celdas"] += n_celdas_registro
+
+        if registro.kwh_corrida_medido is not None and registro.tiempo_real_corrida_s is not None:
+            entrada["tiempo_s"] += registro.tiempo_real_corrida_s
+            entrada["kwh_total"] += registro.kwh_corrida_medido
+            entrada["n_celdas_medidas"] += n_celdas_registro
+        else:
+            for medicion in registro.mediciones:
                 entrada["tiempo_s"] += medicion.tiempo_estimado_celda_s
                 entrada["kwh_total"] += kwh_estimado_celda(
                     medicion.tiempo_estimado_celda_s, medicion.potencia_pct, machine
