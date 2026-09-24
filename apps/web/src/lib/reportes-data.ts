@@ -39,10 +39,11 @@ export interface TotalPorMaterial {
    * (siempre presente, generada automáticamente por la suite/final run);
    * 0 en grabado por diseño -- no corta/consume material. */
   areaMaterialMm2: string;
-  /** Tiempo/energía acumulados sobre TODAS las celdas: medición real del
-   * medidor/cronómetro (Costeo) cuando existe, si no el estimado de
-   * respaldo que ya usa Costeo cuando falta esa lectura -- `nCeldasMedidas`
-   * dice cuántas de `nCeldas` son medición real (el resto es estimado). */
+  /** Tiempo/energía acumulados sobre TODAS las celdas: medición real de la
+   * corrida (Hoja de Registro -- kWh medido/tiempo real) cuando existe, sin
+   * depender de que Costeo se haya corrido; si no, el estimado de respaldo
+   * -- `nCeldasMedidas` dice cuántas de `nCeldas` son medición real (el
+   * resto es estimado). */
   tiempoS: string;
   kwhTotal: string;
   nCeldas: number;
