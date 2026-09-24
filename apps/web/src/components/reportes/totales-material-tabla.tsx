@@ -37,7 +37,10 @@ export function TotalesMaterialTabla({ totales }: TotalesMaterialTablaProps) {
         </thead>
         <tbody>
           {totales.map((t) => (
-            <tr key={t.material} className="border-border border-b last:border-0">
+            <tr
+              key={t.material}
+              className="border-border border-b last:border-0"
+            >
               <td className="text-navy py-2 pr-4">{t.material}</td>
               <td className="text-navy py-2 pr-4 font-mono">
                 {(Number(t.areaMaterialMm2) / 100).toFixed(1)} cm²
@@ -51,7 +54,10 @@ export function TotalesMaterialTabla({ totales }: TotalesMaterialTablaProps) {
               <td className="text-navy py-2 font-mono">
                 {t.nCeldas}
                 {t.nCeldasCosteadas < t.nCeldas && (
-                  <span className="text-text-muted"> ({t.nCeldasCosteadas} costeadas)</span>
+                  <span className="text-text-muted">
+                    {" "}
+                    ({t.nCeldasCosteadas} costeadas)
+                  </span>
                 )}
               </td>
             </tr>
