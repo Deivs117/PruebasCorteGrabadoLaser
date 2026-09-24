@@ -651,8 +651,10 @@ def reportes_resumen(sesion: Session) -> dict:
 
 def _totales_por_material(sesion: Session) -> list[dict]:
     """Totales acumulados (#209) de TODAS las pruebas realizadas, agrupados
-    por material, sin importar si vienen de una Suite (barrido) o de una
-    FinalRun -- a diferencia de `costo_promedio_por_combo` (promedio) o
+    por material Y operación (corte/grabado por separado -- pedido explícito
+    tras la primera versión de este reporte, que los mezclaba en una sola
+    fila por material), sin importar si vienen de una Suite (barrido) o de
+    una FinalRun -- a diferencia de `costo_promedio_por_combo` (promedio) o
     `serie_kwh_calibrado` (evolución en el tiempo), esto es una suma
     histórica simple.
 
@@ -679,11 +681,11 @@ def _totales_por_material(sesion: Session) -> list[dict]:
       real -- el resto del total es estimado.
     """
     machine = construir_machine_config(sesion)
-    acumulado: dict[str, dict[str, float]] = {}
+    acumulado: dict[tuple[str, str], dict[str, float]] = {}
     for registro in sesion.scalars(select(Registro).options(*_OPCIONES_REGISTRO)):
-        material, _, _ = _contexto_registro(registro)
+        material, _, operacion = _contexto_registro(registro)
         entrada = acumulado.setdefault(
-            material,
+            (material, operacion),
             {"area_ocupada_mm2": 0.0, "tiempo_s": 0.0, "kwh_total": 0.0, "n_celdas": 0, "n_celdas_medidas": 0},
         )
         n_celdas_registro = len(registro.mediciones)
@@ -704,13 +706,14 @@ def _totales_por_material(sesion: Session) -> list[dict]:
     return [
         {
             "material": material,
+            "operacion": operacion,
             "areaOcupadaMm2": str(round(valores["area_ocupada_mm2"], 2)),
             "tiempoS": str(round(valores["tiempo_s"], 1)),
             "kwhTotal": str(round(valores["kwh_total"], 4)),
             "nCeldas": valores["n_celdas"],
             "nCeldasMedidas": valores["n_celdas_medidas"],
         }
-        for material, valores in sorted(acumulado.items())
+        for (material, operacion), valores in sorted(acumulado.items())
     ]
 
 
