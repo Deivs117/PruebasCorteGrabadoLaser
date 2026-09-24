@@ -35,10 +35,11 @@ export interface SerieKwhGrupo {
 
 export interface TotalPorMaterial {
   material: string;
-  /** Área acumulada de material consumida en TODAS las celdas de corte
-   * (siempre presente, generada automáticamente por la suite/final run);
-   * 0 en grabado por diseño -- no corta/consume material. */
-  areaMaterialMm2: string;
+  /** Espacio físico ocupado en la lámina por TODAS las celdas (corte y
+   * grabado por igual, siempre generado) -- deliberadamente NO es el
+   * "material consumido/facturable" de Costeo (ese sigue siendo 0 en
+   * grabado ahí, con razón: no se compra material extra por grabar). */
+  areaOcupadaMm2: string;
   /** Tiempo/energía acumulados sobre TODAS las celdas: medición real de la
    * corrida (Hoja de Registro -- kWh medido/tiempo real) cuando existe, sin
    * depender de que Costeo se haya corrido; si no, el estimado de respaldo
