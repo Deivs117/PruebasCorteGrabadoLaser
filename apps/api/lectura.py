@@ -656,10 +656,13 @@ def _totales_por_material(sesion: Session) -> list[dict]:
     `serie_kwh_calibrado` (evolución en el tiempo), esto es una suma
     histórica simple.
 
-    - `areaMaterialMm2` viene de `Medicion.area_material_mm2`, generada
-      automáticamente por la suite/final run -- siempre presente en toda
-      celda de corte; 0.0 en grabado por diseño (no corta/consume material,
-      ver `costos.costo_material`).
+    - `areaOcupadaMm2` es el espacio físico que ocupó cada celda en la
+      lámina (`Medicion.tamano_celda_mm ** 2`, siempre generado, corte y
+      grabado por igual) -- deliberadamente NO es `Medicion.area_material_mm2`
+      (que en grabado es 0.0 por diseño, ver `costos.costo_material`: esa
+      columna significa "material que se compra/factura", no "espacio que
+      ocupó la prueba", y confundir ambas cosas dejaba el grabado en 0 acá
+      aunque sí haya una geometría real evaluada -- issue reportado en #209).
     - `tiempoS`/`kwhTotal`: la medición real del medidor/cronómetro
       (`Registro.kwh_corrida_medido`/`tiempo_real_corrida_s`, Hoja de
       Registro) se carga ANTES y por separado de Costeo -- Costeo es un paso
@@ -681,10 +684,10 @@ def _totales_por_material(sesion: Session) -> list[dict]:
         material, _, _ = _contexto_registro(registro)
         entrada = acumulado.setdefault(
             material,
-            {"area_material_mm2": 0.0, "tiempo_s": 0.0, "kwh_total": 0.0, "n_celdas": 0, "n_celdas_medidas": 0},
+            {"area_ocupada_mm2": 0.0, "tiempo_s": 0.0, "kwh_total": 0.0, "n_celdas": 0, "n_celdas_medidas": 0},
         )
         n_celdas_registro = len(registro.mediciones)
-        entrada["area_material_mm2"] += sum(m.area_material_mm2 for m in registro.mediciones)
+        entrada["area_ocupada_mm2"] += sum(m.tamano_celda_mm**2 for m in registro.mediciones)
         entrada["n_celdas"] += n_celdas_registro
 
         if registro.kwh_corrida_medido is not None and registro.tiempo_real_corrida_s is not None:
@@ -701,7 +704,7 @@ def _totales_por_material(sesion: Session) -> list[dict]:
     return [
         {
             "material": material,
-            "areaMaterialMm2": str(round(valores["area_material_mm2"], 2)),
+            "areaOcupadaMm2": str(round(valores["area_ocupada_mm2"], 2)),
             "tiempoS": str(round(valores["tiempo_s"], 1)),
             "kwhTotal": str(round(valores["kwh_total"], 4)),
             "nCeldas": valores["n_celdas"],

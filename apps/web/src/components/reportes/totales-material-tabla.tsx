@@ -32,7 +32,7 @@ export function TotalesMaterialTabla({ totales }: TotalesMaterialTablaProps) {
         <thead>
           <tr className="text-text-muted border-border border-b text-xs uppercase">
             <th className="py-2 pr-4 font-medium">Material</th>
-            <th className="py-2 pr-4 font-medium">Material consumido</th>
+            <th className="py-2 pr-4 font-medium">Espacio ocupado</th>
             <th className="py-2 pr-4 font-medium">Tiempo de máquina</th>
             <th className="py-2 pr-4 font-medium">Energía</th>
             <th className="py-2 font-medium">N° celdas</th>
@@ -46,7 +46,7 @@ export function TotalesMaterialTabla({ totales }: TotalesMaterialTablaProps) {
             >
               <td className="text-navy py-2 pr-4">{t.material}</td>
               <td className="text-navy py-2 pr-4 font-mono">
-                {(Number(t.areaMaterialMm2) / 100).toFixed(1)} cm²
+                {(Number(t.areaOcupadaMm2) / 100).toFixed(1)} cm²
               </td>
               <td className="text-navy py-2 pr-4 font-mono">
                 {formatearDuracion(Number(t.tiempoS))}
