@@ -62,9 +62,10 @@ export default async function Reportes() {
               Totales acumulados por material
             </h2>
             <p className="text-text-muted text-xs">
-              Suma de todas las pruebas realizadas -- material consumido
-              siempre, tiempo de máquina y energía solo sobre celdas ya
-              costeadas.
+              Suma de todas las pruebas realizadas, sin importar el origen
+              (Suite o Final Run) -- tiempo/energía usan la medición real cuando
+              existe y si no un estimado de respaldo, para incluir también las
+              corridas sin Costeo cargado.
             </p>
             <TotalesMaterialTabla totales={reportes.totalesPorMaterial} />
           </Card>
