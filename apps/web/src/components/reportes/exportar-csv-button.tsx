@@ -50,7 +50,7 @@ export function ExportarCsvButton({
     const tablaTotales = [
       [
         "Material",
-        "Área de material consumida (mm²)",
+        "Espacio ocupado (mm²)",
         "Tiempo (s)",
         "Energía (kWh)",
         "N° celdas",
@@ -58,7 +58,7 @@ export function ExportarCsvButton({
       ],
       ...totalesPorMaterial.map((t) => [
         t.material,
-        t.areaMaterialMm2,
+        t.areaOcupadaMm2,
         t.tiempoS,
         t.kwhTotal,
         t.nCeldas,
