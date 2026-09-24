@@ -13,7 +13,10 @@ function formatearDuracion(segundos: number): string {
 
 /** Totales acumulados (#209) por material, de TODAS las pruebas realizadas
  * -- a diferencia de `CostoPromedioTabla` (promedio por combo), esto es una
- * suma histórica simple de tiempo/energía/material. */
+ * suma histórica simple de tiempo/energía/material. Tiempo/energía usan la
+ * medición real del medidor cuando existe y si no el estimado de respaldo,
+ * para que ninguna prueba quede afuera del total solo por no tener Costeo
+ * cargado -- "N° celdas" aclara cuántas son medición real. */
 export function TotalesMaterialTabla({ totales }: TotalesMaterialTablaProps) {
   if (totales.length === 0) {
     return (
@@ -46,17 +49,17 @@ export function TotalesMaterialTabla({ totales }: TotalesMaterialTablaProps) {
                 {(Number(t.areaMaterialMm2) / 100).toFixed(1)} cm²
               </td>
               <td className="text-navy py-2 pr-4 font-mono">
-                {formatearDuracion(Number(t.tiempoMaquinaS))}
+                {formatearDuracion(Number(t.tiempoS))}
               </td>
               <td className="text-navy py-2 pr-4 font-mono">
                 {Number(t.kwhTotal).toFixed(3)} kWh
               </td>
               <td className="text-navy py-2 font-mono">
                 {t.nCeldas}
-                {t.nCeldasCosteadas < t.nCeldas && (
+                {t.nCeldasMedidas < t.nCeldas && (
                   <span className="text-text-muted">
                     {" "}
-                    ({t.nCeldasCosteadas} costeadas)
+                    ({t.nCeldasMedidas} medidas, resto estimado)
                   </span>
                 )}
               </td>
