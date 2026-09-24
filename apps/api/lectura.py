@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import statistics
 
+from laser_toolkit.costos import kwh_estimado_celda
 from laser_toolkit.db.models import (
     CandidatoFinalRun,
     EstadoFicha,
@@ -30,7 +31,11 @@ from laser_toolkit.db.repo_calibracion import (
     resumen_calibracion_de_grupo,
 )
 from laser_toolkit.db.repo_materiales import listar_materiales
-from laser_toolkit.db.repo_negocio import obtener_configuracion_maquina, obtener_tarifas_vigentes
+from laser_toolkit.db.repo_negocio import (
+    construir_machine_config,
+    obtener_configuracion_maquina,
+    obtener_tarifas_vigentes,
+)
 from laser_toolkit.db.repo_pruebas import listar_candidatos
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -646,42 +651,57 @@ def reportes_resumen(sesion: Session) -> dict:
 
 def _totales_por_material(sesion: Session) -> list[dict]:
     """Totales acumulados (#209) de TODAS las pruebas realizadas, agrupados
-    por material -- a diferencia de `costo_promedio_por_combo` (promedio) o
+    por material, sin importar si vienen de una Suite (barrido) o de una
+    FinalRun -- a diferencia de `costo_promedio_por_combo` (promedio) o
     `serie_kwh_calibrado` (evolución en el tiempo), esto es una suma
     histórica simple.
 
     - `areaMaterialMm2` viene de `Medicion.area_material_mm2`, generada
-      automáticamente por la suite/final run -- siempre presente, en toda
-      celda.
-    - `tiempoMaquinaS`/`kwhTotal` vienen de `tiempo_maquina_celda_s`/
-      `kwh_celda`, el prorrateo de la medición manual de la corrida
-      completa (`calcular_y_guardar_costos_registro`) -- NULL hasta que se
-      complete el costeo, por eso `nCeldasCosteadas` puede ser menor que
-      `nCeldas` y ambas sumas solo cuentan celdas ya costeadas.
+      automáticamente por la suite/final run -- siempre presente en toda
+      celda de corte; 0.0 en grabado por diseño (no corta/consume material,
+      ver `costos.costo_material`).
+    - `tiempoS`/`kwhTotal`: la mayoría de las celdas nunca pasan por Costeo
+      (esa es la lectura MANUAL del medidor/cronómetro de la corrida
+      completa) -- exigir esa medición real dejaba la inmensa mayoría de
+      "pruebas ya hechas" fuera del total, que es justo lo que este ticket
+      pide evitar. Por celda: si hay medición real
+      (`tiempo_maquina_celda_s`/`kwh_celda`, prorrateo de
+      `calcular_y_guardar_costos_registro`) se usa esa; si no, se cae al
+      estimado (`tiempo_estimado_celda_s`, siempre generado, y
+      `costos.kwh_estimado_celda`, la misma "estimación de respaldo" que ya
+      usa Costeo cuando no hay lectura del medidor ese día). `nCeldasMedidas`
+      cuenta cuántas de las `nCeldas` son medición real -- el resto del total
+      es estimado.
     """
+    machine = construir_machine_config(sesion)
     acumulado: dict[str, dict[str, float]] = {}
     for registro in sesion.scalars(select(Registro).options(*_OPCIONES_REGISTRO)):
         material, _, _ = _contexto_registro(registro)
         entrada = acumulado.setdefault(
             material,
-            {"area_material_mm2": 0.0, "tiempo_maquina_s": 0.0, "kwh_total": 0.0, "n_celdas": 0, "n_celdas_costeadas": 0},
+            {"area_material_mm2": 0.0, "tiempo_s": 0.0, "kwh_total": 0.0, "n_celdas": 0, "n_celdas_medidas": 0},
         )
         for medicion in registro.mediciones:
             entrada["area_material_mm2"] += medicion.area_material_mm2
             entrada["n_celdas"] += 1
             if medicion.tiempo_maquina_celda_s is not None and medicion.kwh_celda is not None:
-                entrada["tiempo_maquina_s"] += medicion.tiempo_maquina_celda_s
+                entrada["tiempo_s"] += medicion.tiempo_maquina_celda_s
                 entrada["kwh_total"] += medicion.kwh_celda
-                entrada["n_celdas_costeadas"] += 1
+                entrada["n_celdas_medidas"] += 1
+            else:
+                entrada["tiempo_s"] += medicion.tiempo_estimado_celda_s
+                entrada["kwh_total"] += kwh_estimado_celda(
+                    medicion.tiempo_estimado_celda_s, medicion.potencia_pct, machine
+                )
 
     return [
         {
             "material": material,
             "areaMaterialMm2": str(round(valores["area_material_mm2"], 2)),
-            "tiempoMaquinaS": str(round(valores["tiempo_maquina_s"], 1)),
+            "tiempoS": str(round(valores["tiempo_s"], 1)),
             "kwhTotal": str(round(valores["kwh_total"], 4)),
             "nCeldas": valores["n_celdas"],
-            "nCeldasCosteadas": valores["n_celdas_costeadas"],
+            "nCeldasMedidas": valores["n_celdas_medidas"],
         }
         for material, valores in sorted(acumulado.items())
     ]
