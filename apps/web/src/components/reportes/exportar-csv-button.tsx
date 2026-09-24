@@ -51,18 +51,18 @@ export function ExportarCsvButton({
       [
         "Material",
         "Área de material consumida (mm²)",
-        "Tiempo de máquina (s)",
+        "Tiempo (s)",
         "Energía (kWh)",
         "N° celdas",
-        "N° celdas costeadas",
+        "N° celdas con medición real (resto estimado)",
       ],
       ...totalesPorMaterial.map((t) => [
         t.material,
         t.areaMaterialMm2,
-        t.tiempoMaquinaS,
+        t.tiempoS,
         t.kwhTotal,
         t.nCeldas,
-        t.nCeldasCosteadas,
+        t.nCeldasMedidas,
       ]),
     ];
     const csv = [...tablaCombos, [], ...tablaTotales]

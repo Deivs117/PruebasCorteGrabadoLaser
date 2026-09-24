@@ -35,15 +35,18 @@ export interface SerieKwhGrupo {
 
 export interface TotalPorMaterial {
   material: string;
-  /** Área acumulada de material consumida en TODAS las celdas (siempre
-   * presente, generada automáticamente por la suite/final run). */
+  /** Área acumulada de material consumida en TODAS las celdas de corte
+   * (siempre presente, generada automáticamente por la suite/final run);
+   * 0 en grabado por diseño -- no corta/consume material. */
   areaMaterialMm2: string;
-  /** Tiempo/energía reales acumulados -- solo cuentan las celdas ya
-   * costeadas (`nCeldasCosteadas` puede ser menor que `nCeldas`). */
-  tiempoMaquinaS: string;
+  /** Tiempo/energía acumulados sobre TODAS las celdas: medición real del
+   * medidor/cronómetro (Costeo) cuando existe, si no el estimado de
+   * respaldo que ya usa Costeo cuando falta esa lectura -- `nCeldasMedidas`
+   * dice cuántas de `nCeldas` son medición real (el resto es estimado). */
+  tiempoS: string;
   kwhTotal: string;
   nCeldas: number;
-  nCeldasCosteadas: number;
+  nCeldasMedidas: number;
 }
 
 export interface ReportesResumen {
