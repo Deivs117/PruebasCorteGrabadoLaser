@@ -33,9 +33,23 @@ export interface SerieKwhGrupo {
   puntos: PuntoSerieKwh[];
 }
 
+export interface TotalPorMaterial {
+  material: string;
+  /** Área acumulada de material consumida en TODAS las celdas (siempre
+   * presente, generada automáticamente por la suite/final run). */
+  areaMaterialMm2: string;
+  /** Tiempo/energía reales acumulados -- solo cuentan las celdas ya
+   * costeadas (`nCeldasCosteadas` puede ser menor que `nCeldas`). */
+  tiempoMaquinaS: string;
+  kwhTotal: string;
+  nCeldas: number;
+  nCeldasCosteadas: number;
+}
+
 export interface ReportesResumen {
   costoPromedioPorCombo: CostoPromedioCombo[];
   serieKwhCalibrado: SerieKwhGrupo[];
+  totalesPorMaterial: TotalPorMaterial[];
   totales: {
     nCorridas: number;
     costoAcumulado: string;

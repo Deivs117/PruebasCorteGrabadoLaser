@@ -7,6 +7,7 @@ import { CostoPromedioTabla } from "@/components/reportes/costo-promedio-tabla";
 import { ExportarCsvButton } from "@/components/reportes/exportar-csv-button";
 import { ExportarPdfButton } from "@/components/fichas/exportar-pdf-button";
 import { KwhEvolucionChart } from "@/components/reportes/kwh-evolucion-chart";
+import { TotalesMaterialTabla } from "@/components/reportes/totales-material-tabla";
 import { leerReportes } from "@/lib/reportes-data";
 import { leerTarifas } from "@/lib/tarifas-data";
 
@@ -22,7 +23,8 @@ export default async function Reportes() {
   const moneda = tarifas.moneda || "?";
   const sinDatos =
     reportes.costoPromedioPorCombo.length === 0 &&
-    reportes.serieKwhCalibrado.length === 0;
+    reportes.serieKwhCalibrado.length === 0 &&
+    reportes.totalesPorMaterial.length === 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -38,7 +40,10 @@ export default async function Reportes() {
         </div>
         {!sinDatos && (
           <div className="flex gap-2">
-            <ExportarCsvButton combos={reportes.costoPromedioPorCombo} />
+            <ExportarCsvButton
+              combos={reportes.costoPromedioPorCombo}
+              totalesPorMaterial={reportes.totalesPorMaterial}
+            />
             <ExportarPdfButton />
           </div>
         )}
@@ -52,6 +57,18 @@ export default async function Reportes() {
         />
       ) : (
         <div data-reportes-imprimible className="flex flex-col gap-6">
+          <Card className="flex flex-col gap-4 p-6">
+            <h2 className="text-navy text-lg font-semibold">
+              Totales acumulados por material
+            </h2>
+            <p className="text-text-muted text-xs">
+              Suma de todas las pruebas realizadas -- material consumido
+              siempre, tiempo de máquina y energía solo sobre celdas ya
+              costeadas.
+            </p>
+            <TotalesMaterialTabla totales={reportes.totalesPorMaterial} />
+          </Card>
+
           <Card className="flex flex-col gap-4 p-6">
             <div className="flex items-baseline justify-between gap-4">
               <h2 className="text-navy text-lg font-semibold">

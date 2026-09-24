@@ -3,10 +3,11 @@
 import { Button } from "@/components/ui/button";
 import { DownloadAnimado } from "@/components/ui/icons/download-animado";
 import { guardarBlobComoArchivo } from "@/lib/descargar-archivo";
-import type { CostoPromedioCombo } from "@/lib/reportes-data";
+import type { CostoPromedioCombo, TotalPorMaterial } from "@/lib/reportes-data";
 
 interface ExportarCsvButtonProps {
   combos: CostoPromedioCombo[];
+  totalesPorMaterial: TotalPorMaterial[];
 }
 
 /** Escapa una celda para CSV (RFC 4180) -- comillas dobles si el valor trae
@@ -19,32 +20,56 @@ function celdaCsv(valor: string | number): string {
 }
 
 /**
- * "Exportar a Excel" del Prompt 11 -- CSV, que Excel abre nativamente. La
- * tabla resumen exportable es la de costo promedio por combinación; la
- * serie de kWh en el tiempo es para lectura visual, no para exportar fila
- * por fila acá.
+ * "Exportar a Excel" del Prompt 11 -- CSV, que Excel abre nativamente. Dos
+ * tablas exportables en el mismo archivo (separadas por línea en blanco,
+ * Excel las abre igual en una sola hoja): costo promedio por combinación y,
+ * desde #209, totales acumulados por material. La serie de kWh en el
+ * tiempo es para lectura visual, no para exportar fila por fila acá.
  */
-export function ExportarCsvButton({ combos }: ExportarCsvButtonProps) {
+export function ExportarCsvButton({
+  combos,
+  totalesPorMaterial,
+}: ExportarCsvButtonProps) {
   async function exportar() {
-    const encabezado = [
-      "Material",
-      "Espesor (mm)",
-      "Operación",
-      "Costo promedio por celda",
-      "N° celdas",
+    const tablaCombos = [
+      [
+        "Material",
+        "Espesor (mm)",
+        "Operación",
+        "Costo promedio por celda",
+        "N° celdas",
+      ],
+      ...combos.map((c) => [
+        c.material,
+        c.espesorMm,
+        c.operacion,
+        c.costoPromedioCelda,
+        c.nCeldas,
+      ]),
     ];
-    const filas = combos.map((c) => [
-      c.material,
-      c.espesorMm,
-      c.operacion,
-      c.costoPromedioCelda,
-      c.nCeldas,
-    ]);
-    const csv = [encabezado, ...filas]
+    const tablaTotales = [
+      [
+        "Material",
+        "Área de material consumida (mm²)",
+        "Tiempo de máquina (s)",
+        "Energía (kWh)",
+        "N° celdas",
+        "N° celdas costeadas",
+      ],
+      ...totalesPorMaterial.map((t) => [
+        t.material,
+        t.areaMaterialMm2,
+        t.tiempoMaquinaS,
+        t.kwhTotal,
+        t.nCeldas,
+        t.nCeldasCosteadas,
+      ]),
+    ];
+    const csv = [...tablaCombos, [], ...tablaTotales]
       .map((fila) => fila.map(celdaCsv).join(","))
       .join("\r\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    await guardarBlobComoArchivo(blob, "reportes-costo-promedio.csv");
+    await guardarBlobComoArchivo(blob, "reportes.csv");
   }
 
   return (
@@ -52,7 +77,7 @@ export function ExportarCsvButton({ combos }: ExportarCsvButtonProps) {
       variant="outline"
       size="sm"
       onClick={exportar}
-      disabled={combos.length === 0}
+      disabled={combos.length === 0 && totalesPorMaterial.length === 0}
     >
       <DownloadAnimado className="size-4" strokeWidth={1.75} />
       Exportar a Excel (CSV)

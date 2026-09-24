@@ -636,11 +636,55 @@ def reportes_resumen(sesion: Session) -> dict:
     return {
         "costoPromedioPorCombo": costo_promedio_por_combo,
         "serieKwhCalibrado": serie_kwh_calibrado,
+        "totalesPorMaterial": _totales_por_material(sesion),
         "totales": {
             "nCorridas": n_corridas,
             "costoAcumulado": str(round(costo_acumulado, 2)),
         },
     }
+
+
+def _totales_por_material(sesion: Session) -> list[dict]:
+    """Totales acumulados (#209) de TODAS las pruebas realizadas, agrupados
+    por material -- a diferencia de `costo_promedio_por_combo` (promedio) o
+    `serie_kwh_calibrado` (evolución en el tiempo), esto es una suma
+    histórica simple.
+
+    - `areaMaterialMm2` viene de `Medicion.area_material_mm2`, generada
+      automáticamente por la suite/final run -- siempre presente, en toda
+      celda.
+    - `tiempoMaquinaS`/`kwhTotal` vienen de `tiempo_maquina_celda_s`/
+      `kwh_celda`, el prorrateo de la medición manual de la corrida
+      completa (`calcular_y_guardar_costos_registro`) -- NULL hasta que se
+      complete el costeo, por eso `nCeldasCosteadas` puede ser menor que
+      `nCeldas` y ambas sumas solo cuentan celdas ya costeadas.
+    """
+    acumulado: dict[str, dict[str, float]] = {}
+    for registro in sesion.scalars(select(Registro).options(*_OPCIONES_REGISTRO)):
+        material, _, _ = _contexto_registro(registro)
+        entrada = acumulado.setdefault(
+            material,
+            {"area_material_mm2": 0.0, "tiempo_maquina_s": 0.0, "kwh_total": 0.0, "n_celdas": 0, "n_celdas_costeadas": 0},
+        )
+        for medicion in registro.mediciones:
+            entrada["area_material_mm2"] += medicion.area_material_mm2
+            entrada["n_celdas"] += 1
+            if medicion.tiempo_maquina_celda_s is not None and medicion.kwh_celda is not None:
+                entrada["tiempo_maquina_s"] += medicion.tiempo_maquina_celda_s
+                entrada["kwh_total"] += medicion.kwh_celda
+                entrada["n_celdas_costeadas"] += 1
+
+    return [
+        {
+            "material": material,
+            "areaMaterialMm2": str(round(valores["area_material_mm2"], 2)),
+            "tiempoMaquinaS": str(round(valores["tiempo_maquina_s"], 1)),
+            "kwhTotal": str(round(valores["kwh_total"], 4)),
+            "nCeldas": valores["n_celdas"],
+            "nCeldasCosteadas": valores["n_celdas_costeadas"],
+        }
+        for material, valores in sorted(acumulado.items())
+    ]
 
 
 __all__ = [
