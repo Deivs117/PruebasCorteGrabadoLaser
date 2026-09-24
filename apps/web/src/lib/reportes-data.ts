@@ -35,8 +35,11 @@ export interface SerieKwhGrupo {
 
 export interface TotalPorMaterial {
   material: string;
-  /** Espacio físico ocupado en la lámina por TODAS las celdas (corte y
-   * grabado por igual, siempre generado) -- deliberadamente NO es el
+  /** Una fila por material+operación (corte y grabado nunca se mezclan --
+   * gastan tiempo/energía/espacio de forma muy distinta como para sumarlos
+   * en un solo número). */
+  operacion: "corte" | "grabado";
+  /** Espacio físico ocupado en la lámina -- deliberadamente NO es el
    * "material consumido/facturable" de Costeo (ese sigue siendo 0 en
    * grabado ahí, con razón: no se compra material extra por grabar). */
   areaOcupadaMm2: string;
